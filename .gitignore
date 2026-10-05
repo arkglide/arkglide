@@ -1,0 +1,40 @@
+# 依赖
+node_modules
+.pnp
+.pnp.js
+
+# 构建产物
+dist
+dist-ssr
+*.local
+
+# 构建缓存
+*.tsbuildinfo
+.vite
+
+# IDE / 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+
+# CodeArts Agent / IDE 工作区配置（不上传）
+.arts
+.codeartsdoer
+
+# 误创建的空文件
+nul
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# WASM 编译产物（源码 .d.ts 保留，编译产物忽略）
+src/wasm/*.js
+src/wasm/*.wasm
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
