@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ArkGlide Runtime</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0d0d0d; }
+    #renderCanvas { width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+  </style>
+  <!-- 本地 Babylon UMD（离线可用） -->
+  <script src="/lib/babylon.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    // ===== postMessage 通信（iframe → 编辑器）=====
+    // sandbox="allow-scripts" 无 allow-same-origin → iframe 为 opaque origin
+    // targetOrigin 用 '*'（opaque origin 无法指定），安全靠编辑器端 source 验证
+    var PARENT = window.parent;
+    function sendToEditor(msg) {
+      PARENT.postMessage(msg, '*');
+    }
+
+    // 重写 console.log/warn/error → 转发到编辑器控制台
+    ['log', 'warn', 'error'].forEach(function (level) {
+      var orig = console[level].bind(console);
+      console[level] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        orig.apply(console, args);
+        sendToEditor({ type: 'log', level: level, args: args.map(String) });
+      };
+    });
+
+    // ===== 运行时状态 =====
+    var engine = null, scene = null, camera = null;
+    var lifecycle = null;     // { onStart, onUpdate }（旧模型，向后兼容）
+    var lifecycleInstances = []; // 按实体分发的脚本实例列表：[{ entity, onStart, onUpdate }]
+    var running = false;      // onUpdate 是否激活
+    var initialized = false;  // Babylon 是否已初始化
+
+    // ===== ArkGlide Entity 抽象类 =====
+    // 封装 Babylon Mesh，绝不暴露原始对象给用户脚本
+    function Entity(mesh, entityMap) {
+      this._mesh = mesh;           // 私有：Babylon Mesh（绝不暴露给用户）
+      this._entityMap = entityMap; // 私有：实体表引用（用于 destroy 时清理）
+      this._id = mesh.name;
+    }
+    Entity.prototype.getId = function() { return this._id; };
+    Entity.prototype.getName = function() { return this._mesh.name; };
+    Entity.prototype.setName = function(name) { this._mesh.name = name; };
+    // Transform
+    Entity.prototype.getPosition = function() {
+      return { x: this._mesh.position.x, y: this._mesh.position.y, z: this._mesh.position.z };
+    };
+    Entity.prototype.setPosition = function(x, y, z) { this._mesh.position.set(x, y, z); };
+    Entity.prototype.getRotation = function() {
+      return { x: this._mesh.rotation.x, y: this._mesh.rotation.y, z: this._mesh.rotation.z };
+    };
+    Entity.prototype.setRotation = function(x, y, z) { this._mesh.rotation.set(x, y, z); };
+    Entity.prototype.getScale = function() {
+      return { x: this._mesh.scaling.x, y: this._mesh.scaling.y, z: this._mesh.scaling.z };
+    };
+    Entity.prototype.setScale = function(x, y, z) { this._mesh.scaling.set(x, y, z); };
+    // Visibility
+    Entity.prototype.isVisible = function() { return this._mesh.isVisible; };
+    Entity.prototype.setVisible = function(v) { this._mesh.isVisible = v; };
+    // Lifecycle
+    Entity.prototype.destroy = function() {
+      if (this._mesh) {
+        this._mesh.dispose();
+        this._mesh = null;
+      }
+      if (this._entityMap) {
+        this._entityMap.delete(this._id);
+        this._entityMap = null;
+      }
+    };
+
+    // ===== 属性快捷访问（this.entity.transform.z += 0.05 等）=====
+    // 使用 Object.defineProperty 创建 live wrapper，修改直接反映到 Babylon Mesh
+    Object.defineProperty(Entity.prototype, 'name', {
+      get: function() { return this._mesh.name; },
+      set: function(v) { this._mesh.name = v; },
+      enumerable: true,
+    });
+    Object.defineProperty(Entity.prototype, 'transform', {
+      get: function() {
+        var self = this;
+        return {
+          get x() { return self._mesh.position.x; },
+          set x(v) { self._mesh.position.x = v; },
+          get y() { return self._mesh.position.y; },
+          set y(v) { self._mesh.position.y = v; },
+          get z() { return self._mesh.position.z; },
+          set z(v) { self._mesh.position.z = v; },
+        };
+      },
+      set: function(v) { this._mesh.position.set(v.x, v.y, v.z); },
+      enumerable: true,
+    });
+    Object.defineProperty(Entity.prototype, 'rotation', {
+      get: function() {
+        var self = this;
+        return {
+          get x() { return self._mesh.rotation.x; },
+          set x(v) { self._mesh.rotation.x = v; },
+          get y() { return self._mesh.rotation.y; },
+          set y(v) { self._mesh.rotation.y = v; },
+          get z() { return self._mesh.rotation.z; },
+          set z(v) { self._mesh.rotation.z = v; },
+        };
+      },
+      set: function(v) { this._mesh.rotation.set(v.x, v.y, v.z); },
+      enumerable: true,
+    });
+    Object.defineProperty(Entity.prototype, 'scale', {
+      get: function() {
+        var self = this;
+        return {
+          get x() { return self._mesh.scaling.x; },
+          set x(v) { self._mesh.scaling.x = v; },
+          get y() { return self._mesh.scaling.y; },
+          set y(v) { self._mesh.scaling.y = v; },
+          get z() { return self._mesh.scaling.z; },
+          set z(v) { self._mesh.scaling.z = v; },
+        };
+      },
+      set: function(v) { this._mesh.scaling.set(v.x, v.y, v.z); },
+      enumerable: true,
+    });
+
+    // ===== ArkGlide Input API —— 键盘/鼠标状态追踪 =====
+    var inputState = {
+      _keys: {},          // 当前按下的键
+      _keysPressed: {},   // 本帧新按下的键（边沿检测）
+      _keysReleased: {},  // 本帧释放的键（边沿检测）
+      _mouseX: 0,
+      _mouseY: 0,
+      _mouseDeltaX: 0,
+      _mouseDeltaY: 0,
+      _mouseDown: false,
+      _mousePressed: false,
+      _mouseReleased: false,
+    };
+    var input = {
+      isKeyDown: function(key) { return !!inputState._keys[(key || '').toUpperCase()]; },
+      wasKeyPressed: function(key) { return !!inputState._keysPressed[(key || '').toUpperCase()]; },
+      wasKeyReleased: function(key) { return !!inputState._keysReleased[(key || '').toUpperCase()]; },
+      getMousePosition: function() { return { x: inputState._mouseX, y: inputState._mouseY }; },
+      getMouseDelta: function() { return { x: inputState._mouseDeltaX, y: inputState._mouseDeltaY }; },
+      isMouseDown: function() { return inputState._mouseDown; },
+      wasMousePressed: function() { return inputState._mousePressed; },
+      wasMouseReleased: function() { return inputState._mouseReleased; },
+    };
+
+    // 输入诊断变量
+    var _lastInputLogTime = 0;    // 上次打印按键日志的时间（防抖）
+    var _noKeyWarnTimer = null;   // 10 秒无按键警告定时器
+
+    // ===== 键盘事件监听（绑定到 window，iframe 内捕获）=====
+    window.addEventListener('keydown', function(e) {
+      var key = e.key.toUpperCase();
+      if (!inputState._keys[key]) {
+        inputState._keysPressed[key] = true;
+      }
+      inputState._keys[key] = true;
+
+      // 诊断：防抖打印按键日志（500ms 一次）
+      var now = Date.now();
+      if (now - _lastInputLogTime > 500) {
+        _lastInputLogTime = now;
+        console.log('[ArkGlide Input] Key pressed: ' + key);
+      }
+
+      // 收到按键，取消 10 秒无按键警告
+      if (_noKeyWarnTimer) {
+        clearTimeout(_noKeyWarnTimer);
+        _noKeyWarnTimer = null;
+      }
+
+      // 阻止默认行为（防止 W/A/S/D 滚动页面等）
+      if (['W','A','S','D',' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].indexOf(key) >= 0) {
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', function(e) {
+      var key = e.key.toUpperCase();
+      inputState._keys[key] = false;
+      inputState._keysReleased[key] = true;
+    });
+    // 鼠标事件监听（绑定到 canvas）
+    // 注意：canvas 在 initBabylon 后才存在，所以鼠标监听要在 initBabylon 内部添加
+
+    // ===== ArkGlide Scene API —— 实体管理（不暴露 Babylon Scene）=====
+    var entityMap = new Map(); // id → Entity
+    var sceneAPI = {
+      find: function(id) {
+        var entity = entityMap.get(id);
+        if (!entity) {
+          console.warn('Entity not found: ' + id);
+        }
+        return entity || null;
+      },
+      create: function(type, id) {
+        id = id || (type + '_' + Math.random().toString(36).substr(2, 6));
+        var mesh;
+        switch (type) {
+          case 'box':
+            mesh = BABYLON.MeshBuilder.CreateBox(id, { size: 1 }, scene);
+            break;
+          case 'sphere':
+            mesh = BABYLON.MeshBuilder.CreateSphere(id, { diameter: 1 }, scene);
+            break;
+          case 'plane':
+            mesh = BABYLON.MeshBuilder.CreateGround(id, { width: 1, height: 1 }, scene);
+            break;
+          case 'cylinder':
+            mesh = BABYLON.MeshBuilder.CreateCylinder(id, { height: 1, diameter: 1 }, scene);
+            break;
+          case 'capsule':
+            mesh = BABYLON.MeshBuilder.CreateCapsule(id, { height: 1, radius: 0.5 }, scene);
+            break;
+          case 'torus':
+            mesh = BABYLON.MeshBuilder.CreateTorus(id, { diameter: 1, thickness: 0.3 }, scene);
+            break;
+          default:
+            mesh = BABYLON.MeshBuilder.CreateBox(id, { size: 1 }, scene);
+        }
+        var entity = new Entity(mesh, entityMap);
+        entityMap.set(id, entity);
+        return entity;
+      },
+      findAll: function() { return Array.from(entityMap.values()); },
+      destroy: function(id) {
+        var entity = entityMap.get(id);
+        if (entity) { entity.destroy(); }
+      },
+      destroyAll: function() {
+        entityMap.forEach(function(e) { e.destroy(); });
+        entityMap.clear();
+      },
+      getEntityCount: function() { return entityMap.size; },
+    };
+
+    // ===== ArkGlide Time API —— 帧时间 =====
+    var time = {
+      deltaTime: 0,    // 秒：上一帧到当前帧的时间
+      totalTime: 0,    // 秒：自脚本启动以来的总时间
+      frameCount: 0,   // 帧计数
+    };
+    var _lastFrameTime = 0;
+    var _fpsCap = 60; // 帧率上限，0=无限
+    var _lastRenderTime = 0; // 上次渲染时间戳（用于帧率限制）
+
+    // 将 hex 颜色字符串解析为 {r, g, b}（0-1 范围）
+    // 支持 #RGB 和 #RRGGBB 格式，无效时返回默认值
+    function hexToRgb(hex, defaultR, defaultG, defaultB) {
+      if (!hex || typeof hex !== 'string') return { r: defaultR, g: defaultG, b: defaultB };
+      var h = hex.replace('#', '');
+      if (h.length === 3) {
+        h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      }
+      if (h.length !== 6) return { r: defaultR, g: defaultG, b: defaultB };
+      var r = parseInt(h.substring(0, 2), 16) / 255;
+      var g = parseInt(h.substring(2, 4), 16) / 255;
+      var b = parseInt(h.substring(4, 6), 16) / 255;
+      if (isNaN(r) || isNaN(g) || isNaN(b)) return { r: defaultR, g: defaultG, b: defaultB };
+      return { r: r, g: g, b: b };
+    }
+
+    // 应用项目设置到 Babylon 场景
+    // settings: { gravity, backgroundColor, ambientIntensity, ambientColor, fpsCap }
+    function applySettings(settings) {
+      if (!settings) return; // 无设置则用 initBabylon 默认值
+
+      // 重力
+      if (settings.gravity) {
+        scene.gravity = new BABYLON.Vector3(
+          settings.gravity.x || 0,
+          settings.gravity.y || 0,
+          settings.gravity.z || 0
+        );
+      }
+
+      // 背景色
+      if (settings.backgroundColor) {
+        var bg = hexToRgb(settings.backgroundColor, 0.05, 0.05, 0.05);
+        scene.clearColor = new BABYLON.Color4(bg.r, bg.g, bg.b, 1);
+      }
+
+      // 环境光：查找已有的 hemi 灯，更新强度和颜色
+      var hemi = scene.getLightByName('hemi');
+      if (hemi) {
+        if (typeof settings.ambientIntensity === 'number') {
+          hemi.intensity = settings.ambientIntensity;
+        }
+        if (settings.ambientColor) {
+          var ac = hexToRgb(settings.ambientColor, 1, 1, 1);
+          hemi.diffuse = new BABYLON.Color3(ac.r, ac.g, ac.b);
+        }
+      }
+
+      // 帧率上限：0 = 无限制
+      // Babylon Engine 没有直接 setFpsLimit API
+      // 使用 engine 的 render loop 频率控制：通过自定义时间步长
+      // 简单方案：存到全局变量，在 render loop 中按需跳帧
+      if (typeof settings.fpsCap === 'number') {
+        _fpsCap = settings.fpsCap;
+      }
+    }
+
+    function initBabylon() {
+      if (initialized) return;
+      var canvas = document.getElementById('renderCanvas');
+      engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+      scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0.05, 0.05, 0.05, 1);
+
+      camera = new BABYLON.ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 3, 8, new BABYLON.Vector3(0, 0.5, 0), scene);
+      camera.attachControl(canvas, true);
+      camera.wheelDeltaPercentage = 0.01;
+
+      var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+      hemi.intensity = 0.8;
+
+      // 鼠标事件（在 canvas 获取后添加）
+      canvas.addEventListener('mousedown', function(e) {
+        inputState._mouseDown = true;
+        inputState._mousePressed = true;
+        inputState._mouseX = e.clientX;
+        inputState._mouseY = e.clientY;
+      });
+      canvas.addEventListener('mouseup', function(e) {
+        inputState._mouseDown = false;
+        inputState._mouseReleased = true;
+      });
+      canvas.addEventListener('mousemove', function(e) {
+        if (inputState._mouseDown) {
+          inputState._mouseDeltaX = e.clientX - inputState._mouseX;
+          inputState._mouseDeltaY = e.clientY - inputState._mouseY;
+        }
+        inputState._mouseX = e.clientX;
+        inputState._mouseY = e.clientY;
+      });
+
+      engine.runRenderLoop(function () {
+        // 帧率限制：如果 _fpsCap > 0，按间隔跳帧
+        if (_fpsCap > 0) {
+          var now = performance.now();
+          var minInterval = 1000 / _fpsCap;
+          if (now - _lastRenderTime < minInterval) {
+            return; // 跳过本帧
+          }
+          _lastRenderTime = now;
+        }
+
+        // 更新 time
+        var now = performance.now() / 1000; // 秒
+        if (_lastFrameTime > 0) {
+          time.deltaTime = now - _lastFrameTime;
+        }
+        _lastFrameTime = now;
+        time.totalTime += time.deltaTime;
+        time.frameCount++;
+
+        // 调用 onUpdate（按实体分发：遍历所有实体-脚本实例）
+        if (running) {
+          lifecycleInstances.forEach(function(inst) {
+            try {
+              if (inst.onUpdate) inst.onUpdate.call(inst.instance);
+            } catch (e) {
+              console.error('onUpdate 错误: ' + String((e && e.message) || e));
+            }
+          });
+        }
+
+        // 重置 per-frame input 状态（边沿检测只持续一帧）
+        inputState._keysPressed = {};
+        inputState._keysReleased = {};
+        inputState._mouseDeltaX = 0;
+        inputState._mouseDeltaY = 0;
+        inputState._mousePressed = false;
+        inputState._mouseReleased = false;
+
+        scene.render();
+      });
+
+      window.addEventListener('resize', function () { engine.resize(); });
+      initialized = true;
+    }
+
+    // 创建/同步实体（根据项目节点）—— 用 Entity 包装编辑器场景节点
+    function syncEntities(nodes) {
+      nodes.forEach(function (n) {
+        if (n.type !== 'mesh') return;
+        // 如果已有 Entity，更新位置 + rotation/scale/visible/color
+        var existing = entityMap.get(n.id);
+        if (existing) {
+          existing.setPosition(n.transform.x, n.transform.y, n.transform.z);
+          // 同步 rotation/scale/visible/color
+          var mesh = existing._mesh;
+          if (mesh) {
+            if (n.rotation) mesh.rotation.set(n.rotation.x, n.rotation.y, n.rotation.z);
+            if (n.scale) mesh.scaling.set(n.scale.x, n.scale.y, n.scale.z);
+            if (typeof n.visible === 'boolean') mesh.setEnabled(n.visible);
+            if (n.color) {
+              var mat = mesh.material;
+              if (!mat || mat.name !== n.id + '_mat') {
+                mat = new BABYLON.StandardMaterial(n.id + '_mat', scene);
+                mesh.material = mat;
+              }
+              mat.diffuseColor = BABYLON.Color3.FromHexString(n.color);
+            }
+          }
+          return;
+        }
+        // 创建新 Entity
+        var mesh = n.id === 'cube'
+          ? BABYLON.MeshBuilder.CreateBox(n.id, { size: 1 }, scene)
+          : BABYLON.MeshBuilder.CreateSphere(n.id, { diameter: 1 }, scene);
+        var entity = new Entity(mesh, entityMap);
+        entity.setPosition(n.transform.x, n.transform.y, n.transform.z);
+        // 同步 rotation/scale/visible/color
+        if (n.rotation) mesh.rotation.set(n.rotation.x, n.rotation.y, n.rotation.z);
+        if (n.scale) mesh.scaling.set(n.scale.x, n.scale.y, n.scale.z);
+        if (typeof n.visible === 'boolean') mesh.setEnabled(n.visible);
+        if (n.color) {
+          var mat = new BABYLON.StandardMaterial(n.id + '_mat', scene);
+          mat.diffuseColor = BABYLON.Color3.FromHexString(n.color);
+          mesh.material = mat;
+        }
+        entityMap.set(n.id, entity);
+      });
+      // 调试日志：打印当前场景实体 ID 列表
+      console.log('[ArkGlide] 场景实体已就绪: ' + Array.from(entityMap.keys()).join(', '));
+    }
+
+    // 执行用户脚本（new Function + 生命周期 + try/catch）
+    function runScript(code) {
+      // 注意：entityMap 清理已在 'run' 消息处理中完成（syncEntities 之前）
+      // 此处保留编辑器场景实体，用户脚本可通过 scene.find(id) 访问
+
+      // 重置 time
+      time.deltaTime = 0;
+      time.totalTime = 0;
+      time.frameCount = 0;
+      _lastFrameTime = 0;
+
+      // 重置 input
+      inputState._keys = {};
+      inputState._keysPressed = {};
+      inputState._keysReleased = {};
+      inputState._mouseDown = false;
+      inputState._mousePressed = false;
+      inputState._mouseReleased = false;
+
+      // 启动 10 秒无按键警告定时器
+      if (_noKeyWarnTimer) clearTimeout(_noKeyWarnTimer);
+      _noKeyWarnTimer = setTimeout(function() {
+        console.warn('[ArkGlide Input] No keyboard events received. Iframe might not have focus. Click the viewport to focus.');
+      }, 10000);
+
+      lifecycle = null;
+      running = false;
+
+      try {
+        // 获取默认实体（编辑器场景第一个 mesh）
+        var defaultEntity = entityMap.size > 0 ? entityMap.values().next().value : null;
+
+        // 注入 API：entity（默认实体）, input, scene, time, console
+        var fn = new Function('entity', 'input', 'scene', 'time', 'console', code);
+        var result = fn(defaultEntity, input, sceneAPI, time, console);
+
+        if (result && typeof result === 'object') {
+          lifecycle = result;
+          if (typeof lifecycle.onStart === 'function') {
+            console.log('[ArkGlide] onStart called. onUpdate should follow.');
+            try {
+              lifecycle.onStart();
+            } catch (e) {
+              sendToEditor({ type: 'log', level: 'error', args: ['onStart: ' + String((e && e.message) || e)] });
+            }
+          }
+          running = true;
+        }
+      } catch (e) {
+        sendToEditor({ type: 'fatal', message: String((e && e.message) || e) });
+      }
+    }
+
+    // 执行多脚本：拼接所有脚本为单一 new Function 体，共享同一函数作用域
+    // 非活跃脚本在前（按文件名升序排序），活跃脚本在最后
+    // 只有活跃脚本（最后执行）的 return { onStart, onUpdate } 作为 lifecycle
+    // 非活跃脚本不应有顶层 return（若有会提前退出，属于用户错误）
+    function runScripts(scripts, activeFileId) {
+      // 收集所有文件名并按升序排序
+      var fileNames = Object.keys(scripts).sort();
+      var parts = [];
+      // 先拼接非活跃脚本（按文件名排序）
+      for (var i = 0; i < fileNames.length; i++) {
+        var name = fileNames[i];
+        if (name === activeFileId) continue; // 活跃脚本最后拼
+        if (typeof scripts[name] === 'string') {
+          parts.push(scripts[name]);
+        }
+      }
+      // 活跃脚本最后拼接（其 return 值作为 lifecycle）
+      if (scripts[activeFileId] && typeof scripts[activeFileId] === 'string') {
+        parts.push(scripts[activeFileId]);
+      }
+      // 用 \n;\n 分隔，防止前一脚本末尾无分号导致语法错误
+      var combinedCode = parts.join('\n;\n');
+      // 复用现有 runScript 逻辑执行拼接后的代码
+      runScript(combinedCode);
+    }
+
+    // 执行用户脚本（按实体分发模型）—— 每个实体挂载的脚本独立执行
+    // 为每个脚本文件创建工厂函数 new Function，遍历实体挂载的脚本调用
+    // factory.call(entity, ...) 创建独立实例，收集 { entity, onStart, onUpdate }
+    // 执行生命周期时 onStart/onUpdate 的 this 绑定到对应 entity
+    function runEntityScripts(scripts, nodes) {
+      // 重置 time
+      time.deltaTime = 0;
+      time.totalTime = 0;
+      time.frameCount = 0;
+      _lastFrameTime = 0;
+
+      // 重置 input
+      inputState._keys = {};
+      inputState._keysPressed = {};
+      inputState._keysReleased = {};
+      inputState._mouseX = 0;
+      inputState._mouseY = 0;
+      inputState._mouseDeltaX = 0;
+      inputState._mouseDeltaY = 0;
+      inputState._mouseDown = false;
+      inputState._mousePressed = false;
+      inputState._mouseReleased = false;
+
+      // 启动 10 秒无按键警告定时器
+      if (_noKeyWarnTimer) clearTimeout(_noKeyWarnTimer);
+      _noKeyWarnTimer = setTimeout(function() {
+        console.warn('[ArkGlide Input] No keyboard events received. Iframe might not have focus. Click the viewport to focus.');
+      }, 10000);
+
+      lifecycle = null;
+      running = false;
+      lifecycleInstances = [];
+
+      try {
+        // 为每个脚本文件创建工厂函数（缓存，避免重复编译同一脚本）
+        var factoryCache = {};
+
+        // 遍历场景中的每个实体
+        nodes.forEach(function(node) {
+          if (!node.scripts || node.scripts.length === 0) return; // 没有挂载脚本
+
+          var entity = entityMap.get(node.id);
+          if (!entity) return; // 实体不存在（可能模型加载失败）
+
+          // 遍历该实体挂载的每个脚本
+          node.scripts.forEach(function(scriptFile) {
+            var code = scripts[scriptFile];
+            if (!code) {
+              console.warn('脚本不存在: ' + scriptFile);
+              return;
+            }
+
+            // 创建或获取工厂函数（缓存）
+            if (!factoryCache[scriptFile]) {
+              factoryCache[scriptFile] = new Function('entity', 'input', 'scene', 'time', 'console', code);
+            }
+            var factory = factoryCache[scriptFile];
+
+            // 为此实体-脚本对创建独立实例
+            // factory.call(entity, ...) 绑定 this = entity，脚本内 this.entity 指向该实体
+            // 同时保留 entity 作为第一个参数（向后兼容）
+            var instance = factory.call(entity, entity, input, sceneAPI, time, console);
+
+            if (instance && typeof instance === 'object') {
+              // 注入 this.entity：用户脚本中 this.entity 指向挂载的实体
+              instance.entity = entity;
+              console.log('[ArkGlide] 实体 "' + entity.name + '" 挂载脚本: ' + scriptFile);
+              lifecycleInstances.push({
+                entity: entity,
+                instance: instance,  // 保存实例引用，用于 this 绑定
+                onStart: typeof instance.onStart === 'function' ? instance.onStart : null,
+                onUpdate: typeof instance.onUpdate === 'function' ? instance.onUpdate : null,
+              });
+            }
+          });
+        });
+
+        // 执行所有 onStart（this 绑定到 instance，this.entity 指向挂载的实体）
+        lifecycleInstances.forEach(function(inst) {
+          try {
+            if (inst.onStart) inst.onStart.call(inst.instance);
+          } catch (e) {
+            console.error('onStart 错误: ' + String((e && e.message) || e));
+          }
+        });
+
+        if (lifecycleInstances.length > 0) {
+          console.log('[ArkGlide] 按实体分发脚本已启动，实例数: ' + lifecycleInstances.length);
+        }
+        running = lifecycleInstances.length > 0;
+      } catch (e) {
+        console.error('脚本执行错误: ' + String((e && e.message) || e));
+      }
+    }
+
+    // ===== 接收编辑器消息（source 验证）=====
+    window.addEventListener('message', function (ev) {
+      if (ev.source !== PARENT) return; // 只接受来自 parent 的消息
+      var msg = ev.data;
+      if (!msg || typeof msg !== 'object') return;
+
+      switch (msg.type) {
+        case 'run':
+          initBabylon();
+          // 应用项目设置（重力/背景色/环境光/帧率上限）
+          applySettings(msg.project.settings);
+          // 先清理所有旧实体（上一轮 run 拼建的）
+          entityMap.forEach(function(e) { e.destroy(); });
+          entityMap.clear();
+
+          // 加载模型（如果有 modelData —— 通过 Transferable 传递的 ArrayBuffer）
+          var modelPromises = [];
+          if (msg.modelData) {
+            var modelNodes = msg.project.scene.nodes.filter(function(n) { return n.type === 'model'; });
+            modelNodes.forEach(function(node) {
+              var buffer = msg.modelData[node.id];
+              if (!buffer) return;
+              // 从 modelUrl（原始文件名）推断扩展名，显式指定 loader
+              // （Blob URL 无扩展名，Babylon 无法自动推断格式）
+              var ext = '.glb';
+              if (node.modelUrl) {
+                var parts = node.modelUrl.split('.');
+                if (parts.length > 1) ext = '.' + parts.pop().toLowerCase();
+              }
+              var blobUrl = URL.createObjectURL(new Blob([buffer]));
+              var p = BABYLON.SceneLoader.ImportMeshAsync('', '', blobUrl, scene, undefined, ext).then(function(result) {
+                URL.revokeObjectURL(blobUrl);
+                if (result.meshes.length > 0) {
+                  var rootMesh = result.meshes[0];
+                  rootMesh.name = node.id;
+                  // 同步 transform/rotation/scale/visible
+                  rootMesh.position.set(node.transform.x, node.transform.y, node.transform.z);
+                  if (node.rotation) rootMesh.rotation.set(node.rotation.x, node.rotation.y, node.rotation.z);
+                  if (node.scale) rootMesh.scaling.set(node.scale.x, node.scale.y, node.scale.z);
+                  if (typeof node.visible === 'boolean') rootMesh.setEnabled(node.visible);
+                  var entity = new Entity(rootMesh, entityMap);
+                  entityMap.set(node.id, entity);
+                }
+                console.log('[ArkGlide] 运行时模型加载成功: ' + node.name);
+              }).catch(function(err) {
+                URL.revokeObjectURL(blobUrl);
+                console.error('[ArkGlide] 运行时模型加载失败: ' + node.name + ' - ' + String(err));
+              });
+              modelPromises.push(p);
+            });
+          }
+
+          // 等所有模型加载完，再同步非模型实体和执行脚本
+          // 关键：模型加载是异步的，必须等加载完再 runScript
+          // （onStart 中可能 scene.find 模型实体）
+          Promise.all(modelPromises).then(function() {
+            // 重新创建编辑器场景实体（非 model 类型，model 已在上方加载）
+            var nonModelNodes = msg.project.scene.nodes.filter(function(n) { return n.type !== 'model'; });
+            syncEntities(nonModelNodes);
+            // 执行用户脚本（entityMap 已填充，scene.find 可用）
+            // 按实体分发模型：遍历实体挂载的脚本分别执行；回退单脚本（向后兼容旧项目）
+            if (msg.project.scripts && msg.project.scene && msg.project.scene.nodes) {
+              runEntityScripts(msg.project.scripts, msg.project.scene.nodes);
+            } else if (msg.project.script) {
+              runScript(msg.project.script);
+            }
+          });
+          break;
+        case 'pause':
+          running = false;
+          break;
+        case 'resume':
+          running = true;
+          break;
+        case 'stop':
+          // 完全重置：停止 onUpdate + 清空场景实体 + 重置 time/input
+          // 编辑器侧 stop() 已恢复 prePlaySnapshot，下次 play() 会重新发 'run' 重建场景
+          running = false;
+          lifecycle = null;
+          lifecycleInstances = []; // 清空按实体分发的脚本实例
+          // 清空所有实体（Entity.destroy 内部会 dispose mesh 并从 entityMap 删除）
+          entityMap.forEach(function(entity) { entity.destroy(); });
+          entityMap.clear();
+          // 兜底：清空场景中所有 mesh（清理 entityMap 之外的残留 mesh）
+          if (scene) {
+            scene.meshes.slice().forEach(function(m) { m.dispose(); });
+          }
+          // 重置 time
+          time.deltaTime = 0;
+          time.totalTime = 0;
+          time.frameCount = 0;
+          _lastFrameTime = 0;
+          // 重置 input（inputState 为扁平结构，无 _mouse 对象）
+          inputState._keys = {};
+          inputState._keysPressed = {};
+          inputState._keysReleased = {};
+          inputState._mouseX = 0;
+          inputState._mouseY = 0;
+          inputState._mouseDeltaX = 0;
+          inputState._mouseDeltaY = 0;
+          inputState._mouseDown = false;
+          inputState._mousePressed = false;
+          inputState._mouseReleased = false;
+          break;
+      }
+    });
+
+    // handshake：通知编辑器 iframe 已就绪（只发一次）
+    sendToEditor({ type: 'ready' });
+  </script>
+</body>
+</html>
