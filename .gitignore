@@ -29,8 +29,10 @@ nul
 .DS_Store
 Thumbs.db
 
-# WASM 编译产物（源码 .d.ts 保留，编译产物忽略）
-src/wasm/*.js
+# 本地 Emscripten 工具链（由 npm run build:wasm 下载）
+.emsdk/
+
+# em++ 若仍单独吐出 .wasm（当前使用 SINGLE_FILE，正常不应出现）
 src/wasm/*.wasm
 
 # 日志
