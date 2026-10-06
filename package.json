@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:wasm": "powershell -ExecutionPolicy Bypass -File ./cpp/build_wasm.ps1",
     "preview": "vite preview"
   },
   "dependencies": {
