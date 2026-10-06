@@ -28,5 +28,5 @@ export interface ArkGlideMathModule {
  */
 export async function loadMathModule(): Promise<ArkGlideMathModule> {
   const factory = (await import('../../wasm/arkglide_math.js')).default;
-  return await factory();
+  return (await factory()) as ArkGlideMathModule;
 }
