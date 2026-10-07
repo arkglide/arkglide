@@ -37,139 +37,6 @@
     var lifecycleInstances = []; // 按实体分发的脚本实例列表：[{ entity, onStart, onUpdate }]
     var running = false;      // onUpdate 是否激活
     var initialized = false;  // Babylon 是否已初始化
-    var mathModule = null;    // WASM 数学模块实例
-    var wasmReady = false;    // WASM 是否已加载完成
-
-    // ===== WASM 内存管理辅助函数 =====
-    // withVec3：创建临时 Vector3，执行回调后自动 delete，确保不泄漏
-    function withVec3(x, y, z, fn) {
-      if (!mathModule) return fn(null); // WASM 未就绪时回退
-      var v = new mathModule.Vector3(x, y, z);
-      try { return fn(v); } finally { v.delete(); }
-    }
-
-    // ===== 性能基准测试：JS vs WASM =====
-    function runBenchmark() {
-      if (!mathModule) return;
-
-      // --- JS 版（Float32Array 实现，公平对比）---
-      // Vector3 加法：a + b + c，10000 次
-      function benchJSVec3() {
-        var a = new Float32Array([1.5, 2.5, 3.5]);
-        var b = new Float32Array([4.0, 5.0, 6.0]);
-        var c = new Float32Array([0.1, 0.2, 0.3]);
-        var result = new Float32Array(3);
-        for (var i = 0; i < 10000; i++) {
-          result[0] = a[0] + b[0] + c[0];
-          result[1] = a[1] + b[1] + c[1];
-          result[2] = a[2] + b[2] + c[2];
-        }
-        return result;
-      }
-
-      // Matrix4 乘法：4x4 矩阵乘法，1000 次
-      function benchJSMat4() {
-        // 行主序 4x4 矩阵，Float32Array(16)
-        var m1 = new Float32Array([
-          1, 2, 3, 4,
-          5, 6, 7, 8,
-          9, 10, 11, 12,
-          13, 14, 15, 16
-        ]);
-        var m2 = new Float32Array([
-          0.1, 0.2, 0.3, 0.4,
-          0.5, 0.6, 0.7, 0.8,
-          0.9, 1.0, 1.1, 1.2,
-          1.3, 1.4, 1.5, 1.6
-        ]);
-        var result = new Float32Array(16);
-        for (var iter = 0; iter < 1000; iter++) {
-          for (var col = 0; col < 4; col++) {
-            for (var row = 0; row < 4; row++) {
-              var sum = 0;
-              for (var k = 0; k < 4; k++) {
-                sum += m1[k * 4 + row] * m2[col * 4 + k];
-              }
-              result[col * 4 + row] = sum;
-            }
-          }
-        }
-        return result;
-      }
-
-      // --- WASM 版 ---
-      function benchWasmVec3() {
-        var a = new mathModule.Vector3(1.5, 2.5, 3.5);
-        var b = new mathModule.Vector3(4.0, 5.0, 6.0);
-        var c = new mathModule.Vector3(0.1, 0.2, 0.3);
-        try {
-          var result = null;
-          for (var i = 0; i < 10000; i++) {
-            var ab = a.add(b);
-            try {
-              result = ab.add(c);
-            } finally { ab.delete(); }
-          }
-          return result;
-        } finally {
-          a.delete();
-          b.delete();
-          c.delete();
-          if (result) result.delete();
-        }
-      }
-
-      function benchWasmMat4() {
-        var m1 = mathModule.Matrix4.identity();
-        var m2 = mathModule.Matrix4.identity();
-        try {
-          var result = m1;
-          for (var iter = 0; iter < 1000; iter++) {
-            result = m1.multiply(m2);
-          }
-          return result;
-        } finally {
-          m1.delete();
-          m2.delete();
-        }
-      }
-
-      // --- 三轮取中位数 ---
-      var jsVec3Times = [], wasmVec3Times = [];
-      var jsMat4Times = [], wasmMat4Times = [];
-
-      for (var round = 0; round < 3; round++) {
-        var t0 = performance.now();
-        benchJSVec3();
-        jsVec3Times.push(performance.now() - t0);
-
-        t0 = performance.now();
-        benchWasmVec3();
-        wasmVec3Times.push(performance.now() - t0);
-
-        t0 = performance.now();
-        benchJSMat4();
-        jsMat4Times.push(performance.now() - t0);
-
-        t0 = performance.now();
-        benchWasmMat4();
-        wasmMat4Times.push(performance.now() - t0);
-      }
-
-      // 取中位数（排序后取中间值）
-      function median(arr) {
-        var sorted = arr.slice().sort(function(a, b) { return a - b; });
-        return sorted[Math.floor(sorted.length / 2)];
-      }
-
-      var jsVec3 = median(jsVec3Times);
-      var wasmVec3 = median(wasmVec3Times);
-      var jsMat4 = median(jsMat4Times);
-      var wasmMat4 = median(wasmMat4Times);
-
-      console.log('[WASM Bench] Vector3 Add (10000x): JS=' + jsVec3.toFixed(2) + 'ms, WASM=' + wasmVec3.toFixed(2) + 'ms, Speedup=' + (jsVec3 / wasmVec3).toFixed(2) + 'x');
-      console.log('[WASM Bench] Matrix4 Mul (1000x): JS=' + jsMat4.toFixed(2) + 'ms, WASM=' + wasmMat4.toFixed(2) + 'ms, Speedup=' + (jsMat4 / wasmMat4).toFixed(2) + 'x');
-    }
 
     // ===== ArkGlide Entity 抽象类 =====
     // 封装 Babylon Mesh，绝不暴露原始对象给用户脚本
@@ -566,12 +433,6 @@
       });
       // 调试日志：打印当前场景实体 ID 列表
       console.log('[ArkGlide] 场景实体已就绪: ' + Array.from(entityMap.keys()).join(', '));
-      // WASM 状态报告
-      if (wasmReady) {
-        console.log('[WASM] syncEntities completed, math module available');
-      } else {
-        console.log('[WASM] syncEntities completed, math module not yet ready');
-      }
     }
 
     // 执行用户脚本（new Function + 生命周期 + try/catch）
@@ -755,26 +616,6 @@
       if (!msg || typeof msg !== 'object') return;
 
       switch (msg.type) {
-        case 'wasm_init':
-          // 接收 WASM JS 胶水代码 + wasm 二进制
-          (async function() {
-            try {
-              // 用 Blob URL 加载 JS 胶水代码
-              var jsBlob = new Blob([msg.wasmJs], { type: 'text/javascript' });
-              var jsUrl = URL.createObjectURL(jsBlob);
-              var factory = (await import(jsUrl)).default;
-              URL.revokeObjectURL(jsUrl);
-              // 用 wasmBinary 直接实例化（不需要 URL 定位 wasm 文件）
-              mathModule = await factory({ wasmBinary: msg.wasmBinary });
-              wasmReady = true;
-              console.log('[WASM] Module loaded successfully');
-              // 立即跑基准测试
-              runBenchmark();
-            } catch (e) {
-              console.error('[WASM] Failed to load module: ' + String((e && e.message) || e));
-            }
-          })();
-          break;
         case 'run':
           initBabylon();
           // 应用项目设置（重力/背景色/环境光/帧率上限）
@@ -827,8 +668,6 @@
             // 重新创建编辑器场景实体（非 model 类型，model 已在上方加载）
             var nonModelNodes = msg.project.scene.nodes.filter(function(n) { return n.type !== 'model'; });
             syncEntities(nonModelNodes);
-            // WASM 已就绪时跑基准测试（如果 wasm_init 先于 run 到达）
-            if (wasmReady) runBenchmark();
             // 执行用户脚本（entityMap 已填充，scene.find 可用）
             // 按实体分发模型：遍历实体挂载的脚本分别执行；回退单脚本（向后兼容旧项目）
             if (msg.project.scripts && msg.project.scene && msg.project.scene.nodes) {
