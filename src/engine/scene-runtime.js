@@ -10,8 +10,8 @@
     function disposeContent(id) {
       pending.delete(id);
       const resource = resources.get(id);
-      if (resource) resource.dispose();
       resources.delete(id);
+      if (resource) resource.dispose();
     }
     function decorate(mesh, id) {
       mesh.metadata = { ...(mesh.metadata || {}), arkglideId: id };
@@ -33,6 +33,9 @@
         object = B.MeshBuilder[builders[primitiveOf(node)] || 'CreateBox'](node.id, {}, scene);
       } else object = new B.TransformNode(node.id, scene);
       nodes.set(node.id, object);
+      object.onDisposeObservable?.add(() => {
+        disposeContent(node.id); nodes.delete(node.id); records.delete(node.id);
+      });
       decorate(object, node.id);
       marker(node, node.id);
       if (node.type === 'light') {
@@ -121,7 +124,7 @@
       nodes.forEach((object, id) => { if (ids.has(id)) object.parent = null; });
       nodes.forEach((object, id) => {
         if (!ids.has(id)) {
-          disposeContent(id); options.onRemove?.(id); object.dispose(); nodes.delete(id); records.delete(id);
+          disposeContent(id); options.onRemove?.(id); object.dispose(false, true); nodes.delete(id); records.delete(id);
         }
       });
       const loads = [];
@@ -130,7 +133,7 @@
         const old = records.get(node.id);
         const kind = node.type + ':' + (node.type === 'mesh' ? primitiveOf(node) : node.lightType || '');
         if (old && old.kind !== kind) {
-          disposeContent(node.id); options.onRemove?.(node.id); nodes.get(node.id).dispose(); nodes.delete(node.id);
+          disposeContent(node.id); options.onRemove?.(node.id); nodes.get(node.id).dispose(false, true); nodes.delete(node.id);
         }
         if (!nodes.has(node.id)) make(node);
         update(node);
@@ -147,7 +150,7 @@
       definitions = [];
       pending.clear();
       nodes.forEach(object => { object.parent = null; });
-      [...nodes].forEach(([id, object]) => { disposeContent(id); options.onRemove?.(id); object.dispose(); });
+      [...nodes].forEach(([id, object]) => { disposeContent(id); options.onRemove?.(id); object.dispose(false, true); });
       nodes.clear(); records.clear();
     }
     function dispose() { disposed = true; clear(); }

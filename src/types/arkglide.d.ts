@@ -81,12 +81,24 @@ interface TimeAPI {
   /** Simulation time in seconds, excluding pauses. */
   readonly totalTime: number;
   readonly frameCount: number;
+  readonly unscaledDeltaTime:number;
+  readonly unscaledTotalTime:number;
+  readonly fixedDeltaTime:number;
+  readonly fixedTotalTime:number;
+  readonly fixedFrameCount:number;
+  readonly interpolationAlpha:number;
+  /** 0 freezes simulation time and timers; range 0..100. */
+  timeScale:number;
 }
 
 interface ScriptThis { entity: Entity; }
 interface ScriptLifecycle {
   onStart?(this: ScriptInstance): void;
   onUpdate?(this: ScriptInstance): void;
+  /** Use time.fixedDeltaTime; runs zero or multiple times before onUpdate. */
+  onFixedUpdate?(this: ScriptInstance):void;
+  /** Once, before entity disposal or when stopping the run. */
+  onDestroy?(this: ScriptInstance):void;
   // Scripts can keep per-instance state on the returned object.
   [key: string]: any;
 }
@@ -122,3 +134,19 @@ interface MathAPI {
   };
 }
 declare const math: MathAPI;
+
+interface TimersAPI {
+  /** Scaled game seconds. Returned function cancels this timer. */
+  after(seconds:number,callback:()=>void):()=>void;
+  /** Coalesces missed intervals to one callback per frame. */
+  every(seconds:number,callback:()=>void):()=>void;
+}
+interface EventsAPI {
+  on<T=unknown>(name:string,callback:(payload:T)=>void):()=>void;
+  once<T=unknown>(name:string,callback:(payload:T)=>void):()=>void;
+  emit(name:string,payload?:unknown):void;
+  /** Track a native listener; it is removed on script/entity destruction. */
+  listen(target:EventTarget,name:string,callback:(event:Event)=>void,options?:boolean|AddEventListenerOptions):()=>void;
+}
+declare const timers:TimersAPI;
+declare const events:EventsAPI;

@@ -20,6 +20,7 @@ function setup() {
     setTimeout: () => 1, clearTimeout() {}, URL, Blob,
   });
   vm.runInContext(fs.readFileSync(new URL('../public/arkglide-api.js', import.meta.url), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(new URL('../public/arkglide-lifecycle.js', import.meta.url), 'utf8'), context);
   vm.runInContext(fs.readFileSync(new URL('../public/arkglide-scene.js', import.meta.url), 'utf8'), context);
   const html = fs.readFileSync(new URL('../public/runtime.html', import.meta.url), 'utf8');
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
@@ -97,4 +98,26 @@ test('legacy single-script projects update and retain old transform methods', as
     tick(); // Destroyed entities must not keep invoking their hooks.
     assert.equal(context.sceneAPI.getEntityCount(), 0);
   } finally { context.engine?.dispose(); }
+});
+
+test('destroy hooks run before disposal and stop releases all owned timers/listeners/materials',async()=>{
+ const {context,send,tick}=setup();
+ try{
+  await send({type:'run',project:{scene:{nodes:[{...node,color:'#123456'}]},scripts:{'main.js': `return {
+   onStart(){setInterval(()=>this.entity.position.x++,50);timers.every(.1,()=>{});events.on('score',()=>{});},
+   onDestroy(){console.log('destroy-live:'+this.entity.getName());}
+  };`}}});tick();tick();
+  assert.ok(context.session.stats().timers>0);context.sceneAPI.destroy('cube');
+  assert.equal(context.session.stats().timers,0);assert.equal(context.session.stats().subscriptions,0);assert.equal(context.scene.materials.filter(m=>m.name==='cube:material').length,0);
+  await send({type:'stop'});assert.equal(context.session.stats().scripts,0);assert.equal(context.entityMap.size,0);
+ }finally{context.engine?.dispose();}
+});
+test('a failing script reports its filename and hook once without disabling other entities',async()=>{
+ const {context,messages,send,tick}=setup();
+ try{
+  await send({type:'run',project:{scene:{nodes:[node,{...node,id:'other',scripts:['good.js']}]},scripts:{'main.js':'return {onUpdate(){throw new Error("failure");}};','good.js':'return {onUpdate(){this.entity.position.x++;}};'}}});
+  tick();tick();tick();
+  const errors=messages.filter(m=>m.type==='diagnostic');assert.equal(errors.length,1);assert.equal(errors[0].file,'main.js');assert.equal(errors[0].hook,'onUpdate');assert.equal(context.sceneAPI.find('other').position.x,3);
+  await send({type:'stop'});
+ }finally{context.engine?.dispose();}
 });

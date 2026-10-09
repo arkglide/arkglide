@@ -5,6 +5,7 @@ import type { ProjectJSON } from '../../types/project';
 // iframe 运行时沙箱容器：常驻不卸载，postMessage 收发桥梁
 export default function RuntimeFrame() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const runIdRef=useRef(0);
   const readyRef = useRef(false);
   const pendingProjectRef = useRef<ProjectJSON | null>(null);
   // 暂存待发送的模型数据（iframe 未 ready 时）
@@ -12,6 +13,8 @@ export default function RuntimeFrame() {
   const pendingTransferRef = useRef<Transferable[] | null>(null);
   const prevPlayStateRef = useRef(useEditorStore.getState().playState);
 
+  const documentId=useEditorStore(s=>s.documentId);
+  useEffect(()=>{runIdRef.current++;useEditorStore.getState().setRuntimeStats(null);},[documentId]);
   const project = useEditorStore((s) => s.project);
   const playState = useEditorStore((s) => s.playState);
   const addConsoleLog = useEditorStore((s) => s.addConsoleLog);
@@ -37,6 +40,7 @@ export default function RuntimeFrame() {
       const msg = ev.data;
       if (!msg || typeof msg !== 'object') return;
 
+      if(msg.runId != null && msg.runId!==runIdRef.current)return;
       switch (msg.type) {
         case 'ready':
           readyRef.current = true;
@@ -47,14 +51,14 @@ export default function RuntimeFrame() {
             if (pendingTransferRef.current && pendingTransferRef.current.length > 0) {
               postToIframe(
                 {
-                  type: 'run',
+                  type: 'run',runId:runIdRef.current,
                   project: pendingProjectRef.current,
                   modelData: pendingModelDataRef.current,
                 },
                 pendingTransferRef.current,
               );
             } else {
-              postToIframe({ type: 'run', project: pendingProjectRef.current });
+              postToIframe({ type: 'run',runId:runIdRef.current, project: pendingProjectRef.current });
             }
             pendingProjectRef.current = null;
             pendingModelDataRef.current = null;
@@ -65,8 +69,15 @@ export default function RuntimeFrame() {
         case 'log':
           addConsoleLog(msg.level, (msg.args || []).join(' '));
           break;
+        case 'diagnostic':
+          addConsoleLog(msg.level || 'error',msg.message,{file:msg.file,line:msg.line,column:msg.column,hook:msg.hook,entityId:msg.entityId,stack:msg.stack});
+          break;
+        case 'telemetry':
+          useEditorStore.getState().setRuntimeStats(msg.stats);
+          break;
         case 'fatal':
           addConsoleLog('error', '[FATAL] ' + msg.message);
+          useEditorStore.getState().stop();
           break;
       }
     };
@@ -82,6 +93,8 @@ export default function RuntimeFrame() {
 
     if (playState === 'playing') {
       if (prev === 'stopped') {
+        runIdRef.current++;
+        useEditorStore.getState().setRuntimeStats(null);
         // 收集所有 model 节点的 ArrayBuffer，通过 Transferable 零拷贝传递给 iframe
         const modelData: Record<string, ArrayBuffer> = {};
         const transferList: ArrayBuffer[] = [];
@@ -103,9 +116,9 @@ export default function RuntimeFrame() {
         // 启动：发 run（若 iframe 未 ready，暂存等 handshake）
         if (readyRef.current && project) {
           if (transferList.length > 0) {
-            postToIframe({ type: 'run', project, modelData }, transferList);
+            postToIframe({ type: 'run',runId:runIdRef.current, project, modelData }, transferList);
           } else {
-            postToIframe({ type: 'run', project });
+            postToIframe({ type: 'run',runId:runIdRef.current, project });
           }
         } else if (project) {
           pendingProjectRef.current = project;

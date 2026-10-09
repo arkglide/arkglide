@@ -14,6 +14,9 @@ export interface ProjectSettings {
   backgroundColor: string; // 背景色 hex（默认 '#0D0D0D'）
   ambientIntensity: number; // 环境光强度（默认 0.5）
   ambientColor: string; // 环境光颜色 hex（默认 '#FFFFFF'）
+  fixedTimeStep: number; // 固定步秒数
+  maxSubSteps: number; // 每帧最大追赶步数
+  timeScale: number; // 游戏时间倍率，0 冻结游戏时间
   fpsCap: number; // 帧率上限，0=无限（默认 60）
 }
 
@@ -39,4 +42,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   ambientIntensity: 0.5,
   ambientColor: '#FFFFFF',
   fpsCap: 60,
+  fixedTimeStep: 1 / 60,
+  maxSubSteps: 8,
+  timeScale: 1,
 };

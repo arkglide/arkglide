@@ -120,3 +120,7 @@ return defineScript({
 
 `.ts` 文件可获得类型提示；当前 runtime 的 `new Function` **不支持执行 TypeScript 类型语法或 import/export**。本次没有新增 TypeScript 转译链路。
 旧版只含 `project.script` 的单脚本项目继续执行，其空场景下 `entity` 可能为 `null`；绑定实体脚本始终接收有效实体。
+
+## 固定步、销毁、时间与资源管理
+
+新增 `onFixedUpdate`、`onDestroy`、`time.timeScale`、`timers` 和 `events`。完整示例及暂停、清理、异常行为见 [第一批说明](first-batch.md)。原有 `onStart/onUpdate` 脚本继续有效。

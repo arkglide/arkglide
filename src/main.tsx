@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import App from './App';
+import { startProjectRecovery } from './utils/projectRecovery';
+const recovery = startProjectRecovery();
+if(import.meta.hot)import.meta.hot.dispose(()=>recovery.dispose());
 import { theme } from './theme';
 import 'dockview/dist/styles/dockview.css'; // Dockview 面板样式
 import { loadMathModule } from './engine/wasm/math-loader';

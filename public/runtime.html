@@ -13,6 +13,7 @@
   <script src="/arkglide-math.js"></script>
   <script src="/lib/arkglide_math.js"></script>
   <script src="/arkglide-api.js"></script>
+  <script src="/arkglide-lifecycle.js"></script>
   <script src="/arkglide-scene.js"></script>
 </head>
 <body>
@@ -23,6 +24,7 @@
     // targetOrigin 用 '*'（opaque origin 无法指定），安全靠编辑器端 source 验证
     var PARENT = window.parent;
     function sendToEditor(msg) {
+      msg.runId = currentRunId;
       PARENT.postMessage(msg, '*');
     }
 
@@ -38,6 +40,7 @@
 
     // ===== 运行时状态 =====
     var engine = null, scene = null, camera = null;
+    var currentRunId = null;
     var lifecycle = null;     // { onStart, onUpdate }（旧模型，向后兼容）
     var lifecycleInstances = []; // 按实体分发的脚本实例列表：[{ entity, onStart, onUpdate }]
     var running = false;      // onUpdate 是否激活
@@ -49,7 +52,10 @@
       ? createArkGlideMath().then(function(module) { math = ArkGlideMath.createMathAPI(module); })
       : Promise.resolve();
     var sceneAdapter = null, runGeneration = 0, desiredState = 'stopped';
-    var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; }, function() { return math; });
+    var session = ArkGlideLifecycle.createSession({onError: reportScriptError});
+    var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; }, function() { return math; }, {
+      onBeforeDestroy: function(id) { session.destroyEntity(id); }
+    });
     var entityMap = entityAPI.entities;
     var sceneAPI = entityAPI.sceneAPI;
     var defineScript = ArkGlideRuntime.defineScript;
@@ -120,12 +126,44 @@
     // 注意：canvas 在 initBabylon 后才存在，所以鼠标监听要在 initBabylon 内部添加
 
     // ===== ArkGlide Time API —— 帧时间 =====
-    var time = {
-      deltaTime: 0,    // 秒：上一帧到当前帧的时间
-      totalTime: 0,    // 秒：自脚本启动以来的总时间
-      frameCount: 0,   // 帧计数
-    };
-    var _lastFrameTime = 0;
+    var time = session.time;
+    var _lastFrameTime = 0; // Compatibility for older editor probes.
+    var scriptErrors=0;
+    var _renderFrames=0, measuredFps=0;
+    var _lastTelemetry = 0, modelLoads = 0, renderMs = 0, frameMs = 0, peakFrameMs = 0;
+    function reportScriptError(detail) {
+      scriptErrors++;
+      var error = detail.error, stack = String(error && error.stack || '');
+      var match = stack.match(/arkglide-script:\/\/\/([^\s:]+):(\d+):(\d+)/);
+      sendToEditor({type:'diagnostic', level:'error', message:String(error && error.message || error),
+        file:match ? decodeURIComponent(match[1]) : detail.file || null,
+        line:match ? Math.max(1, Number(match[2])-2) : null,
+        column:match ? Number(match[3]) : null, hook:detail.hook, entityId:detail.entityId, stack:stack});
+    }
+    function resetInput() {
+      inputState._keys={};inputState._keysPressed={};inputState._keysReleased={};
+      inputState._mouseDown=false;inputState._mousePressed=false;inputState._mouseReleased=false;
+      inputState._mouseDeltaX=0;inputState._mouseDeltaY=0;
+    }
+    window.addEventListener('blur', resetInput);
+    window.addEventListener('error', function(event) { reportScriptError({hook:'uncaught',error:event.error || event.message}); });
+    window.addEventListener('unhandledrejection', function(event) { reportScriptError({hook:'promise',error:event.reason}); });
+    function telemetry(force) {
+      var now=performance.now();
+      if(!force && now-_lastTelemetry<500)return;
+      if(now>_lastTelemetry)measuredFps=_renderFrames*1000/(now-_lastTelemetry);
+      _renderFrames=0;_lastTelemetry=now;
+      var stats=session.stats();
+      sendToEditor({type:'telemetry',stats:Object.assign(stats,{
+        errors:scriptErrors,state:desiredState, mathBackend:math && math.backend, fps:measuredFps,
+        frameMs:frameMs,peakFrameMs:peakFrameMs,renderMs:renderMs,
+        entities:entityMap.size,meshes:scene ? scene.meshes.length : 0,
+        materials:scene ? scene.materials.length : 0,textures:scene ? scene.textures.length : 0,
+        modelLoads:modelLoads,lights:scene ? scene.lights.length : 0,cameras:scene ? scene.cameras.length : 0,
+        heapBytes:performance.memory ? performance.memory.usedJSHeapSize : null,
+        totalTime:time.totalTime,unscaledTotalTime:time.unscaledTotalTime
+      })});
+    }
     var _fpsCap = 60; // 帧率上限，0=无限
     var _lastRenderTime = 0; // 上次渲染时间戳（用于帧率限制）
 
@@ -231,31 +269,8 @@
           _lastRenderTime = now;
         }
 
-        if (running) {
-          // Advance simulation time only while playing.
-          var now = performance.now() / 1000; // 秒
-          if (_lastFrameTime > 0) {
-            time.deltaTime = now - _lastFrameTime;
-          } else {
-            time.deltaTime = 0;
-          }
-          _lastFrameTime = now;
-          time.totalTime += time.deltaTime;
-          time.frameCount++;
-        }
-
-        // 调用 onUpdate（按实体分发：遍历所有实体-脚本实例）
-        if (running) {
-          lifecycleInstances.forEach(function(inst) {
-            if (inst.entity && inst.entity.destroyed) return;
-            try {
-              if (inst.onUpdate) inst.onUpdate.call(inst.instance);
-            } catch (e) {
-              console.error('onUpdate 错误: ' + String((e && e.message) || e));
-            }
-          });
-        }
-
+        var frameStart=performance.now();
+        if (running) session.tick(frameStart);
         // 重置 per-frame input 状态（边沿检测只持续一帧）
         inputState._keysPressed = {};
         inputState._keysReleased = {};
@@ -264,199 +279,71 @@
         inputState._mousePressed = false;
         inputState._mouseReleased = false;
 
+        if (!scene.activeCamera || scene.activeCamera.isDisposed()) scene.activeCamera=camera;
+        var renderStart=performance.now();
         scene.render();
+        renderMs=performance.now()-renderStart;
+        _renderFrames++;
+        frameMs=performance.now()-frameStart;peakFrameMs=Math.max(peakFrameMs,frameMs);
+        telemetry(false);
       });
 
       window.addEventListener('resize', function () { engine.resize(); });
       sceneAdapter = ArkGlideScene.createSceneAdapter(BABYLON, scene, {
         onCreate: function(object, node) { entityAPI.register(object, node.id, node.name); },
         onRemove: function(id) { sceneAPI.destroy(id); },
-        onError: function(node, error) { console.error('模型加载失败: ' + node.name + ' - ' + String(error)); },
+        onError: function(node, error) { reportScriptError({hook:'model',entityId:node.id,error:error}); },
+        onLoading: function(delta) { modelLoads+=delta; },
       });
       initialized = true;
     }
 
-    // 执行用户脚本（new Function + 生命周期 + try/catch）
-    function runScript(code) {
-      // 注意：entityMap 清理已在 'run' 消息处理中完成（syncEntities 之前）
-      // 此处保留编辑器场景实体，用户脚本可通过 scene.find(id) 访问
-
-      // 重置 time
-      time.deltaTime = 0;
-      time.totalTime = 0;
-      time.frameCount = 0;
-      _lastFrameTime = 0;
-
-      // 重置 input
-      inputState._keys = {};
-      inputState._keysPressed = {};
-      inputState._keysReleased = {};
-      inputState._mouseDown = false;
-      inputState._mousePressed = false;
-      inputState._mouseReleased = false;
-
-      // 启动 10 秒无按键警告定时器
-      if (_noKeyWarnTimer) clearTimeout(_noKeyWarnTimer);
-      _noKeyWarnTimer = setTimeout(function() {
-        console.warn('[ArkGlide Input] No keyboard events received. Iframe might not have focus. Click the viewport to focus.');
-      }, 10000);
-
-      lifecycle = null;
-      lifecycleInstances = [];
-      running = false;
-
-      try {
-        // 获取默认实体（编辑器场景第一个 mesh）
-        var defaultEntity = entityMap.size > 0 ? entityMap.values().next().value : null;
-
-        // 注入 API：entity（默认实体）, input, scene, time, console
-        var fn = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', 'math', code);
-        var result = fn.call({ entity: defaultEntity }, defaultEntity, input, sceneAPI, time, console, defineScript, math);
-
-        if (result && typeof result === 'object') {
-          lifecycle = result;
-          lifecycle.entity = defaultEntity;
-          if (typeof lifecycle.onStart === 'function') {
-            console.log('[ArkGlide] onStart called. onUpdate should follow.');
-            try {
-              lifecycle.onStart.call(lifecycle);
-            } catch (e) {
-              sendToEditor({ type: 'log', level: 'error', args: ['onStart: ' + String((e && e.message) || e)] });
-            }
-          }
-          lifecycleInstances = [{
-            entity: defaultEntity, instance: lifecycle,
-            onStart: typeof lifecycle.onStart === 'function' ? lifecycle.onStart : null,
-            onUpdate: typeof lifecycle.onUpdate === 'function' ? lifecycle.onUpdate : null,
-          }];
-          running = true;
-        }
-      } catch (e) {
-        sendToEditor({ type: 'fatal', message: String((e && e.message) || e) });
+    function runEntityScripts(scripts, nodes, legacyCode) {
+      resetInput();
+      session = ArkGlideLifecycle.createSession({onError:reportScriptError});
+      time=session.time;lifecycleInstances=session.records;
+      var factoryCache=Object.create(null);
+      var definitions=nodes.slice();
+      function depth(node) {
+        var n=node,count=0;
+        while(n && n.parentId && count<nodes.length){count++;n=nodes.find(function(p){return p.id===n.parentId;});}
+        return count;
       }
-    }
-
-    // 执行多脚本：拼接所有脚本为单一 new Function 体，共享同一函数作用域
-    // 非活跃脚本在前（按文件名升序排序），活跃脚本在最后
-    // 只有活跃脚本（最后执行）的 return { onStart, onUpdate } 作为 lifecycle
-    // 非活跃脚本不应有顶层 return（若有会提前退出，属于用户错误）
-    function runScripts(scripts, activeFileId) {
-      // 收集所有文件名并按升序排序
-      var fileNames = Object.keys(scripts).sort();
-      var parts = [];
-      // 先拼接非活跃脚本（按文件名排序）
-      for (var i = 0; i < fileNames.length; i++) {
-        var name = fileNames[i];
-        if (name === activeFileId) continue; // 活跃脚本最后拼
-        if (typeof scripts[name] === 'string') {
-          parts.push(scripts[name]);
-        }
-      }
-      // 活跃脚本最后拼接（其 return 值作为 lifecycle）
-      if (scripts[activeFileId] && typeof scripts[activeFileId] === 'string') {
-        parts.push(scripts[activeFileId]);
-      }
-      // 用 \n;\n 分隔，防止前一脚本末尾无分号导致语法错误
-      var combinedCode = parts.join('\n;\n');
-      // 复用现有 runScript 逻辑执行拼接后的代码
-      runScript(combinedCode);
-    }
-
-    // 执行用户脚本（按实体分发模型）—— 每个实体挂载的脚本独立执行
-    // 为每个脚本文件创建工厂函数 new Function，遍历实体挂载的脚本调用
-    // Each factory receives { entity } as this; lifecycle hooks bind to its result.
-    function runEntityScripts(scripts, nodes) {
-      // 重置 time
-      time.deltaTime = 0;
-      time.totalTime = 0;
-      time.frameCount = 0;
-      _lastFrameTime = 0;
-
-      // 重置 input
-      inputState._keys = {};
-      inputState._keysPressed = {};
-      inputState._keysReleased = {};
-      inputState._mouseX = 0;
-      inputState._mouseY = 0;
-      inputState._mouseDeltaX = 0;
-      inputState._mouseDeltaY = 0;
-      inputState._mouseDown = false;
-      inputState._mousePressed = false;
-      inputState._mouseReleased = false;
-
-      // 启动 10 秒无按键警告定时器
-      if (_noKeyWarnTimer) clearTimeout(_noKeyWarnTimer);
-      _noKeyWarnTimer = setTimeout(function() {
-        console.warn('[ArkGlide Input] No keyboard events received. Iframe might not have focus. Click the viewport to focus.');
-      }, 10000);
-
-      lifecycle = null;
-      running = false;
-      lifecycleInstances = [];
-
-      try {
-        // 为每个脚本文件创建工厂函数（缓存，避免重复编译同一脚本）
-        var factoryCache = {};
-
-        // 遍历场景中的每个实体
-        nodes.forEach(function(node) {
-          if (!node.scripts || node.scripts.length === 0) return; // 没有挂载脚本
-
-          var entity = entityMap.get(node.id);
-          if (!entity) return; // 实体不存在（可能模型加载失败）
-
-          // 遍历该实体挂载的每个脚本
-          node.scripts.forEach(function(scriptFile) {
-            var code = scripts[scriptFile];
-            if (!code) {
-              console.warn('脚本不存在: ' + scriptFile);
-              return;
-            }
-
-            // 创建或获取工厂函数（缓存）
-            if (!factoryCache[scriptFile]) {
-              factoryCache[scriptFile] = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', 'math', code);
-            }
-            var factory = factoryCache[scriptFile];
-
-            // 为此实体-脚本对创建独立实例
-            // Bind the factory context so top-level this.entity and arrow hooks work too.
-            // 同时保留 entity 作为第一个参数（向后兼容）
-            var instance = factory.call({ entity: entity }, entity, input, sceneAPI, time, console, defineScript, math);
-
-            if (instance && typeof instance === 'object') {
-              // 注入 this.entity：用户脚本中 this.entity 指向挂载的实体
-              instance.entity = entity;
-              console.log('[ArkGlide] 实体 "' + entity.name + '" 挂载脚本: ' + scriptFile);
-              lifecycleInstances.push({
-                entity: entity,
-                instance: instance,  // 保存实例引用，用于 this 绑定
-                onStart: typeof instance.onStart === 'function' ? instance.onStart : null,
-                onUpdate: typeof instance.onUpdate === 'function' ? instance.onUpdate : null,
-              });
-            }
-          });
-        });
-
-        // 执行所有 onStart（this 绑定到 instance，this.entity 指向挂载的实体）
-        lifecycleInstances.forEach(function(inst) {
-          if (inst.entity && inst.entity.destroyed) return;
+      definitions.sort(function(a,b){return depth(a)-depth(b);});
+      if(legacyCode !== undefined) definitions=[{id:entityMap.size ? entityMap.keys().next().value : null,scripts:['main.js']}];
+      definitions.forEach(function(node) {
+        var entity=entityMap.get(node.id) || null;
+        (node.scripts || []).forEach(function(file) {
+          var owner=session.owner(entity,file);
           try {
-            if (inst.onStart) inst.onStart.call(inst.instance);
-          } catch (e) {
-            console.error('onStart 错误: ' + String((e && e.message) || e));
-          }
+            var code=legacyCode !== undefined ? legacyCode : scripts[file];
+            if(typeof code!=='string')throw new Error('脚本不存在: '+file);
+            if(!factoryCache[file]) factoryCache[file]=new Function('entity','input','scene','time','console','defineScript','math','events','timers','setTimeout','clearTimeout','setInterval','clearInterval',
+              code+'\n//# sourceURL=arkglide-script:///'+encodeURIComponent(file));
+            var globals=owner.globals;
+            var instance=factoryCache[file].call({entity:entity},entity,input,sceneAPI,time,console,defineScript,math,owner.events,owner.timers,
+              globals.setTimeout,globals.clearTimeout,globals.setInterval,globals.clearInterval);
+            if(instance && typeof instance==='object') {instance.entity=entity;owner.attach(instance);}
+            else owner.attach({entity:entity});
+          } catch(error) { reportScriptError({file:file,entityId:node.id,hook:'factory',error:error});owner.abort(); }
         });
-
-        if (lifecycleInstances.length > 0) {
-          console.log('[ArkGlide] 按实体分发脚本已启动，实例数: ' + lifecycleInstances.length);
-        }
-        running = lifecycleInstances.length > 0;
-      } catch (e) {
-        console.error('脚本执行错误: ' + String((e && e.message) || e));
-      }
+      });
+      session.start(runtimeSettings);
+      running=true;
+      if(desiredState==='paused'){session.pause();running=false;}
+      telemetry(true);
     }
-
+    var runtimeSettings={};
+    function stopRun() {
+      running=false;
+      session.stop();
+      sceneAPI.destroyAll();sceneAdapter?.clear();
+      if(scene)scene.activeCamera=camera;
+      lifecycle=null;lifecycleInstances=[];
+      resetInput();
+      if(_noKeyWarnTimer){clearTimeout(_noKeyWarnTimer);_noKeyWarnTimer=null;}
+      telemetry(true);
+    }
     // ===== 接收编辑器消息（source 验证）=====
     window.addEventListener('message', function (ev) {
       if (ev.source !== PARENT) return; // 只接受来自 parent 的消息
@@ -465,75 +352,34 @@
 
       switch (msg.type) {
         case 'run':
-          var generation = ++runGeneration;
-          desiredState = 'playing';
-          running = false;
-          lifecycle = null;
-          lifecycleInstances = [];
+          var generation=++runGeneration;
+          stopRun();currentRunId=msg.runId;
+          desiredState='playing';scriptErrors=0;_renderFrames=0;_lastTelemetry=performance.now();measuredFps=0;peakFrameMs=0;frameMs=0;renderMs=0;
           initBabylon();
-          sceneAdapter.clear();
-          sceneAPI.destroyAll();
-          applySettings(msg.project.settings);
-          Promise.all([
-            mathReady,
-            sceneAdapter.sync(msg.project.scene.nodes, msg.modelData || {}),
-          ]).then(function() {
-            if (generation !== runGeneration || desiredState === 'stopped') return;
-            scene.activeCamera = sceneAdapter.activeCamera() || camera;
-            if (msg.project.scripts) runEntityScripts(msg.project.scripts, msg.project.scene.nodes);
-            else if (msg.project.script) runScript(msg.project.script);
-            if (desiredState === 'paused') running = false;
-          }).catch(function(error) {
-            if (generation === runGeneration) sendToEditor({ type: 'fatal', message: String(error) });
-          });
+          runtimeSettings=msg.project.settings || {};
+          applySettings(runtimeSettings);
+          Promise.all([mathReady,sceneAdapter.sync(msg.project.scene.nodes,msg.modelData || {})]).then(function(){
+            if(generation!==runGeneration || desiredState==='stopped')return;
+            scene.activeCamera=sceneAdapter.activeCamera() || camera;
+            if(msg.project.scripts)runEntityScripts(msg.project.scripts,msg.project.scene.nodes);
+            else runEntityScripts({},msg.project.scene.nodes,msg.project.script || '');
+          }).catch(function(error){if(generation===runGeneration){desiredState='stopped';stopRun();sendToEditor({type:'fatal',message:String(error)});}});
           break;
         case 'pause':
-          desiredState = 'paused';
-          running = false;
-          time.deltaTime = 0;
-          _lastFrameTime = 0;
+          if(desiredState==='stopped')break;
+          desiredState='paused';running=false;session.pause();resetInput();telemetry(true);
           break;
         case 'resume':
-          desiredState = 'playing';
-          _lastFrameTime = 0;
-          time.deltaTime = 0;
-          running = true;
+          if(desiredState!=='paused')break;
+          desiredState='playing';
+          // Loading runs start themselves; do not advance an old session.
+          if(lifecycleInstances===session.records){session.resume();running=true;}
+          resetInput();telemetry(true);
           break;
         case 'stop':
-          ++runGeneration;
-          desiredState = 'stopped';
-          sceneAdapter?.clear();
-          if (scene) scene.activeCamera = camera;
-          if (_noKeyWarnTimer) { clearTimeout(_noKeyWarnTimer); _noKeyWarnTimer = null; }
-          // 完全重置：停止 onUpdate + 清空场景实体 + 重置 time/input
-          // 编辑器侧 stop() 已恢复 prePlaySnapshot，下次 play() 会重新发 'run' 重建场景
-          running = false;
-          lifecycle = null;
-          lifecycleInstances = []; // 清空按实体分发的脚本实例
-          // 清空所有实体（Entity.destroy 内部会 dispose mesh 并从 entityMap 删除）
-          entityMap.forEach(function(entity) { entity.destroy(); });
-          entityMap.clear();
-          // 兜底：清空场景中所有 mesh（清理 entityMap 之外的残留 mesh）
-          if (scene) {
-            scene.meshes.slice().forEach(function(m) { m.dispose(); });
-          }
-          // 重置 time
-          time.deltaTime = 0;
-          time.totalTime = 0;
-          time.frameCount = 0;
-          _lastFrameTime = 0;
-          // 重置 input（inputState 为扁平结构，无 _mouse 对象）
-          inputState._keys = {};
-          inputState._keysPressed = {};
-          inputState._keysReleased = {};
-          inputState._mouseX = 0;
-          inputState._mouseY = 0;
-          inputState._mouseDeltaX = 0;
-          inputState._mouseDeltaY = 0;
-          inputState._mouseDown = false;
-          inputState._mousePressed = false;
-          inputState._mouseReleased = false;
+          ++runGeneration;desiredState='stopped';stopRun();
           break;
+
       }
     });
 

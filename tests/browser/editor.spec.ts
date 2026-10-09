@@ -174,6 +174,7 @@ test('editor roadmap: model authoring, persistence, runtime, isolation and WASM'
     await page.unroute('**/lib/arkglide_math.js');
   });
 
+  if(await page.getByRole('dialog',{name:'项目恢复'}).isVisible())await page.getByRole('button',{name:'稍后处理'}).click();
   await test.step('Monaco math API completion and browser benchmark', async () => {
     await page.getByRole('tab',{name:'代码编辑器',exact:true}).click();
     await page.waitForFunction(async()=>{

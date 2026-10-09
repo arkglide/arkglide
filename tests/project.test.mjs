@@ -2,7 +2,7 @@ import test, {before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {indexedDB} from 'fake-indexeddb';
-let server,store,storage,archive,validate,selection,readModelAsset;
+let server,store,storage,archive,validate,selection,readModelAsset,recovery,normalize;
 function request(r){return new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 before(async()=>{
  globalThis.indexedDB=indexedDB;
@@ -12,6 +12,8 @@ before(async()=>{
  ({useEditorStore:store}=await server.ssrLoadModule('/src/store/useEditorStore.ts'));
  storage=await server.ssrLoadModule('/src/utils/projectStorage.ts');
  archive=await server.ssrLoadModule('/src/utils/projectExport.ts');
+ recovery=await server.ssrLoadModule('/src/utils/projectRecovery.ts');
+ ({normalizeProject:normalize}=await server.ssrLoadModule('/src/utils/projectValidation.ts'));
  ({validateProject:validate}=await server.ssrLoadModule('/src/utils/projectValidation.ts'));
  selection=await server.ssrLoadModule('/src/engine/selectionTransform.ts');
  ({readModelAsset}=await server.ssrLoadModule('/src/engine/modelImport.ts'));
@@ -98,4 +100,68 @@ test('ZIP keeps a missing model missing when another model has the same filename
  const zip=archive.createProjectArchive();await archive.importProject(new File([zip],'test.arkglide'));
  assert.ok(store.getState().missingModelIds.has(missing));assert.ok(!store.getState().modelBuffers.has(missing));
  assert.deepEqual([...new Uint8Array(store.getState().modelBuffers.get(valid))],[7,8,9]);
+});
+
+test('legacy project migration adds time defaults; future versions and invalid references leave current project untouched',async()=>{
+ store.getState().newProject();const before=store.getState().nodes;
+ const old={version:'0.1',scene:{nodes:before},scripts:{'main.js':''}};
+ const upgraded=normalize(old);assert.equal(upgraded.version,'0.2');assert.equal(upgraded.settings.fixedTimeStep,1/60);assert.equal(upgraded.settings.timeScale,1);
+ assert.throws(()=>normalize({...old,version:'0.3'}),/版本/);
+ const {zipSync,strToU8}=await import('fflate');
+ const bytes=zipSync({'project.json':strToU8(JSON.stringify({...old,version:'0.3'}))});
+ await assert.rejects(archive.importProject(new File([bytes],'future.arkglide')),/版本/);assert.equal(store.getState().nodes,before);
+ const model={...before[0],id:'model',type:'model'};
+ assert.throws(()=>normalize({...old,scene:{nodes:[model]},modelRefs:[{assetId:'model',fileName:'../outside.glb'}]}),/引用/);
+ assert.throws(()=>normalize({...old,settings:{fixedTimeStep:0}}),/时间/);
+});
+test('automatic recovery atomically stores script, scene and binary data without overwriting the saved project',async()=>{
+ store.getState().newProject();await store.getState().saveCurrentProject('manual');const projectId=store.getState().currentProjectId;
+ const controller=recovery.startProjectRecovery({delay:100000,maxWait:100000});
+ try{
+  const model=store.getState().addNode('model','draft');store.getState().setModelBuffer(model,new Uint8Array([3,4,5]).buffer);
+  store.getState().updateScript('main.js','return {onUpdate(){}};');
+  const id=store.getState().documentId;await controller.flush();
+  const draft=await storage.loadRecovery(id);assert.ok(draft);assert.equal(draft.project.version,'0.2');assert.deepEqual([...new Uint8Array(draft.buffers.get(model))],[3,4,5]);
+  assert.ok(!(await storage.loadProject(projectId)).scene.nodes.some(n=>n.id===model));
+  store.getState().newProject();await recovery.restoreRecovery(id);
+  assert.equal(store.getState().documentId,id);assert.equal(store.getState().currentProjectId,projectId);
+  assert.equal(store.getState().past.length,0);assert.deepEqual([...new Uint8Array(store.getState().modelBuffers.get(model))],[3,4,5]);
+  await store.getState().saveCurrentProject();await controller.flush();assert.equal(await storage.loadRecovery(id),undefined);
+ }finally{controller.dispose();}
+});
+test('failed auto save is visible, leaves editing data intact and can be retried',async()=>{
+ store.getState().newProject();let fail=true;
+ const controller=recovery.startProjectRecovery({delay:100000,maxWait:100000,write:async record=>{if(fail)throw new DOMException('full','QuotaExceededError');await storage.saveRecovery(record);}});
+ try{
+  store.getState().renameNode('cube','unsaved');const nodes=store.getState().nodes;
+  await controller.flush();assert.equal(store.getState().recoveryStatus,'error');assert.match(store.getState().recoveryError,/QuotaExceededError/);assert.equal(store.getState().nodes,nodes);
+  fail=false;await controller.flush();assert.equal(store.getState().recoveryStatus,'saved');
+ }finally{controller.dispose();}
+});
+test('autosave switches documents safely and a queued stale save cannot overwrite newer edits',async()=>{
+ store.getState().newProject();let unlock,entered;
+ const began=new Promise(r=>entered=r),blocked=new Promise(r=>unlock=r),writes=[];
+ const controller=recovery.startProjectRecovery({delay:100000,maxWait:100000,write:async record=>{writes.push(record);if(writes.length===1){entered();await blocked;}}});
+ try{
+  store.getState().renameNode('cube','older');const first=controller.flush();await began;
+  store.getState().renameNode('cube','latest');const next=controller.flush();unlock();await Promise.all([first,next]);
+  assert.equal(writes.at(-1).project.scene.nodes.find(n=>n.id==='cube').name,'latest');assert.equal(store.getState().recoveryStatus,'saved');
+  store.getState().renameNode('cube','before switch');const id=store.getState().documentId;store.getState().newProject();await controller.flush();
+  assert.ok(writes.some(r=>r.recoveryId===id&&r.project.scene.nodes.find(n=>n.id==='cube').name==='before switch'));
+ }finally{controller.dispose();}
+});
+test('restoring damaged data is atomic and missing binary data is reported',async()=>{
+ store.getState().newProject();const before=store.getState().nodes;
+ await storage.saveRecovery({recoveryId:'broken',project:{version:'999'},buffers:new Map(),updatedAt:1});
+ await assert.rejects(recovery.restoreRecovery('broken'),/版本/);assert.equal(store.getState().nodes,before);
+ const model=store.getState().addNode('model','missing');const project=recovery.captureEditorProject(store.getState());
+ await storage.saveRecovery({recoveryId:'missing',project,buffers:new Map(),updatedAt:2});await recovery.restoreRecovery('missing');
+ assert.ok(store.getState().missingModelIds.has(model));assert.ok(store.getState().consoleLogs.some(log=>log.text.includes('资源丢失')));
+});
+test('unchanged playback does not create a recovery draft and draft retention is bounded',async()=>{
+ store.getState().newProject();const writes=[];const controller=recovery.startProjectRecovery({delay:100000,maxWait:100000,write:async r=>writes.push(r)});
+ try{store.getState().play();store.getState().pause();store.getState().play();store.getState().stop();await controller.flush();assert.equal(writes.length,0);}finally{controller.dispose();}
+ const project=recovery.captureEditorProject(store.getState());
+ for(let i=0;i<22;i++)await storage.saveRecovery({recoveryId:'retention-'+i,project,buffers:new Map(),updatedAt:1000+i});
+ assert.equal((await storage.listRecoveries()).length,20);assert.ok(await storage.loadRecovery('retention-21'));assert.equal(await storage.loadRecovery('retention-0'),undefined);
 });

@@ -28,3 +28,7 @@ npm run benchmark:math
 
 `npm run dev/build/build:wasm` 会同步共享场景脚本及 iframe 使用的经典脚本 WASM 版本。
 F11 物理、F12 C++ 场景图、F13 可玩项目导出、F14 联机仍待实现。
+
+### 第一批可靠性功能
+
+已加入固定步和销毁生命周期、时间缩放、脚本计时器/事件清理、自动恢复副本，以及运行诊断和错误定位。详见 [第一批说明](docs/first-batch.md)。生产构建后可运行 `npm run analyze:build` 查看体积报告。
