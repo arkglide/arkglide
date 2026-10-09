@@ -63,18 +63,20 @@ export const DEFAULT_SCRIPT = [
   '// ArkGlide 脚本 — this.entity 指向挂载此脚本的实体',
   '// 生命周期：onStart（启动时调用一次）/ onUpdate（每帧调用）',
   '// 输入：input.isKeyDown(\'w\') / input.getMouseDelta()',
-  '// 场景：scene.find(\'name\') / scene.findAll()',
+  '// 场景：scene.find(\'id\') / scene.findByName(\'Cube\')',
   '',
   'return {',
   '  onStart() {',
   '    console.log(\'脚本启动:\', this.entity.name);',
   '  },',
   '  onUpdate() {',
-  '    // WASD 移动当前实体',
-  '    if (input.isKeyDown(\'w\')) this.entity.transform.z += 0.05;',
-  '    if (input.isKeyDown(\'s\')) this.entity.transform.z -= 0.05;',
-  '    if (input.isKeyDown(\'a\')) this.entity.transform.x -= 0.05;',
-  '    if (input.isKeyDown(\'d\')) this.entity.transform.x += 0.05;',
+  '    // 以每秒 3 个单位移动，速度不随帧率变化',
+  '    const distance = 3 * time.deltaTime;',
+  '    this.entity.translate(',
+  '      input.getAxis(\'a\', \'d\') * distance,',
+  '      0,',
+  '      input.getAxis(\'s\', \'w\') * distance',
+  '    );',
   '  }',
   '};',
   '',
@@ -600,7 +602,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 新建脚本：避免重名，创建后切换为活跃文件
   createScript: (fileName) =>
     set((state) => {
-      if (state.scripts[fileName]) return {}; // 重名则不操作
+      if (Object.prototype.hasOwnProperty.call(state.scripts, fileName)) return {}; // 重名则不操作
       const newScripts = { ...state.scripts, [fileName]: '' };
       return { scripts: newScripts, activeFileId: fileName, script: '' };
     }),
@@ -620,7 +622,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 重命名脚本：目标名已存在或源名不存在则不操作
   renameScript: (oldName, newName) =>
     set((state) => {
-      if (state.scripts[newName] || !state.scripts[oldName]) return {};
+      if (Object.prototype.hasOwnProperty.call(state.scripts, newName) || !Object.prototype.hasOwnProperty.call(state.scripts, oldName)) return {};
       const newScripts = { ...state.scripts };
       newScripts[newName] = newScripts[oldName];
       delete newScripts[oldName];

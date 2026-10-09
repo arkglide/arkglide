@@ -9,6 +9,7 @@
   </style>
   <!-- 本地 Babylon UMD（离线可用） -->
   <script src="/lib/babylon.js"></script>
+  <script src="/arkglide-api.js"></script>
 </head>
 <body>
   <canvas id="renderCanvas"></canvas>
@@ -37,230 +38,12 @@
     var lifecycleInstances = []; // 按实体分发的脚本实例列表：[{ entity, onStart, onUpdate }]
     var running = false;      // onUpdate 是否激活
     var initialized = false;  // Babylon 是否已初始化
-    var mathModule = null;    // WASM 数学模块实例
-    var wasmReady = false;    // WASM 是否已加载完成
 
-    // ===== WASM 内存管理辅助函数 =====
-    // withVec3：创建临时 Vector3，执行回调后自动 delete，确保不泄漏
-    function withVec3(x, y, z, fn) {
-      if (!mathModule) return fn(null); // WASM 未就绪时回退
-      var v = new mathModule.Vector3(x, y, z);
-      try { return fn(v); } finally { v.delete(); }
-    }
-
-    // ===== 性能基准测试：JS vs WASM =====
-    function runBenchmark() {
-      if (!mathModule) return;
-
-      // --- JS 版（Float32Array 实现，公平对比）---
-      // Vector3 加法：a + b + c，10000 次
-      function benchJSVec3() {
-        var a = new Float32Array([1.5, 2.5, 3.5]);
-        var b = new Float32Array([4.0, 5.0, 6.0]);
-        var c = new Float32Array([0.1, 0.2, 0.3]);
-        var result = new Float32Array(3);
-        for (var i = 0; i < 10000; i++) {
-          result[0] = a[0] + b[0] + c[0];
-          result[1] = a[1] + b[1] + c[1];
-          result[2] = a[2] + b[2] + c[2];
-        }
-        return result;
-      }
-
-      // Matrix4 乘法：4x4 矩阵乘法，1000 次
-      function benchJSMat4() {
-        // 行主序 4x4 矩阵，Float32Array(16)
-        var m1 = new Float32Array([
-          1, 2, 3, 4,
-          5, 6, 7, 8,
-          9, 10, 11, 12,
-          13, 14, 15, 16
-        ]);
-        var m2 = new Float32Array([
-          0.1, 0.2, 0.3, 0.4,
-          0.5, 0.6, 0.7, 0.8,
-          0.9, 1.0, 1.1, 1.2,
-          1.3, 1.4, 1.5, 1.6
-        ]);
-        var result = new Float32Array(16);
-        for (var iter = 0; iter < 1000; iter++) {
-          for (var col = 0; col < 4; col++) {
-            for (var row = 0; row < 4; row++) {
-              var sum = 0;
-              for (var k = 0; k < 4; k++) {
-                sum += m1[k * 4 + row] * m2[col * 4 + k];
-              }
-              result[col * 4 + row] = sum;
-            }
-          }
-        }
-        return result;
-      }
-
-      // --- WASM 版 ---
-      function benchWasmVec3() {
-        var a = new mathModule.Vector3(1.5, 2.5, 3.5);
-        var b = new mathModule.Vector3(4.0, 5.0, 6.0);
-        var c = new mathModule.Vector3(0.1, 0.2, 0.3);
-        try {
-          var result = null;
-          for (var i = 0; i < 10000; i++) {
-            var ab = a.add(b);
-            try {
-              result = ab.add(c);
-            } finally { ab.delete(); }
-          }
-          return result;
-        } finally {
-          a.delete();
-          b.delete();
-          c.delete();
-          if (result) result.delete();
-        }
-      }
-
-      function benchWasmMat4() {
-        var m1 = mathModule.Matrix4.identity();
-        var m2 = mathModule.Matrix4.identity();
-        try {
-          var result = m1;
-          for (var iter = 0; iter < 1000; iter++) {
-            result = m1.multiply(m2);
-          }
-          return result;
-        } finally {
-          m1.delete();
-          m2.delete();
-        }
-      }
-
-      // --- 三轮取中位数 ---
-      var jsVec3Times = [], wasmVec3Times = [];
-      var jsMat4Times = [], wasmMat4Times = [];
-
-      for (var round = 0; round < 3; round++) {
-        var t0 = performance.now();
-        benchJSVec3();
-        jsVec3Times.push(performance.now() - t0);
-
-        t0 = performance.now();
-        benchWasmVec3();
-        wasmVec3Times.push(performance.now() - t0);
-
-        t0 = performance.now();
-        benchJSMat4();
-        jsMat4Times.push(performance.now() - t0);
-
-        t0 = performance.now();
-        benchWasmMat4();
-        wasmMat4Times.push(performance.now() - t0);
-      }
-
-      // 取中位数（排序后取中间值）
-      function median(arr) {
-        var sorted = arr.slice().sort(function(a, b) { return a - b; });
-        return sorted[Math.floor(sorted.length / 2)];
-      }
-
-      var jsVec3 = median(jsVec3Times);
-      var wasmVec3 = median(wasmVec3Times);
-      var jsMat4 = median(jsMat4Times);
-      var wasmMat4 = median(wasmMat4Times);
-
-      console.log('[WASM Bench] Vector3 Add (10000x): JS=' + jsVec3.toFixed(2) + 'ms, WASM=' + wasmVec3.toFixed(2) + 'ms, Speedup=' + (jsVec3 / wasmVec3).toFixed(2) + 'x');
-      console.log('[WASM Bench] Matrix4 Mul (1000x): JS=' + jsMat4.toFixed(2) + 'ms, WASM=' + wasmMat4.toFixed(2) + 'ms, Speedup=' + (jsMat4 / wasmMat4).toFixed(2) + 'x');
-    }
-
-    // ===== ArkGlide Entity 抽象类 =====
-    // 封装 Babylon Mesh，绝不暴露原始对象给用户脚本
-    function Entity(mesh, entityMap) {
-      this._mesh = mesh;           // 私有：Babylon Mesh（绝不暴露给用户）
-      this._entityMap = entityMap; // 私有：实体表引用（用于 destroy 时清理）
-      this._id = mesh.name;
-    }
-    Entity.prototype.getId = function() { return this._id; };
-    Entity.prototype.getName = function() { return this._mesh.name; };
-    Entity.prototype.setName = function(name) { this._mesh.name = name; };
-    // Transform
-    Entity.prototype.getPosition = function() {
-      return { x: this._mesh.position.x, y: this._mesh.position.y, z: this._mesh.position.z };
-    };
-    Entity.prototype.setPosition = function(x, y, z) { this._mesh.position.set(x, y, z); };
-    Entity.prototype.getRotation = function() {
-      return { x: this._mesh.rotation.x, y: this._mesh.rotation.y, z: this._mesh.rotation.z };
-    };
-    Entity.prototype.setRotation = function(x, y, z) { this._mesh.rotation.set(x, y, z); };
-    Entity.prototype.getScale = function() {
-      return { x: this._mesh.scaling.x, y: this._mesh.scaling.y, z: this._mesh.scaling.z };
-    };
-    Entity.prototype.setScale = function(x, y, z) { this._mesh.scaling.set(x, y, z); };
-    // Visibility
-    Entity.prototype.isVisible = function() { return this._mesh.isVisible; };
-    Entity.prototype.setVisible = function(v) { this._mesh.isVisible = v; };
-    // Lifecycle
-    Entity.prototype.destroy = function() {
-      if (this._mesh) {
-        this._mesh.dispose();
-        this._mesh = null;
-      }
-      if (this._entityMap) {
-        this._entityMap.delete(this._id);
-        this._entityMap = null;
-      }
-    };
-
-    // ===== 属性快捷访问（this.entity.transform.z += 0.05 等）=====
-    // 使用 Object.defineProperty 创建 live wrapper，修改直接反映到 Babylon Mesh
-    Object.defineProperty(Entity.prototype, 'name', {
-      get: function() { return this._mesh.name; },
-      set: function(v) { this._mesh.name = v; },
-      enumerable: true,
-    });
-    Object.defineProperty(Entity.prototype, 'transform', {
-      get: function() {
-        var self = this;
-        return {
-          get x() { return self._mesh.position.x; },
-          set x(v) { self._mesh.position.x = v; },
-          get y() { return self._mesh.position.y; },
-          set y(v) { self._mesh.position.y = v; },
-          get z() { return self._mesh.position.z; },
-          set z(v) { self._mesh.position.z = v; },
-        };
-      },
-      set: function(v) { this._mesh.position.set(v.x, v.y, v.z); },
-      enumerable: true,
-    });
-    Object.defineProperty(Entity.prototype, 'rotation', {
-      get: function() {
-        var self = this;
-        return {
-          get x() { return self._mesh.rotation.x; },
-          set x(v) { self._mesh.rotation.x = v; },
-          get y() { return self._mesh.rotation.y; },
-          set y(v) { self._mesh.rotation.y = v; },
-          get z() { return self._mesh.rotation.z; },
-          set z(v) { self._mesh.rotation.z = v; },
-        };
-      },
-      set: function(v) { this._mesh.rotation.set(v.x, v.y, v.z); },
-      enumerable: true,
-    });
-    Object.defineProperty(Entity.prototype, 'scale', {
-      get: function() {
-        var self = this;
-        return {
-          get x() { return self._mesh.scaling.x; },
-          set x(v) { self._mesh.scaling.x = v; },
-          get y() { return self._mesh.scaling.y; },
-          set y(v) { self._mesh.scaling.y = v; },
-          get z() { return self._mesh.scaling.z; },
-          set z(v) { self._mesh.scaling.z = v; },
-        };
-      },
-      set: function(v) { this._mesh.scaling.set(v.x, v.y, v.z); },
-      enumerable: true,
-    });
+    // Script API adapter owns renderer details; scripts receive only handles.
+    var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; });
+    var entityMap = entityAPI.entities;
+    var sceneAPI = entityAPI.sceneAPI;
+    var defineScript = ArkGlideRuntime.defineScript;
 
     // ===== ArkGlide Input API —— 键盘/鼠标状态追踪 =====
     var inputState = {
@@ -279,6 +62,9 @@
       isKeyDown: function(key) { return !!inputState._keys[(key || '').toUpperCase()]; },
       wasKeyPressed: function(key) { return !!inputState._keysPressed[(key || '').toUpperCase()]; },
       wasKeyReleased: function(key) { return !!inputState._keysReleased[(key || '').toUpperCase()]; },
+      getAxis: function(negativeKey, positiveKey) {
+        return Number(input.isKeyDown(positiveKey)) - Number(input.isKeyDown(negativeKey));
+      },
       getMousePosition: function() { return { x: inputState._mouseX, y: inputState._mouseY }; },
       getMouseDelta: function() { return { x: inputState._mouseDeltaX, y: inputState._mouseDeltaY }; },
       isMouseDown: function() { return inputState._mouseDown; },
@@ -323,57 +109,6 @@
     });
     // 鼠标事件监听（绑定到 canvas）
     // 注意：canvas 在 initBabylon 后才存在，所以鼠标监听要在 initBabylon 内部添加
-
-    // ===== ArkGlide Scene API —— 实体管理（不暴露 Babylon Scene）=====
-    var entityMap = new Map(); // id → Entity
-    var sceneAPI = {
-      find: function(id) {
-        var entity = entityMap.get(id);
-        if (!entity) {
-          console.warn('Entity not found: ' + id);
-        }
-        return entity || null;
-      },
-      create: function(type, id) {
-        id = id || (type + '_' + Math.random().toString(36).substr(2, 6));
-        var mesh;
-        switch (type) {
-          case 'box':
-            mesh = BABYLON.MeshBuilder.CreateBox(id, { size: 1 }, scene);
-            break;
-          case 'sphere':
-            mesh = BABYLON.MeshBuilder.CreateSphere(id, { diameter: 1 }, scene);
-            break;
-          case 'plane':
-            mesh = BABYLON.MeshBuilder.CreateGround(id, { width: 1, height: 1 }, scene);
-            break;
-          case 'cylinder':
-            mesh = BABYLON.MeshBuilder.CreateCylinder(id, { height: 1, diameter: 1 }, scene);
-            break;
-          case 'capsule':
-            mesh = BABYLON.MeshBuilder.CreateCapsule(id, { height: 1, radius: 0.5 }, scene);
-            break;
-          case 'torus':
-            mesh = BABYLON.MeshBuilder.CreateTorus(id, { diameter: 1, thickness: 0.3 }, scene);
-            break;
-          default:
-            mesh = BABYLON.MeshBuilder.CreateBox(id, { size: 1 }, scene);
-        }
-        var entity = new Entity(mesh, entityMap);
-        entityMap.set(id, entity);
-        return entity;
-      },
-      findAll: function() { return Array.from(entityMap.values()); },
-      destroy: function(id) {
-        var entity = entityMap.get(id);
-        if (entity) { entity.destroy(); }
-      },
-      destroyAll: function() {
-        entityMap.forEach(function(e) { e.destroy(); });
-        entityMap.clear();
-      },
-      getEntityCount: function() { return entityMap.size; },
-    };
 
     // ===== ArkGlide Time API —— 帧时间 =====
     var time = {
@@ -469,8 +204,8 @@
       });
       canvas.addEventListener('mousemove', function(e) {
         if (inputState._mouseDown) {
-          inputState._mouseDeltaX = e.clientX - inputState._mouseX;
-          inputState._mouseDeltaY = e.clientY - inputState._mouseY;
+          inputState._mouseDeltaX += e.clientX - inputState._mouseX;
+          inputState._mouseDeltaY += e.clientY - inputState._mouseY;
         }
         inputState._mouseX = e.clientX;
         inputState._mouseY = e.clientY;
@@ -487,18 +222,23 @@
           _lastRenderTime = now;
         }
 
-        // 更新 time
-        var now = performance.now() / 1000; // 秒
-        if (_lastFrameTime > 0) {
-          time.deltaTime = now - _lastFrameTime;
+        if (running) {
+          // Advance simulation time only while playing.
+          var now = performance.now() / 1000; // 秒
+          if (_lastFrameTime > 0) {
+            time.deltaTime = now - _lastFrameTime;
+          } else {
+            time.deltaTime = 0;
+          }
+          _lastFrameTime = now;
+          time.totalTime += time.deltaTime;
+          time.frameCount++;
         }
-        _lastFrameTime = now;
-        time.totalTime += time.deltaTime;
-        time.frameCount++;
 
         // 调用 onUpdate（按实体分发：遍历所有实体-脚本实例）
         if (running) {
           lifecycleInstances.forEach(function(inst) {
+            if (inst.entity && inst.entity.destroyed) return;
             try {
               if (inst.onUpdate) inst.onUpdate.call(inst.instance);
             } catch (e) {
@@ -526,32 +266,11 @@
     function syncEntities(nodes) {
       nodes.forEach(function (n) {
         if (n.type !== 'mesh') return;
-        // 如果已有 Entity，更新位置 + rotation/scale/visible/color
-        var existing = entityMap.get(n.id);
-        if (existing) {
-          existing.setPosition(n.transform.x, n.transform.y, n.transform.z);
-          // 同步 rotation/scale/visible/color
-          var mesh = existing._mesh;
-          if (mesh) {
-            if (n.rotation) mesh.rotation.set(n.rotation.x, n.rotation.y, n.rotation.z);
-            if (n.scale) mesh.scaling.set(n.scale.x, n.scale.y, n.scale.z);
-            if (typeof n.visible === 'boolean') mesh.setEnabled(n.visible);
-            if (n.color) {
-              var mat = mesh.material;
-              if (!mat || mat.name !== n.id + '_mat') {
-                mat = new BABYLON.StandardMaterial(n.id + '_mat', scene);
-                mesh.material = mat;
-              }
-              mat.diffuseColor = BABYLON.Color3.FromHexString(n.color);
-            }
-          }
-          return;
-        }
         // 创建新 Entity
         var mesh = n.id === 'cube'
           ? BABYLON.MeshBuilder.CreateBox(n.id, { size: 1 }, scene)
           : BABYLON.MeshBuilder.CreateSphere(n.id, { diameter: 1 }, scene);
-        var entity = new Entity(mesh, entityMap);
+        var entity = entityAPI.register(mesh, n.id, n.name);
         entity.setPosition(n.transform.x, n.transform.y, n.transform.z);
         // 同步 rotation/scale/visible/color
         if (n.rotation) mesh.rotation.set(n.rotation.x, n.rotation.y, n.rotation.z);
@@ -562,16 +281,9 @@
           mat.diffuseColor = BABYLON.Color3.FromHexString(n.color);
           mesh.material = mat;
         }
-        entityMap.set(n.id, entity);
       });
       // 调试日志：打印当前场景实体 ID 列表
       console.log('[ArkGlide] 场景实体已就绪: ' + Array.from(entityMap.keys()).join(', '));
-      // WASM 状态报告
-      if (wasmReady) {
-        console.log('[WASM] syncEntities completed, math module available');
-      } else {
-        console.log('[WASM] syncEntities completed, math module not yet ready');
-      }
     }
 
     // 执行用户脚本（new Function + 生命周期 + try/catch）
@@ -600,6 +312,7 @@
       }, 10000);
 
       lifecycle = null;
+      lifecycleInstances = [];
       running = false;
 
       try {
@@ -607,19 +320,25 @@
         var defaultEntity = entityMap.size > 0 ? entityMap.values().next().value : null;
 
         // 注入 API：entity（默认实体）, input, scene, time, console
-        var fn = new Function('entity', 'input', 'scene', 'time', 'console', code);
-        var result = fn(defaultEntity, input, sceneAPI, time, console);
+        var fn = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', code);
+        var result = fn.call({ entity: defaultEntity }, defaultEntity, input, sceneAPI, time, console, defineScript);
 
         if (result && typeof result === 'object') {
           lifecycle = result;
+          lifecycle.entity = defaultEntity;
           if (typeof lifecycle.onStart === 'function') {
             console.log('[ArkGlide] onStart called. onUpdate should follow.');
             try {
-              lifecycle.onStart();
+              lifecycle.onStart.call(lifecycle);
             } catch (e) {
               sendToEditor({ type: 'log', level: 'error', args: ['onStart: ' + String((e && e.message) || e)] });
             }
           }
+          lifecycleInstances = [{
+            entity: defaultEntity, instance: lifecycle,
+            onStart: typeof lifecycle.onStart === 'function' ? lifecycle.onStart : null,
+            onUpdate: typeof lifecycle.onUpdate === 'function' ? lifecycle.onUpdate : null,
+          }];
           running = true;
         }
       } catch (e) {
@@ -655,8 +374,7 @@
 
     // 执行用户脚本（按实体分发模型）—— 每个实体挂载的脚本独立执行
     // 为每个脚本文件创建工厂函数 new Function，遍历实体挂载的脚本调用
-    // factory.call(entity, ...) 创建独立实例，收集 { entity, onStart, onUpdate }
-    // 执行生命周期时 onStart/onUpdate 的 this 绑定到对应 entity
+    // Each factory receives { entity } as this; lifecycle hooks bind to its result.
     function runEntityScripts(scripts, nodes) {
       // 重置 time
       time.deltaTime = 0;
@@ -707,14 +425,14 @@
 
             // 创建或获取工厂函数（缓存）
             if (!factoryCache[scriptFile]) {
-              factoryCache[scriptFile] = new Function('entity', 'input', 'scene', 'time', 'console', code);
+              factoryCache[scriptFile] = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', code);
             }
             var factory = factoryCache[scriptFile];
 
             // 为此实体-脚本对创建独立实例
-            // factory.call(entity, ...) 绑定 this = entity，脚本内 this.entity 指向该实体
+            // Bind the factory context so top-level this.entity and arrow hooks work too.
             // 同时保留 entity 作为第一个参数（向后兼容）
-            var instance = factory.call(entity, entity, input, sceneAPI, time, console);
+            var instance = factory.call({ entity: entity }, entity, input, sceneAPI, time, console, defineScript);
 
             if (instance && typeof instance === 'object') {
               // 注入 this.entity：用户脚本中 this.entity 指向挂载的实体
@@ -732,6 +450,7 @@
 
         // 执行所有 onStart（this 绑定到 instance，this.entity 指向挂载的实体）
         lifecycleInstances.forEach(function(inst) {
+          if (inst.entity && inst.entity.destroyed) return;
           try {
             if (inst.onStart) inst.onStart.call(inst.instance);
           } catch (e) {
@@ -755,26 +474,6 @@
       if (!msg || typeof msg !== 'object') return;
 
       switch (msg.type) {
-        case 'wasm_init':
-          // 接收 WASM JS 胶水代码 + wasm 二进制
-          (async function() {
-            try {
-              // 用 Blob URL 加载 JS 胶水代码
-              var jsBlob = new Blob([msg.wasmJs], { type: 'text/javascript' });
-              var jsUrl = URL.createObjectURL(jsBlob);
-              var factory = (await import(jsUrl)).default;
-              URL.revokeObjectURL(jsUrl);
-              // 用 wasmBinary 直接实例化（不需要 URL 定位 wasm 文件）
-              mathModule = await factory({ wasmBinary: msg.wasmBinary });
-              wasmReady = true;
-              console.log('[WASM] Module loaded successfully');
-              // 立即跑基准测试
-              runBenchmark();
-            } catch (e) {
-              console.error('[WASM] Failed to load module: ' + String((e && e.message) || e));
-            }
-          })();
-          break;
         case 'run':
           initBabylon();
           // 应用项目设置（重力/背景色/环境光/帧率上限）
@@ -803,13 +502,12 @@
                 if (result.meshes.length > 0) {
                   var rootMesh = result.meshes[0];
                   rootMesh.name = node.id;
-                  // 同步 transform/rotation/scale/visible
-                  rootMesh.position.set(node.transform.x, node.transform.y, node.transform.z);
-                  if (node.rotation) rootMesh.rotation.set(node.rotation.x, node.rotation.y, node.rotation.z);
-                  if (node.scale) rootMesh.scaling.set(node.scale.x, node.scale.y, node.scale.z);
-                  if (typeof node.visible === 'boolean') rootMesh.setEnabled(node.visible);
-                  var entity = new Entity(rootMesh, entityMap);
-                  entityMap.set(node.id, entity);
+                  // Register first to normalize imported quaternion roots.
+                  var entity = entityAPI.register(rootMesh, node.id, node.name);
+                  entity.setPosition(node.transform);
+                  if (node.rotation) entity.setRotation(node.rotation);
+                  if (node.scale) entity.setScale(node.scale);
+                  if (typeof node.visible === 'boolean') entity.setVisible(node.visible);
                 }
                 console.log('[ArkGlide] 运行时模型加载成功: ' + node.name);
               }).catch(function(err) {
@@ -827,8 +525,6 @@
             // 重新创建编辑器场景实体（非 model 类型，model 已在上方加载）
             var nonModelNodes = msg.project.scene.nodes.filter(function(n) { return n.type !== 'model'; });
             syncEntities(nonModelNodes);
-            // WASM 已就绪时跑基准测试（如果 wasm_init 先于 run 到达）
-            if (wasmReady) runBenchmark();
             // 执行用户脚本（entityMap 已填充，scene.find 可用）
             // 按实体分发模型：遍历实体挂载的脚本分别执行；回退单脚本（向后兼容旧项目）
             if (msg.project.scripts && msg.project.scene && msg.project.scene.nodes) {
@@ -840,8 +536,12 @@
           break;
         case 'pause':
           running = false;
+          time.deltaTime = 0;
+          _lastFrameTime = 0;
           break;
         case 'resume':
+          _lastFrameTime = 0;
+          time.deltaTime = 0;
           running = true;
           break;
         case 'stop':
