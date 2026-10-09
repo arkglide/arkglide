@@ -3,7 +3,7 @@
 (function (root) {
   'use strict';
 
-  function createEntityAPI(Babylon, getScene) {
+  function createEntityAPI(Babylon, getScene, getMath = () => null) {
     const entities = new Map();
     const handles = new WeakMap();
 
@@ -67,7 +67,7 @@
       set name(value) { meshOf(this); handles.get(this).name = String(value); }
       get transform() { return this.position; }
       set transform(value) { this.position = value; }
-      get visible() { return meshOf(this).isEnabled() && meshOf(this).isVisible; }
+      get visible() { const mesh = meshOf(this); return mesh.isEnabled() && mesh.isVisible !== false; }
       set visible(value) { const mesh = meshOf(this); mesh.isVisible = !!value; mesh.setEnabled(!!value); }
       getId() { return this.id; }
       getName() { return this.name; }
@@ -76,22 +76,39 @@
       setPosition(x, y, z) { setVector(this, 'position', x, y, z); }
       getRotation() { return copyVector(this, 'rotation'); }
       setRotation(x, y, z) { setVector(this, 'rotation', x, y, z); }
+      getWorldMatrix() {
+        const math = getMath(), mesh = meshOf(this);
+        if (!math) return Array.from(mesh.computeWorldMatrix(true).m);
+        function world(node) {
+          const angles = node.rotationQuaternion?.toEulerAngles() || node.rotation;
+          const local = math.mat4.compose(node.position, angles, node.scaling);
+          return node.parent && node.parent.position ? math.mat4.multiply(world(node.parent), local) : local;
+        }
+        return world(mesh);
+      }
+      getWorldPosition() {
+        const matrix = this.getWorldMatrix();
+        return { x: matrix[12], y: matrix[13], z: matrix[14] };
+      }
       getScale() { return copyVector(this, 'scaling'); }
       setScale(x, y, z) { setVector(this, 'scaling', x, y, z); }
       translate(x, y, z) {
         const delta = vector(x, y, z), position = this.getPosition();
-        this.setPosition(position.x + delta.x, position.y + delta.y, position.z + delta.z);
+        const math = getMath();
+        this.setPosition(math ? math.vec3.add(position, delta) : { x: position.x + delta.x, y: position.y + delta.y, z: position.z + delta.z });
       }
       rotate(x, y, z) {
         const angles = vector(x, y, z), rotation = this.getRotation();
-        this.setRotation(rotation.x + angles.x, rotation.y + angles.y, rotation.z + angles.z);
+        const math = getMath();
+        this.setRotation(math ? math.vec3.add(rotation, angles) : { x: rotation.x + angles.x, y: rotation.y + angles.y, z: rotation.z + angles.z });
       }
       isVisible() { return this.visible; }
       setVisible(value) { this.visible = value; }
       destroy() {
         const handle = handles.get(this);
         if (!handle.mesh) return;
-        handle.mesh.dispose();
+        const mesh = handle.mesh;
+        mesh.dispose();
         handle.mesh = null;
         entities.delete(handle.id);
       }
@@ -104,6 +121,7 @@
         mesh.rotationQuaternion = null;
       }
       const entity = new EntityHandle(mesh, id, name);
+      mesh.onDisposeObservable?.add(() => { handles.get(entity).mesh = null; entities.delete(id); });
       entities.set(id, entity);
       return entity;
     }

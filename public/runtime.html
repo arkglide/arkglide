@@ -9,7 +9,11 @@
   </style>
   <!-- 本地 Babylon UMD（离线可用） -->
   <script src="/lib/babylon.js"></script>
+  <script src="/lib/babylon.glTFFileLoader.min.js"></script>
+  <script src="/arkglide-math.js"></script>
+  <script src="/lib/arkglide_math.js"></script>
   <script src="/arkglide-api.js"></script>
+  <script src="/arkglide-scene.js"></script>
 </head>
 <body>
   <canvas id="renderCanvas"></canvas>
@@ -40,7 +44,12 @@
     var initialized = false;  // Babylon 是否已初始化
 
     // Script API adapter owns renderer details; scripts receive only handles.
-    var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; });
+    var math = null;
+    var mathReady = typeof createArkGlideMath === 'function'
+      ? createArkGlideMath().then(function(module) { math = ArkGlideMath.createMathAPI(module); })
+      : Promise.resolve();
+    var sceneAdapter = null, runGeneration = 0, desiredState = 'stopped';
+    var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; }, function() { return math; });
     var entityMap = entityAPI.entities;
     var sceneAPI = entityAPI.sceneAPI;
     var defineScript = ArkGlideRuntime.defineScript;
@@ -157,7 +166,7 @@
       }
 
       // 环境光：查找已有的 hemi 灯，更新强度和颜色
-      var hemi = scene.getLightByName('hemi');
+      var hemi = scene.getLightByName('__ambient');
       if (hemi) {
         if (typeof settings.ambientIntensity === 'number') {
           hemi.intensity = settings.ambientIntensity;
@@ -188,7 +197,7 @@
       camera.attachControl(canvas, true);
       camera.wheelDeltaPercentage = 0.01;
 
-      var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+      var hemi = new BABYLON.HemisphericLight('__ambient', new BABYLON.Vector3(0, 1, 0), scene);
       hemi.intensity = 0.8;
 
       // 鼠标事件（在 canvas 获取后添加）
@@ -259,31 +268,12 @@
       });
 
       window.addEventListener('resize', function () { engine.resize(); });
-      initialized = true;
-    }
-
-    // 创建/同步实体（根据项目节点）—— 用 Entity 包装编辑器场景节点
-    function syncEntities(nodes) {
-      nodes.forEach(function (n) {
-        if (n.type !== 'mesh') return;
-        // 创建新 Entity
-        var mesh = n.id === 'cube'
-          ? BABYLON.MeshBuilder.CreateBox(n.id, { size: 1 }, scene)
-          : BABYLON.MeshBuilder.CreateSphere(n.id, { diameter: 1 }, scene);
-        var entity = entityAPI.register(mesh, n.id, n.name);
-        entity.setPosition(n.transform.x, n.transform.y, n.transform.z);
-        // 同步 rotation/scale/visible/color
-        if (n.rotation) mesh.rotation.set(n.rotation.x, n.rotation.y, n.rotation.z);
-        if (n.scale) mesh.scaling.set(n.scale.x, n.scale.y, n.scale.z);
-        if (typeof n.visible === 'boolean') mesh.setEnabled(n.visible);
-        if (n.color) {
-          var mat = new BABYLON.StandardMaterial(n.id + '_mat', scene);
-          mat.diffuseColor = BABYLON.Color3.FromHexString(n.color);
-          mesh.material = mat;
-        }
+      sceneAdapter = ArkGlideScene.createSceneAdapter(BABYLON, scene, {
+        onCreate: function(object, node) { entityAPI.register(object, node.id, node.name); },
+        onRemove: function(id) { sceneAPI.destroy(id); },
+        onError: function(node, error) { console.error('模型加载失败: ' + node.name + ' - ' + String(error)); },
       });
-      // 调试日志：打印当前场景实体 ID 列表
-      console.log('[ArkGlide] 场景实体已就绪: ' + Array.from(entityMap.keys()).join(', '));
+      initialized = true;
     }
 
     // 执行用户脚本（new Function + 生命周期 + try/catch）
@@ -320,8 +310,8 @@
         var defaultEntity = entityMap.size > 0 ? entityMap.values().next().value : null;
 
         // 注入 API：entity（默认实体）, input, scene, time, console
-        var fn = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', code);
-        var result = fn.call({ entity: defaultEntity }, defaultEntity, input, sceneAPI, time, console, defineScript);
+        var fn = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', 'math', code);
+        var result = fn.call({ entity: defaultEntity }, defaultEntity, input, sceneAPI, time, console, defineScript, math);
 
         if (result && typeof result === 'object') {
           lifecycle = result;
@@ -425,14 +415,14 @@
 
             // 创建或获取工厂函数（缓存）
             if (!factoryCache[scriptFile]) {
-              factoryCache[scriptFile] = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', code);
+              factoryCache[scriptFile] = new Function('entity', 'input', 'scene', 'time', 'console', 'defineScript', 'math', code);
             }
             var factory = factoryCache[scriptFile];
 
             // 为此实体-脚本对创建独立实例
             // Bind the factory context so top-level this.entity and arrow hooks work too.
             // 同时保留 entity 作为第一个参数（向后兼容）
-            var instance = factory.call({ entity: entity }, entity, input, sceneAPI, time, console, defineScript);
+            var instance = factory.call({ entity: entity }, entity, input, sceneAPI, time, console, defineScript, math);
 
             if (instance && typeof instance === 'object') {
               // 注入 this.entity：用户脚本中 this.entity 指向挂载的实体
@@ -475,76 +465,46 @@
 
       switch (msg.type) {
         case 'run':
+          var generation = ++runGeneration;
+          desiredState = 'playing';
+          running = false;
+          lifecycle = null;
+          lifecycleInstances = [];
           initBabylon();
-          // 应用项目设置（重力/背景色/环境光/帧率上限）
+          sceneAdapter.clear();
+          sceneAPI.destroyAll();
           applySettings(msg.project.settings);
-          // 先清理所有旧实体（上一轮 run 拼建的）
-          entityMap.forEach(function(e) { e.destroy(); });
-          entityMap.clear();
-
-          // 加载模型（如果有 modelData —— 通过 Transferable 传递的 ArrayBuffer）
-          var modelPromises = [];
-          if (msg.modelData) {
-            var modelNodes = msg.project.scene.nodes.filter(function(n) { return n.type === 'model'; });
-            modelNodes.forEach(function(node) {
-              var buffer = msg.modelData[node.id];
-              if (!buffer) return;
-              // 从 modelUrl（原始文件名）推断扩展名，显式指定 loader
-              // （Blob URL 无扩展名，Babylon 无法自动推断格式）
-              var ext = '.glb';
-              if (node.modelUrl) {
-                var parts = node.modelUrl.split('.');
-                if (parts.length > 1) ext = '.' + parts.pop().toLowerCase();
-              }
-              var blobUrl = URL.createObjectURL(new Blob([buffer]));
-              var p = BABYLON.SceneLoader.ImportMeshAsync('', '', blobUrl, scene, undefined, ext).then(function(result) {
-                URL.revokeObjectURL(blobUrl);
-                if (result.meshes.length > 0) {
-                  var rootMesh = result.meshes[0];
-                  rootMesh.name = node.id;
-                  // Register first to normalize imported quaternion roots.
-                  var entity = entityAPI.register(rootMesh, node.id, node.name);
-                  entity.setPosition(node.transform);
-                  if (node.rotation) entity.setRotation(node.rotation);
-                  if (node.scale) entity.setScale(node.scale);
-                  if (typeof node.visible === 'boolean') entity.setVisible(node.visible);
-                }
-                console.log('[ArkGlide] 运行时模型加载成功: ' + node.name);
-              }).catch(function(err) {
-                URL.revokeObjectURL(blobUrl);
-                console.error('[ArkGlide] 运行时模型加载失败: ' + node.name + ' - ' + String(err));
-              });
-              modelPromises.push(p);
-            });
-          }
-
-          // 等所有模型加载完，再同步非模型实体和执行脚本
-          // 关键：模型加载是异步的，必须等加载完再 runScript
-          // （onStart 中可能 scene.find 模型实体）
-          Promise.all(modelPromises).then(function() {
-            // 重新创建编辑器场景实体（非 model 类型，model 已在上方加载）
-            var nonModelNodes = msg.project.scene.nodes.filter(function(n) { return n.type !== 'model'; });
-            syncEntities(nonModelNodes);
-            // 执行用户脚本（entityMap 已填充，scene.find 可用）
-            // 按实体分发模型：遍历实体挂载的脚本分别执行；回退单脚本（向后兼容旧项目）
-            if (msg.project.scripts && msg.project.scene && msg.project.scene.nodes) {
-              runEntityScripts(msg.project.scripts, msg.project.scene.nodes);
-            } else if (msg.project.script) {
-              runScript(msg.project.script);
-            }
+          Promise.all([
+            mathReady,
+            sceneAdapter.sync(msg.project.scene.nodes, msg.modelData || {}),
+          ]).then(function() {
+            if (generation !== runGeneration || desiredState === 'stopped') return;
+            scene.activeCamera = sceneAdapter.activeCamera() || camera;
+            if (msg.project.scripts) runEntityScripts(msg.project.scripts, msg.project.scene.nodes);
+            else if (msg.project.script) runScript(msg.project.script);
+            if (desiredState === 'paused') running = false;
+          }).catch(function(error) {
+            if (generation === runGeneration) sendToEditor({ type: 'fatal', message: String(error) });
           });
           break;
         case 'pause':
+          desiredState = 'paused';
           running = false;
           time.deltaTime = 0;
           _lastFrameTime = 0;
           break;
         case 'resume':
+          desiredState = 'playing';
           _lastFrameTime = 0;
           time.deltaTime = 0;
           running = true;
           break;
         case 'stop':
+          ++runGeneration;
+          desiredState = 'stopped';
+          sceneAdapter?.clear();
+          if (scene) scene.activeCamera = camera;
+          if (_noKeyWarnTimer) { clearTimeout(_noKeyWarnTimer); _noKeyWarnTimer = null; }
           // 完全重置：停止 onUpdate + 清空场景实体 + 重置 time/input
           // 编辑器侧 stop() 已恢复 prePlaySnapshot，下次 play() 会重新发 'run' 重建场景
           running = false;
@@ -578,7 +538,7 @@
     });
 
     // handshake：通知编辑器 iframe 已就绪（只发一次）
-    sendToEditor({ type: 'ready' });
+    mathReady.then(function() { sendToEditor({ type: 'ready' }); }).catch(function(error) { sendToEditor({ type: 'fatal', message: 'WASM 数学模块加载失败: ' + String(error) }); });
   </script>
 </body>
 </html>

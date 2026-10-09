@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ArkGlide 数学性能基准</title>
+<style>body{background:#121212;color:#ddd;font:15px system-ui;max-width:900px;margin:40px auto;padding:0 20px}button{background:#7c9cff;border:0;border-radius:8px;padding:12px 20px;cursor:pointer}table{width:100%;border-collapse:collapse;margin:24px 0}td,th{text-align:left;border-bottom:1px solid #444;padding:12px}p{line-height:1.7;color:#aaa}</style>
+<h1>数学性能基准</h1><p>比较 JavaScript 与 WASM 的公共数学 API。结果包含参数校验、跨边界调用、分配、结果复制和释放。每项预热后测量 5 次，取中位数。比值大于 1 表示本次 WASM 用时更长。</p>
+<button id="run">运行基准</button><p id="status">准备中</p><table><thead><tr><th>运算</th><th>次数／轮</th><th>JS（ms）</th><th>WASM（ms）</th><th>WASM / JS</th></tr></thead><tbody id="results"></tbody></table>
+<script src="/lib/arkglide_math.js"></script><script src="/arkglide-math.js"></script><script src="/math-benchmark.js"></script>
+<script>
+const button=document.querySelector('#run'),status=document.querySelector('#status');
+const ready=createArkGlideMath();
+ready.then(()=>status.textContent='就绪').catch(error=>status.textContent='加载失败：'+error);
+button.onclick=async()=>{
+ button.disabled=true;status.textContent='运行中';
+ try {const module=await ready;await new Promise(resolve=>setTimeout(resolve,20));
+ const report=ArkGlideBenchmark.runMathBenchmark(ArkGlideMath.createMathAPI(module),ArkGlideMath.createMathAPI(null));
+ document.querySelector('#results').replaceChildren(...report.results.map(row=>{
+  const tr=document.createElement('tr');for(const value of [row.operation,row.iterations,row.jsMs.toFixed(3),row.wasmMs.toFixed(3),row.wasmOverJs.toFixed(2)]){const td=document.createElement('td');td.textContent=value;tr.append(td);}return tr;
+ }));status.textContent='完成';window.benchmarkReport=report;
+ }catch(error){status.textContent='运行失败：'+error;}finally{button.disabled=false;}
+};
+</script></html>

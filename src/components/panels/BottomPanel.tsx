@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Box, Tabs, Tab, Typography, IconButton, Tooltip } from '@mui/material';
 import { DeleteSweep } from '@mui/icons-material';
 import AssetBrowser from './AssetBrowser';
@@ -59,6 +59,9 @@ function ConsolePanel() {
 // 底部 Tab 面板：控制台 / 代码编辑器 / 项目资源
 export default function BottomPanel() {
   const [tab, setTab] = useState(0);
+  const editing = useEditorStore(s => s.playState === 'stopped');
+  const resources = useRef<HTMLDivElement>(null);
+  useEffect(() => { if(resources.current) resources.current.inert = !editing; }, [editing,tab]);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -70,7 +73,7 @@ export default function BottomPanel() {
       <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {tab === 0 && <ConsolePanel />}
         {tab === 1 && <CodeEditor />}
-        {tab === 2 && <AssetBrowser />}
+        {tab === 2 && <Box ref={resources} sx={{height:'100%',opacity:editing ? 1 : 0.6}}><AssetBrowser /></Box>}
       </Box>
     </Box>
   );

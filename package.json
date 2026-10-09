@@ -5,13 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run sync:runtime && tsc && vite build",
     "build:wasm": "node scripts/build-wasm.mjs",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "sync:wasm": "node scripts/sync-wasm.mjs",
+    "benchmark:math": "node scripts/benchmark-math.mjs",
+    "test:browser": "playwright test",
+    "sync:runtime": "node scripts/sync-runtime.mjs",
+    "predev": "npm run sync:runtime"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",
+    "@babylonjs/loaders": "^9.28.0",
     "@babylonjs/materials": "^9.28.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -28,10 +34,12 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/node": "^22.20.4",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.7.0",
     "vite": "^7.3.6"
   },

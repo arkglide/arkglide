@@ -41,8 +41,8 @@ export default function RuntimeFrame() {
         case 'ready':
           readyRef.current = true;
           // iframe 就绪后立即获取焦点，确保键盘事件能被捕获
-          iframeRef.current?.focus();
-          if (pendingProjectRef.current) {
+          if (useEditorStore.getState().playState !== 'stopped') iframeRef.current?.focus();
+          if (pendingProjectRef.current && useEditorStore.getState().playState !== 'stopped') {
             // 发送暂存的项目（含模型 ArrayBuffer，通过 Transferable 零拷贝传递）
             if (pendingTransferRef.current && pendingTransferRef.current.length > 0) {
               postToIframe(
@@ -59,6 +59,7 @@ export default function RuntimeFrame() {
             pendingProjectRef.current = null;
             pendingModelDataRef.current = null;
             pendingTransferRef.current = null;
+            if (useEditorStore.getState().playState === 'paused') postToIframe({ type: 'pause' });
           }
           break;
         case 'log':
@@ -117,13 +118,16 @@ export default function RuntimeFrame() {
     } else if (playState === 'paused') {
       postToIframe({ type: 'pause' });
     } else if (playState === 'stopped') {
+      pendingProjectRef.current = null;
+      pendingModelDataRef.current = null;
+      pendingTransferRef.current = null;
       postToIframe({ type: 'stop' }); // 完全重置 iframe 场景
     }
   }, [playState, project]);
 
   // 用户点击运行区域时自动 focus iframe（确保键盘事件被捕获）
   const handleFocus = () => {
-    iframeRef.current?.focus();
+    if (useEditorStore.getState().playState !== 'stopped') iframeRef.current?.focus();
   };
 
   return (

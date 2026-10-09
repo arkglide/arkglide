@@ -13,9 +13,16 @@ import {
   Mesh,
   PointerEventTypes,
   GizmoManager,
-  StandardMaterial,
-  SceneLoader,
+  TransformNode,
+  Matrix,
+  Quaternion,
+  GizmoCoordinatesMode,
 } from '@babylonjs/core';
+import * as Babylon from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
+import { createSceneAdapter, type SceneAdapter } from '../../engine/sceneAdapter';
+import { readModelAsset } from '../../engine/modelImport';
+import { applySelectionDelta, selectionRoots } from '../../engine/selectionTransform';
 import { GridMaterial } from '@babylonjs/materials';
 import { useEditorStore } from '../../store/useEditorStore';
 import RuntimeFrame from './RuntimeFrame';
@@ -25,10 +32,17 @@ export default function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const highlightRef = useRef<HighlightLayer | null>(null);
-  const meshMapRef = useRef<Map<string, Mesh>>(new Map());
+  const meshMapRef = useRef<Map<string, TransformNode>>(new Map());
   const gizmoManagerRef = useRef<GizmoManager | null>(null);
   // 模型 ArrayBuffer 缓存：nodeId → ArrayBuffer（供播放时 Transferable 传递）
-  const modelBuffersRef = useRef<Map<string, ArrayBuffer>>(new Map());
+  const adapterRef = useRef<SceneAdapter | null>(null);
+  const loadingCountRef = useRef(0);
+  const modelBuffers = useEditorStore((s) => s.modelBuffers);
+  const settings = useEditorStore((s) => s.settings);
+  const [sceneRevision, setSceneRevision] = useState(0);
+  const pivotRef = useRef<TransformNode | null>(null);
+  const initialWorldRef = useRef<Map<TransformNode, Matrix>>(new Map());
+  const initialPivotRef = useRef(Matrix.Identity());
   const [modelLoading, setModelLoading] = useState(false);
   // 相机引用：供键盘/鼠标事件处理中访问 ArcRotateCamera
   const cameraRef = useRef<ArcRotateCamera | null>(null);
@@ -63,7 +77,7 @@ export default function Viewport() {
   // 拖拽中状态 + 各选中节点初始位置（供增量同步）
   const isDraggingRef = useRef(false);
   const draggedIdRef = useRef<string | null>(null);
-  const initialPositionsRef = useRef<Map<string, Vector3>>(new Map());
+
 
   // 初始化编辑引擎 / 场景 / 环境光 / 网格地面
   useEffect(() => {
@@ -74,7 +88,7 @@ export default function Viewport() {
     sceneRef.current = scene;
 
     const camera = new ArcRotateCamera(
-      'camera',
+      '__editor_camera',
       -Math.PI / 2,
       Math.PI / 3,
       8,
@@ -85,7 +99,7 @@ export default function Viewport() {
     camera.wheelDeltaPercentage = 0.01;
     cameraRef.current = camera;
 
-    const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
+    const hemi = new HemisphericLight('__ambient', new Vector3(0, 1, 0), scene);
     hemi.intensity = 0.8;
 
     const ground = MeshBuilder.CreateGround('ground', { width: 12, height: 12 }, scene);
@@ -94,23 +108,38 @@ export default function Viewport() {
     gridMat.lineColor = new Color3(0.35, 0.35, 0.35);
     gridMat.gridRatio = 1;
     ground.material = gridMat;
+    ground.isPickable = false;
+    adapterRef.current = createSceneAdapter(Babylon, scene, {
+      editor: true,
+      onLoading: (delta) => { loadingCountRef.current += delta; setModelLoading(loadingCountRef.current > 0); },
+      onLoaded: () => setSceneRevision(v => v + 1),
+      onError: (node, error) => useEditorStore.getState().addConsoleLog('error', `模型加载失败: ${node.name} - ${String(error)}`),
+    });
+    meshMapRef.current = adapterRef.current.nodes;
+    pivotRef.current = new TransformNode('__selection_pivot', scene);
 
     const hl = new HighlightLayer('hl', scene);
     highlightRef.current = hl;
 
     // Gizmo 管理器（初始只启用 positionGizmo，由 gizmoMode/selectedNodeId useEffect 控制切换）
     const gizmoManager = new GizmoManager(scene);
+    gizmoManager.usePointerToAttachGizmos = false;
     gizmoManager.positionGizmoEnabled = true;
     gizmoManager.gizmos.positionGizmo!.snapDistance = 0.1;
     gizmoManagerRef.current = gizmoManager;
 
     scene.onPointerObservable.add((pi) => {
-      if (pi.type === PointerEventTypes.POINTERDOWN) {
-        const pick = pi.pickInfo;
-        if (pick?.hit && pick.pickedMesh && pick.pickedMesh.name !== 'ground') {
-          selectNodeRef.current(pick.pickedMesh.name);
-        }
-      }
+      if (pi.type !== PointerEventTypes.POINTERDOWN || gizmoManager.isHovered) return;
+      const event = pi.event as PointerEvent;
+      if (event.button !== 0 || useEditorStore.getState().playState !== 'stopped') return;
+      let picked = pi.pickInfo?.pickedMesh;
+      let id: string | undefined;
+      while (picked && !id) { id = picked.metadata?.arkglideId; picked = picked.parent as Mesh; }
+      const store = useEditorStore.getState();
+      if (id) {
+        if (event.ctrlKey || event.metaKey || event.shiftKey) store.toggleNodeSelection(id);
+        else store.selectNode(id);
+      } else if (!event.ctrlKey && !event.metaKey && !event.shiftKey) store.clearSelection();
     });
 
     // 飞行模式移动逻辑：每帧渲染前根据 WASD/QE 按键状态移动相机 target
@@ -118,10 +147,10 @@ export default function Viewport() {
     const flyObserver = scene.onBeforeRenderObservable.add(() => {
       if (!flyModeRef.current) return;
       const fly = flyStateRef.current;
-      const speed = 0.1;
+      const speed = 6 * Math.min(engine.getDeltaTime() / 1000, 0.1);
       // ArcRotateCamera.getForwardRay 获取前向方向
       const forward = camera.getForwardRay().direction;
-      const right = Vector3.Cross(forward, upAxis).normalize();
+      const right = Vector3.Cross(upAxis, forward).normalize();
 
       const move = Vector3.Zero();
       if (fly.w) move.addInPlace(forward);
@@ -144,6 +173,8 @@ export default function Viewport() {
       ro.disconnect();
       engine.stopRenderLoop();
       scene.onBeforeRenderObservable.remove(flyObserver);
+      adapterRef.current?.dispose();
+      adapterRef.current = null;
       meshMapRef.current.clear();
       gizmoManagerRef.current = null;
       cameraRef.current = null;
@@ -154,183 +185,82 @@ export default function Viewport() {
     };
   }, []);
 
-  // 同步 nodes → 编辑 mesh（增删改 + 层级）
+  useEffect(() => {
+    void adapterRef.current?.sync(nodes, modelBuffers);
+  }, [nodes, modelBuffers]);
+
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-    const meshMap = meshMapRef.current;
-    const nodeIds = new Set(nodes.map((n) => n.id));
+    scene.clearColor = Color4.FromColor3(Color3.FromHexString(settings.backgroundColor));
+    const ambient = scene.getLightByName('__ambient') as HemisphericLight;
+    ambient.intensity = settings.ambientIntensity;
+    ambient.diffuse = Color3.FromHexString(settings.ambientColor);
+  }, [settings]);
 
-    // 删除：meshMap 中有但 nodes 中没有的（dispose 会级联清理 Babylon 子 mesh）
-    for (const [id, mesh] of meshMap) {
-      if (!nodeIds.has(id)) {
-        mesh.dispose();
-        meshMap.delete(id);
-      }
-    }
-
-    // 新增/更新
-    nodes.forEach((n) => {
-      if (n.type !== 'mesh' && n.type !== 'model') return;
-      let mesh = meshMap.get(n.id);
-      if (!mesh) {
-        if (n.type === 'mesh') {
-          mesh = n.name.toLowerCase().includes('sphere')
-            ? MeshBuilder.CreateSphere(n.id, { diameter: 1 }, scene)
-            : MeshBuilder.CreateBox(n.id, { size: 1 }, scene);
-        } else {
-          mesh = MeshBuilder.CreateBox(n.id, { size: 1 }, scene); // model 占位
-        }
-        meshMap.set(n.id, mesh);
-      }
-      mesh.position.set(n.transform.x, n.transform.y, n.transform.z);
-      mesh.rotation.set(n.rotation.x, n.rotation.y, n.rotation.z);
-      mesh.scaling.set(n.scale.x, n.scale.y, n.scale.z);
-      mesh.setEnabled(n.visible);
-
-      // 父子层级同步
-      if (n.parentId) {
-        const parentMesh = meshMap.get(n.parentId);
-        if (parentMesh) mesh.parent = parentMesh;
-      } else {
-        mesh.parent = null;
-      }
-
-      // 颜色 material
-      if (n.color) {
-        let mat = mesh.material as StandardMaterial;
-        if (!mat || mat.name !== n.id + '_mat') {
-          mat = new StandardMaterial(n.id + '_mat', scene);
-          mesh.material = mat;
-        }
-        mat.diffuseColor = Color3.FromHexString(n.color);
-        mat.emissiveColor = Color3.FromHexString(n.color).scale(0.1);
-      }
-    });
-  }, [nodes]);
-
-  // Gizmo 选中同步 + gizmoMode 切换 + 多选批量拖拽：
-  // 选中节点时 attachToMesh（多选时挂到第一个选中节点），W/E/R 切换时更新启用状态
   useEffect(() => {
-    const gizmoManager = gizmoManagerRef.current;
-    if (!gizmoManager) return;
-
-    // 根据 gizmoMode 启用对应 gizmo（W/E/R 切换时重新启用对应 gizmo）
-    gizmoManager.positionGizmoEnabled = gizmoMode === 'move';
-    gizmoManager.rotationGizmoEnabled = gizmoMode === 'rotate';
-    gizmoManager.scaleGizmoEnabled = gizmoMode === 'scale';
-
-    if (selectedNodeId) {
-      const mesh = meshMapRef.current.get(selectedNodeId);
-      if (mesh) {
-        gizmoManager.attachToMesh(mesh);
-
-        // onDragStart：拖拽开始时保存拖拽前快照（供撤销使用）+ 记录所有选中节点初始位置
-        const onDragStart = () => {
-          if (isDraggingRef.current) return; // 防止 observer 累积导致重复触发
-          beginTransformRef.current();
-          // 记录所有选中节点初始位置（供多选批量拖拽增量同步）
-          const initialPositions = new Map<string, Vector3>();
-          selectedNodeIdsRef.current.forEach((id) => {
-            const m = meshMapRef.current.get(id);
-            if (m) initialPositions.set(id, m.position.clone());
-          });
-          initialPositionsRef.current = initialPositions;
-          draggedIdRef.current = selectedNodeId;
-          isDraggingRef.current = true;
-        };
-        gizmoManager.gizmos.positionGizmo?.onDragStartObservable.add(onDragStart);
-        gizmoManager.gizmos.rotationGizmo?.onDragStartObservable.add(onDragStart);
-        gizmoManager.gizmos.scaleGizmo?.onDragStartObservable.add(onDragStart);
-
-        // onDragEnd 节流：松开鼠标时才一次性提交到 Zustand
-        // recordHistory=false：beginTransform 已保存拖拽前快照，此处仅同步最终值
-        // 多选时：一次性提交所有选中节点（单选时 selectedNodeIds=[selectedNodeId] 兼容）
-        const updateFromGizmo = () => {
-          isDraggingRef.current = false;
-          const ids = selectedNodeIdsRef.current;
-          ids.forEach((id) => {
-            const m = meshMapRef.current.get(id);
-            if (!m) return;
-            updateTransformRef.current(
-              id,
-              {
-                transform: { x: m.position.x, y: m.position.y, z: m.position.z },
-                rotation: { x: m.rotation.x, y: m.rotation.y, z: m.rotation.z },
-                scale: { x: m.scaling.x, y: m.scaling.y, z: m.scaling.z },
-              },
-              false,
-            );
-          });
-        };
-
-        // 监听三种 Gizmo 的 dragEnd
-        gizmoManager.gizmos.positionGizmo?.onDragEndObservable.add(updateFromGizmo);
-        gizmoManager.gizmos.rotationGizmo?.onDragEndObservable.add(updateFromGizmo);
-        gizmoManager.gizmos.scaleGizmo?.onDragEndObservable.add(updateFromGizmo);
-      }
-    } else {
-      gizmoManager.attachToMesh(null);
+    const manager = gizmoManagerRef.current, scene = sceneRef.current, pivot = pivotRef.current;
+    if (!manager || !scene || !pivot) return;
+    manager.positionGizmoEnabled = gizmoMode === 'move';
+    manager.rotationGizmoEnabled = gizmoMode === 'rotate';
+    manager.scaleGizmoEnabled = gizmoMode === 'scale';
+    manager.coordinatesMode = gizmoSpace === 'local' ? GizmoCoordinatesMode.Local : GizmoCoordinatesMode.World;
+    const selected = selectedNodeIds.map(id => meshMapRef.current.get(id)).filter((n): n is TransformNode => !!n);
+    const roots = selectionRoots(selected);
+    const multiple = roots.length > 1;
+    if (multiple) {
+      const center = Vector3.Zero();
+      roots.forEach(node => { node.computeWorldMatrix(true); center.addInPlace(node.getAbsolutePosition()); });
+      pivot.position.copyFrom(center.scale(1 / roots.length));
+      pivot.scaling.setAll(1);
+      pivot.rotationQuaternion = gizmoSpace === 'local' ? roots[0].absoluteRotationQuaternion.clone() : Quaternion.Identity();
     }
-  }, [selectedNodeId, selectedNodeIds, gizmoMode]);
-
-  // 多选批量拖拽实时同步：拖拽中根据第一个节点的位移增量同步到其他选中节点
-  // 仅 position gizmo 模式生效（rotation/scale 作用于第一个节点）
-  // 用 onBeforeRenderObservable 替代 onDragObservable（Babylon 9 Gizmo 无 onDragObservable）
-  useEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene) return;
-
-    const syncObserver = scene.onBeforeRenderObservable.add(() => {
-      if (!isDraggingRef.current) return;
-      // 仅 move 模式同步位移增量
-      if (gizmoModeRef.current !== 'move') return;
-
-      const ids = selectedNodeIdsRef.current;
-      if (ids.length <= 1) return;
-
-      const draggedId = draggedIdRef.current;
-      if (!draggedId) return;
-
-      const draggedMesh = meshMapRef.current.get(draggedId);
-      if (!draggedMesh) return;
-
-      const initialPositions = initialPositionsRef.current;
-      const draggedInitial = initialPositions.get(draggedId);
-      if (!draggedInitial) return;
-
-      // 计算位移增量 delta = 当前位置 - 初始位置
-      const delta = draggedMesh.position.subtract(draggedInitial);
-
-      // 同步到其他选中节点：新位置 = 各自初始位置 + delta
-      ids.forEach((id) => {
-        if (id === draggedId) return;
-        const m = meshMapRef.current.get(id);
-        const initial = initialPositions.get(id);
-        if (m && initial) {
-          m.position = initial.add(delta);
-        }
-      });
-    });
-
-    return () => {
-      scene.onBeforeRenderObservable.remove(syncObserver);
+    manager.attachToNode(playState === 'stopped' ? (multiple ? pivot : roots[0] || null) : null);
+    const onStart = () => {
+      if (isDraggingRef.current) return;
+      beginTransformRef.current();
+      isDraggingRef.current = true;
+      initialWorldRef.current = new Map(roots.map(node => [node, node.computeWorldMatrix(true).clone()]));
+      initialPivotRef.current = pivot.computeWorldMatrix(true).clone();
     };
-  }, []);
+    const applyGroup = () => {
+      if (multiple && isDraggingRef.current) applySelectionDelta(initialWorldRef.current, initialPivotRef.current, pivot.computeWorldMatrix(true));
+    };
+    const onEnd = () => {
+      if (!isDraggingRef.current) return;
+      applyGroup();
+      isDraggingRef.current = false;
+      selected.forEach(node => {
+        const rotation = node.rotationQuaternion?.toEulerAngles() || node.rotation;
+        node.rotation.copyFrom(rotation); node.rotationQuaternion = null;
+        updateTransformRef.current(node.name, {
+          transform: { x: node.position.x, y: node.position.y, z: node.position.z },
+          rotation: { x: rotation.x, y: rotation.y, z: rotation.z },
+          scale: { x: node.scaling.x, y: node.scaling.y, z: node.scaling.z },
+        }, false);
+      });
+    };
+    const gizmos = [manager.gizmos.positionGizmo, manager.gizmos.rotationGizmo, manager.gizmos.scaleGizmo].filter(g => !!g);
+    const observers = gizmos.map(g => ({ g: g!, start: g!.onDragStartObservable.add(onStart), end: g!.onDragEndObservable.add(onEnd) }));
+    const frame = scene.onBeforeRenderObservable.add(applyGroup);
+    return () => {
+      observers.forEach(({g, start, end}) => { g.onDragStartObservable.remove(start); g.onDragEndObservable.remove(end); });
+      scene.onBeforeRenderObservable.remove(frame);
+    };
+  }, [selectedNodeIds, gizmoMode, gizmoSpace, playState, nodes]);
 
-  // 高亮选中节点（多选时高亮所有选中节点）
   useEffect(() => {
     const hl = highlightRef.current;
     if (!hl) return;
     hl.removeAllMeshes();
-    const highlightColor = Color3.FromHexString('#7C9CFF');
-    selectedNodeIds.forEach((id) => {
-      const mesh = meshMapRef.current.get(id);
-      if (mesh) {
-        hl.addMesh(mesh, highlightColor);
-      }
+    const color = Color3.FromHexString('#7C9CFF');
+    selectedNodeIds.forEach(id => {
+      const node = meshMapRef.current.get(id);
+      if (!node) return;
+      const meshes = [...(node instanceof Mesh ? [node] : []), ...node.getChildMeshes()];
+      meshes.forEach(mesh => { if (mesh instanceof Mesh && mesh.getTotalVertices() > 0) hl.addMesh(mesh, color); });
     });
-  }, [selectedNodeIds, nodes]);
+  }, [selectedNodeIds, nodes, sceneRevision]);
 
   // 停止时编辑 canvas 恢复显示，触发 resize
   useEffect(() => {
@@ -355,6 +285,7 @@ export default function Viewport() {
 
     // 右键按下 → 进入飞行模式，脱离轨道控制
     const onMouseDown = (e: MouseEvent) => {
+      canvas.focus();
       if (e.button === 2) {
         flyModeRef.current = true;
         setFlyModeDisplay(true);
@@ -372,7 +303,9 @@ export default function Viewport() {
         camera.attachControl(canvas, true);
       }
     };
-    canvas.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('mouseup', onMouseUp);
+    const onBlur = () => { flyStateRef.current = { w:false,a:false,s:false,d:false,q:false,e:false }; onMouseUp({ button:2 } as MouseEvent); };
+    window.addEventListener('blur', onBlur);
 
     // 飞行模式下鼠标移动控制视角（旋转 alpha/beta）
     const onMouseMove = (e: MouseEvent) => {
@@ -388,6 +321,7 @@ export default function Viewport() {
     // 键盘按下：监听 window（过滤输入元素，避免在 Inspector/CodeEditor 中触发）
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
@@ -412,10 +346,12 @@ export default function Viewport() {
         if (selectedId) {
           const mesh = meshMapRef.current.get(selectedId);
           if (mesh) {
-            camera.setTarget(mesh.position);
+            mesh.computeWorldMatrix(true);
+            const bounds = mesh.getHierarchyBoundingVectors(true);
+            const validBounds = Number.isFinite(bounds.min.x) && Number.isFinite(bounds.max.x);
+            camera.setTarget(validBounds ? bounds.min.add(bounds.max).scale(0.5) : mesh.getAbsolutePosition());
             // 调整 radius 使物体在视口中合适大小
-            const meshBounds = mesh.getBoundingInfo().boundingBox;
-            const radius = meshBounds.minimum.subtract(meshBounds.maximum).length() * 2;
+            const radius = validBounds ? bounds.max.subtract(bounds.min).length() * 2 : 3;
             camera.radius = Math.max(radius, 3);
           }
         }
@@ -441,10 +377,12 @@ export default function Viewport() {
     return () => {
       canvas.removeEventListener('contextmenu', onContextMenu);
       canvas.removeEventListener('mousedown', onMouseDown);
-      canvas.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('blur', onBlur);
       canvas.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      camera.attachControl(canvas,true);
     };
   }, [editing]);
 
@@ -462,6 +400,7 @@ export default function Viewport() {
       {/* 编辑 canvas（常驻，stopped 时显示） */}
       <canvas
         id="viewport"
+        tabIndex={0}
         ref={canvasRef}
         onDragOver={(e) => {
           e.preventDefault();
@@ -486,59 +425,14 @@ export default function Viewport() {
             return;
           }
 
-          setModelLoading(true);
           try {
-            // 读取文件为 ArrayBuffer（不用 Base64，避免体积膨胀 33%）
-            let file: File;
-            if (asset.fileHandle) {
-              file = await asset.fileHandle.getFile();
-            } else if (asset.file) {
-              file = asset.file;
-            } else {
-              throw new Error('无法获取文件（缺少 fileHandle 和 file）');
-            }
-            const buffer = await file.arrayBuffer();
-
-            const scene = sceneRef.current;
-            if (!scene) throw new Error('场景未初始化');
-
-            // 用 Blob URL 加载模型（ArrayBuffer → Blob → URL，零 Base64）
-            const blobUrl = URL.createObjectURL(new Blob([buffer]));
-            // 从文件名推断扩展名，显式指定 loader
-            // （Blob URL 无扩展名，Babylon 无法自动推断格式）
-            const ext = '.' + (info.name.split('.').pop()?.toLowerCase() || 'glb');
-            const result = await SceneLoader.ImportMeshAsync('', '', blobUrl, scene, undefined, ext);
-            URL.revokeObjectURL(blobUrl);
-
-            // 创建 SceneNode（type: 'model'），去掉文件扩展名作为节点名
-            const nodeId = useEditorStore.getState().addNode(
-              'model',
-              info.name.replace(/\.(glb|gltf)$/i, ''),
-            );
-            // 保存原始文件名到 modelUrl，供 runtime.html 推断 loader 扩展名
-            useEditorStore.getState().updateTransform(nodeId, { modelUrl: info.name });
-
-            // 存储 ArrayBuffer 供播放时 Transferable 传递
-            modelBuffersRef.current.set(nodeId, buffer);
-            // 同步到 store，供 RuntimeFrame 播放时读取
-            useEditorStore.getState().setModelBuffer(nodeId, buffer);
-
-            // 将加载的根 mesh 存入 meshMapRef（供选中/Gizmo/高亮使用）
-            const loadedMeshes = result.meshes;
-            if (loadedMeshes.length > 0) {
-              const rootMesh = loadedMeshes[0] as Mesh;
-              rootMesh.name = nodeId;
-              meshMapRef.current.set(nodeId, rootMesh);
-            }
-
-            console.log(`[ArkGlide] 模型加载成功: ${info.name}`);
-          } catch (err) {
-            console.error(`[ArkGlide] 模型加载失败: ${info.name} - ${String(err)}`);
-            useEditorStore
-              .getState()
-              .addConsoleLog('error', `模型加载失败: ${info.name} - ${String(err)}`);
-          } finally {
-            setModelLoading(false);
+            const buffer = await readModelAsset(asset, assets);
+            const store = useEditorStore.getState();
+            const nodeId = store.addNode('model', info.name.replace(/\.(glb|gltf)$/i, ''));
+            store.updateTransform(nodeId, { modelUrl: info.name }, false);
+            store.setModelBuffer(nodeId, buffer);
+          } catch (error) {
+            useEditorStore.getState().addConsoleLog('error', `模型导入失败: ${info.name} - ${String(error)}`);
           }
         }}
         style={{
@@ -575,9 +469,7 @@ export default function Viewport() {
           {flyModeDisplay && <span style={{ color: '#7C9CFF' }}>飞行中</span>}
         </Box>
       )}
-      {/* Global/Local 坐标系切换按钮
-          TODO: Local 模式下需设置 gizmo.customRotationMatrix 为 mesh 旋转矩阵，
-                Babylon 9 GizmoManager 不直接支持 Local 切换，当前仅 UI 状态切换 */}
+      {/* Babylon GizmoManager.coordinatesMode controls world/local axes. */}
       {editing && (
         <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
           <ToggleButtonGroup

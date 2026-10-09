@@ -40,3 +40,6 @@ src/wasm/*.wasm
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Browser test reports
+test-results/
+playwright-report/

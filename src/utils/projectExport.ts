@@ -2,7 +2,7 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { useEditorStore } from '../store/useEditorStore';
 import type { SceneNode } from '../store/useEditorStore';
 import type { ProjectSettings } from '../types/project';
-import { DEFAULT_SETTINGS } from '../types/project';
+import { validateProject } from './projectValidation';
 
 // 导出项目 JSON 结构（.arkglide 包内的 project.json）
 interface ExportedProject {
@@ -24,7 +24,7 @@ interface ExportedProject {
  *   assets/<fileName> — 模型二进制文件（使用原始文件名，不重命名为 UUID）
  * 导出后触发浏览器下载。
  */
-export function exportProject(): void {
+export function createProjectArchive(): Uint8Array {
   const state = useEditorStore.getState();
   const nodes = state.nodes;
   const scripts = state.scripts;
@@ -53,7 +53,6 @@ export function exportProject(): void {
   for (const node of nodes) {
     if (node.type === 'model') {
       const buffer = modelBuffers.get(node.id);
-      if (!buffer) continue; // 无缓冲数据则跳过（不导出该模型）
 
       let fileName = node.modelUrl || `${node.id}.glb`;
       // 确保文件名不冲突（同名文件加序号）
@@ -70,8 +69,8 @@ export function exportProject(): void {
       usedFileNames.add(fileName);
 
       const assetPath = `assets/${fileName}`;
-      files[assetPath] = new Uint8Array(buffer);
       projectData.modelRefs.push({ assetId: node.id, fileName });
+      if (buffer) files[assetPath] = new Uint8Array(buffer);
     }
   }
 
@@ -81,14 +80,18 @@ export function exportProject(): void {
   // 打包 ZIP
   const zipped = zipSync(files);
 
-  // 触发浏览器下载
-  const blob = new Blob([zipped], { type: 'application/octet-stream' });
+  return zipped;
+}
+
+export function exportProject(): void {
+  const zipped = createProjectArchive();
+  const blob = new Blob([new Uint8Array(zipped).buffer], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${projectData.name}.arkglide`;
+  a.download = `${useEditorStore.getState().currentProjectName || '未命名项目'}.arkglide`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
@@ -112,64 +115,17 @@ export async function importProject(file: File): Promise<void> {
   const projectJsonText = strFromU8(projectJsonBytes);
   const projectData: ExportedProject = JSON.parse(projectJsonText);
 
-  const store = useEditorStore.getState();
-
-  // 恢复基础状态
-  // 注意：导入后视为新项目（currentProjectId = null），再次保存会生成新 ID
-  useEditorStore.setState({
-    nodes: projectData.scene.nodes,
-    scripts: projectData.scripts,
-    activeFileId: projectData.activeFileId,
-    script: projectData.scripts[projectData.activeFileId] || '',
-    currentProjectId: null, // 导入后是新项目
-    currentProjectName: projectData.name,
-    playState: 'stopped',
-    selectedNodeId: projectData.scene.nodes[0]?.id || null,
-    selectedNodeIds: projectData.scene.nodes[0]?.id ? [projectData.scene.nodes[0].id] : [],
-    consoleLogs: [],
-    missingModelIds: new Set(),
-    settings: projectData.settings ?? { ...DEFAULT_SETTINGS },
-    modelBuffers: new Map(),
-  });
-
-  // 加载模型文件到 modelBuffers
+  validateProject(projectData);
+  if (!Array.isArray(projectData.modelRefs)) throw new Error('无效模型引用列表');
+  const modelBuffers = new Map<string, ArrayBuffer>(), missing = new Set<string>();
+  const modelIds = new Set(projectData.scene.nodes.filter(n => n.type === 'model').map(n => n.id));
   for (const ref of projectData.modelRefs) {
-    const assetPath = `assets/${ref.fileName}`;
-    const fileData = files[assetPath];
-    if (fileData) {
-      // 把 Uint8Array 转为 ArrayBuffer（避免共享底层 buffer 的切片问题）
-      const buffer = fileData.buffer.slice(
-        fileData.byteOffset,
-        fileData.byteOffset + fileData.byteLength
-      );
-      store.setModelBuffer(ref.assetId, buffer);
-    } else {
-      // 模型文件缺失：计入 missingModelIds 并输出警告日志
-      useEditorStore.setState((state) => ({
-        missingModelIds: new Set(state.missingModelIds).add(ref.assetId),
-        consoleLogs: [
-          ...state.consoleLogs,
-          {
-            id: Date.now() + Math.random(),
-            level: 'warn' as const,
-            text: '资源丢失: ' + ref.fileName,
-            time: Date.now(),
-          },
-        ],
-      }));
-    }
+    if (!ref || typeof ref.assetId !== 'string' || typeof ref.fileName !== 'string' || !modelIds.has(ref.assetId)) throw new Error('无效模型引用');
+    const bytes = files[`assets/${ref.fileName}`];
+    if (bytes) modelBuffers.set(ref.assetId, bytes.slice().buffer);
+    else missing.add(ref.assetId);
   }
-
-  // 成功日志
-  useEditorStore.setState((state) => ({
-    consoleLogs: [
-      ...state.consoleLogs,
-      {
-        id: Date.now() + Math.random(),
-        level: 'log' as const,
-        text: `项目已导入: ${projectData.name}（${projectData.scene.nodes.length} 个节点，${Object.keys(projectData.scripts).length} 个脚本）`,
-        time: Date.now(),
-      },
-    ],
-  }));
+  modelIds.forEach(id => { if (!modelBuffers.has(id)) missing.add(id); });
+  useEditorStore.getState().replaceProject({ ...projectData, projectId: '', updatedAt: Date.now() }, modelBuffers, missing, true);
+  useEditorStore.getState().addConsoleLog('log', `项目已导入: ${projectData.name}`);
 }

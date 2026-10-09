@@ -3,7 +3,7 @@
 脚本是 JavaScript **函数体**，由运行时工厂执行；不是 ES module。
 在属性面板把脚本挂到实体，每个「实体 × 脚本」有独立实例。
 `onStart` 在启动时调用一次，`onUpdate` 在播放期间每帧调用；暂停时不执行。
-运行时注入 `entity`、`input`、`scene`、`time`、`console`、`defineScript`。
+运行时注入 `entity`、`input`、`scene`、`time`、`console`、`defineScript`、`math`。
 
 ## 推荐写法
 
@@ -41,6 +41,7 @@ return defineScript({
 | `rotation` | live 欧拉角，单位为弧度 |
 | `scale` | live 缩放 |
 | `visible` / `isVisible()` / `setVisible(value)` | 可见性，支持重新显示初始隐藏的实体 |
+| `getWorldMatrix()` / `getWorldPosition()` | 包含父级的世界矩阵（列主序）与世界位置，由 WASM 计算 |
 | `getPosition()` / `getRotation()` / `getScale()` | 普通 `{x,y,z}` 副本；修改副本不影响实体 |
 | `setPosition(...)` / `setRotation(...)` / `setScale(...)` | 接受三个数或一个 `{x,y,z}` |
 | `translate(...)` / `rotate(...)` | 叠加位置偏移 / 欧拉角；接受三个数或一个 `{x,y,z}` |
@@ -55,7 +56,7 @@ this.entity.rotate(0, Math.PI * time.deltaTime, 0);
 ```
 
 句柄使用 WeakMap 保存渲染器引用，不提供 Babylon mesh/vector 对象。
-这是一层可替换的渲染适配器；当前实现仍由 Babylon 执行，不代表 F10/F12 的 WASM 迁移已经完成。
+渲染适配器仍使用 Babylon；实体增量和世界矩阵数学已接入 WASM，场景图与实体生命周期的 C++ 迁移属于 F12。
 
 ## Scene
 
@@ -71,7 +72,31 @@ const player = scene.findByName('Player');
 if (player) player.translate(0, 1, 0);
 ```
 
-当前运行时只登记 mesh 和成功加载的 model 节点；查询不涵盖编辑器中的 light/camera/empty。
+运行时登记 mesh/model/light/camera/empty。模型使用稳定的变换根节点；模型内容异步加载后才启动脚本。销毁父级时，后代句柄也会失效。
+
+## Math（WASM）
+
+`math.backend` 在运行窗口为 `wasm`。所有参数与结果都是普通数值对象或数组，不需要用户 `.delete()`。
+
+| 命名空间 | API |
+| --- | --- |
+| `math.vec3` | add/sub/scale/length/normalize/dot/cross/lerp/distance |
+| `math.mat4` | identity/multiply/translation/scaling/rotation/compose/transformPoint |
+| `math.quat` | fromEuler/normalize/slerp/toMatrix |
+
+矩阵为列主序，`multiply(parent, local)` 得到世界矩阵。`mat4.compose` 使用与 Babylon 场景一致的 Y-X-Z 欧拉顺序；C++ 的 `quat.fromEuler` 使用 X-Y-Z 组合。`slerp` 归一化输入并取最短旋转路径。
+
+```js
+return defineScript({
+  onStart() {
+    console.log('数学后端', math.backend);
+    console.log('向量求和', math.vec3.add({x:1,y:2,z:3},{x:4,y:5,z:6}));
+    console.log('实体世界位置', this.entity.getWorldPosition());
+  }
+});
+```
+
+`npm run benchmark:math` 或菜单「数学性能基准」可测量实际 API 成本；小粒度 WASM 运算可能慢于 JS。
 
 ## Input 和 Time
 
