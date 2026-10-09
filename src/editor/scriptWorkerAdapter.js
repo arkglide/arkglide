@@ -3,10 +3,10 @@
 export function scriptPrefix(fileName) {
   if (!fileName.startsWith('file:///arkglide/scripts/')) return '';
   if (fileName.endsWith('.js')) {
-    return 'export {};\n/** @this {ScriptThis}\n * @param {Entity} entity\n * @param {InputAPI} input\n * @param {SceneAPI} scene\n * @param {TimeAPI} time\n * @param {MathAPI} math\n * @returns {ScriptLifecycle | void}\n */\nfunction __arkglideFactory(entity, input, scene, time, math) {\n';
+    return 'export {};\n/** @this {ScriptThis}\n * @param {Entity} entity\n * @param {InputAPI} input\n * @param {SceneAPI} scene\n * @param {TimeAPI} time\n * @param {MathAPI} math\n * @param {EventsAPI} events\n * @param {TimersAPI} timers\n * @returns {ScriptLifecycle | void}\n */\nfunction __arkglideFactory(entity, input, scene, time, math, events, timers) {\n';
   }
   if (fileName.endsWith('.ts')) {
-    return 'export {};\nfunction __arkglideFactory(this: ScriptThis, entity: Entity, input: InputAPI, scene: SceneAPI, time: TimeAPI, math: MathAPI): ScriptLifecycle | void {\n';
+    return 'export {};\nfunction __arkglideFactory(this: ScriptThis, entity: Entity, input: InputAPI, scene: SceneAPI, time: TimeAPI, math: MathAPI, events: EventsAPI, timers: TimersAPI): ScriptLifecycle | void {\n';
   }
   return '';
 }

@@ -3,7 +3,7 @@
 (function (root) {
   'use strict';
 
-  function createEntityAPI(Babylon, getScene, getMath = () => null) {
+  function createEntityAPI(Babylon, getScene, getMath = () => null, options = {}) {
     const entities = new Map();
     const handles = new WeakMap();
 
@@ -108,7 +108,16 @@
         const handle = handles.get(this);
         if (!handle.mesh) return;
         const mesh = handle.mesh;
-        mesh.dispose();
+        if (handle.destroying) return;
+        handle.destroying = true;
+        // Destroy descendant scripts while their handles are still valid.
+        for (const child of mesh.getDescendants?.() || []) {
+          const id = child.metadata?.arkglideId;
+          const entity = entities.get(id);
+          if (entity && entity !== this) entity.destroy();
+        }
+        options.onBeforeDestroy?.(handle.id);
+        mesh.dispose(false, true);
         handle.mesh = null;
         entities.delete(handle.id);
       }
@@ -121,7 +130,7 @@
         mesh.rotationQuaternion = null;
       }
       const entity = new EntityHandle(mesh, id, name);
-      mesh.onDisposeObservable?.add(() => { handles.get(entity).mesh = null; entities.delete(id); });
+      mesh.onDisposeObservable?.add(() => { options.onBeforeDestroy?.(id); handles.get(entity).mesh = null; entities.delete(id); });
       entities.set(id, entity);
       return entity;
     }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ProjectJSON, ProjectSettings } from '../types/project';
-import { validateProject } from '../utils/projectValidation';
+import { validateProject, normalizeProject, PROJECT_VERSION } from '../utils/projectValidation';
 import { DEFAULT_SETTINGS } from '../types/project';
 import {
   saveProjectSnapshot,
@@ -40,7 +40,10 @@ export interface SceneNode {
 }
 
 // 控制台消息（来自 iframe 沙箱转发）
+export interface DiagnosticLocation {file?:string|null;line?:number|null;column?:number|null;hook?:string;entityId?:string|null;stack?:string;}
+export interface RuntimeStats {state:string;mathBackend:string;fps:number;frameMs:number;peakFrameMs:number;renderMs:number;scriptMs:number;entities:number;scripts:number;meshes:number;materials:number;textures:number;lights:number;cameras:number;modelLoads:number;timers:number;subscriptions:number;listeners:number;heapBytes:number|null;totalTime:number;unscaledTotalTime:number;fixedSteps:number;timeScale:number;droppedTime:number;errors:number;}
 export interface ConsoleMessage {
+  location?:DiagnosticLocation;
   id: number;
   level: 'log' | 'warn' | 'error';
   text: string;
@@ -95,7 +98,17 @@ interface HistoryEntry {
   settings: ProjectSettings;
 }
 
-interface EditorState {
+export interface EditorState {
+  documentId:string;
+  documentOrigin:'new'|'loaded'|'imported'|'recovered';
+  savedSnapshot:{project:StoredProject;buffers:Map<string,ArrayBuffer>}|null;
+  recoveryStatus:'idle'|'pending'|'saving'|'saved'|'error';
+  recoveryError:string|null;
+  recoveryUpdatedAt:number|null;
+  scriptNavigation:{id:number;file:string;line:number;column:number}|null;
+  navigateToScript:(file:string,line?:number,column?:number)=>void;
+  runtimeStats:RuntimeStats|null;
+  setRuntimeStats:(stats:RuntimeStats|null)=>void;
   playState: PlayState;
   nodes: SceneNode[];
   selectedNodeId: string | null;
@@ -157,7 +170,7 @@ interface EditorState {
   setActiveFile: (fileName: string) => void;                 // 切换当前编辑的脚本
   // 向后兼容别名：setScript(code) === updateScript(activeFileId, code)
   setScript: (code: string) => void;
-  addConsoleLog: (level: ConsoleMessage['level'], text: string) => void;
+  addConsoleLog: (level: ConsoleMessage['level'], text: string, location?:DiagnosticLocation) => void;
   clearConsoleLogs: () => void;
   setAssets: (assets: AssetEntry[]) => void;
   // 模型 ArrayBuffer 缓存：nodeId → ArrayBuffer
@@ -173,7 +186,7 @@ interface EditorState {
   saveCurrentProject: (name?: string) => Promise<void>;
   loadProjectById: (projectId: string) => Promise<void>;
   newProject: () => void;
-  replaceProject: (data: StoredProject, buffers: Map<string, ArrayBuffer>, missing: Set<string>, imported?: boolean) => void;
+  replaceProject: (data: StoredProject, buffers: Map<string, ArrayBuffer>, missing: Set<string>, imported?: boolean, recoveryId?:string) => void;
   // 项目设置：重力/背景色/环境光/帧率上限
   settings: ProjectSettings;
   updateSettings: (partial: Partial<ProjectSettings>) => void;
@@ -244,6 +257,15 @@ function pushHistory(get: () => EditorState, set: EditorSet): void {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
+  documentId:crypto.randomUUID(),documentOrigin:'new',savedSnapshot:null,
+  recoveryStatus:'idle',recoveryError:null,recoveryUpdatedAt:null,
+  scriptNavigation:null,runtimeStats:null,
+  navigateToScript:(file,line=1,column=1)=>{
+    if(!Object.hasOwn(get().scripts,file))return;
+    get().setActiveFile(file);
+    set({scriptNavigation:{id:Date.now()+Math.random(),file,line:Math.max(1,line),column:Math.max(1,column)}});
+  },
+  setRuntimeStats:runtimeStats=>set({runtimeStats}),
   playState: 'stopped',
   nodes: initialNodes,
   selectedNodeId: 'cube',
@@ -288,7 +310,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         scripts: n.scripts ? [...n.scripts] : undefined,
       })),
       project: {
-        version: '0.1',
+        version: PROJECT_VERSION,
         scene: {
           nodes: state.nodes.map((n) => ({
             ...n,
@@ -697,9 +719,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeFileId: fileName,
       script: state.scripts[fileName] || '',
     })),
-  addConsoleLog: (level, text) =>
+  addConsoleLog: (level, text, location) =>
     set((state) => ({
-      consoleLogs: [...state.consoleLogs, { id: ++logId, level, text, time: Date.now() }],
+      consoleLogs: [...state.consoleLogs.slice(-999), { id: ++logId, level, text, time: Date.now(),location }],
     })),
   clearConsoleLogs: () => set({ consoleLogs: [] }),
   setAssets: (assets) => set({ assets }),
@@ -737,12 +759,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // 从 nodes 中提取模型引用：遍历 type='model' 的节点
     const modelRefs = state.nodes
       .filter((n) => n.type === 'model')
-      .map((n) => ({ assetId: n.id, fileName: n.modelUrl || n.id }));
+      .map((n) => ({ assetId: n.id, fileName: n.modelUrl || n.id+'.glb' }));
     // 构造 StoredProject 元数据
     const data: StoredProject = {
       projectId,
       name: projectName,
-      version: '0.1',
+      version: PROJECT_VERSION,
       updatedAt: Date.now(),
       scene: { nodes: state.nodes },
       scripts: state.scripts,
@@ -753,7 +775,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // 保存项目元数据
     await saveProjectSnapshot(data, state.modelBuffers);
     // 更新 currentProjectId / currentProjectName 状态
-    if (epoch === projectEpoch) set({ currentProjectId: projectId, currentProjectName: projectName });
+    if (epoch === projectEpoch) set({ currentProjectId: projectId, currentProjectName: projectName, savedSnapshot:{project:data,buffers:state.modelBuffers} });
   },
   // 从 IndexedDB 加载项目并恢复全部状态
   // 读取 StoredProject → 恢复 nodes/scripts/activeFileId/currentProjectId/currentProjectName
@@ -761,7 +783,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 如果某个 modelBlob 不存在（用户清了缓存），在 consoleLogs 中添加警告
   loadProjectById: async (projectId) => {
     const epoch = ++projectEpoch;
-    const data = await loadProject(projectId);
+    const stored = await loadProject(projectId);
+    const data = stored ? normalizeProject(stored) : undefined;
     if (!data) throw new Error('项目不存在: ' + projectId);
     validateProject(data);
     const buffers = new Map<string, ArrayBuffer>(), missing = new Set<string>();
@@ -772,10 +795,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (epoch !== projectEpoch) return;
     get().replaceProject(data, buffers, missing);
   },
-  replaceProject: (data, buffers, missing, imported = false) => {
+  replaceProject: (data, buffers, missing, imported = false, recoveryId) => {
+    const normalized=normalizeProject(data);
+    const valid = validateProject(normalized);
     ++projectEpoch;
-    const valid = validateProject(data);
     set({
+      documentId:recoveryId || crypto.randomUUID(),documentOrigin:recoveryId?'recovered':imported?'imported':'loaded',savedSnapshot:null,
+      recoveryStatus:'idle',recoveryError:null,recoveryUpdatedAt:null,scriptNavigation:null,runtimeStats:null,
       nodes: valid.nodes, scripts: valid.scripts, activeFileId: valid.activeFileId,
       script: valid.scripts[valid.activeFileId], settings: valid.settings,
       currentProjectId: imported ? null : data.projectId,
@@ -798,6 +824,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newProject: () => {
     ++projectEpoch;
     set({
+      documentId:crypto.randomUUID(),documentOrigin:'new',savedSnapshot:null,
+      recoveryStatus:'idle',recoveryError:null,recoveryUpdatedAt:null,scriptNavigation:null,runtimeStats:null,
       past: [], future: [], project: null, assets: [],
       nodes: deepCloneNodes(initialNodes),
       scripts: { 'main.js': DEFAULT_SCRIPT },

@@ -35,6 +35,8 @@ import {
   Redo,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
+import RecoveryPanel from './RecoveryPanel';
+import { validateProject } from '../../utils/projectValidation';
 import { useEditorStore } from '../../store/useEditorStore';
 import type { ProjectSettings } from '../../types/project';
 import {
@@ -216,8 +218,10 @@ export default function TopBar() {
 
   // 确认设置：调用 updateSettings 写回 store + 关闭 Dialog
   const handleSettingsConfirm = () => {
-    updateSettings(localSettings);
-    setSettingsDialogOpen(false);
+    try{
+      validateProject({scene:{nodes:useEditorStore.getState().nodes},scripts:useEditorStore.getState().scripts,settings:localSettings});
+      updateSettings(localSettings);setSettingsDialogOpen(false);setImportError(null);
+    }catch(error){setImportError(String(error));}
   };
 
   // 全局撤销/重做快捷键：Ctrl/Cmd+Z 撤销，Ctrl/Cmd+Shift+Z 或 Ctrl/Cmd+Y 重做
@@ -315,6 +319,7 @@ export default function TopBar() {
           </span>
         </Tooltip>
         <Box sx={{ flexGrow: 1 }} />
+        <RecoveryPanel />
         <Tooltip title="导出为 .arkglide 文件">
           <Button variant="outlined" startIcon={<Download />} onClick={handleExport}>
             导出
@@ -322,7 +327,7 @@ export default function TopBar() {
         </Tooltip>
         {importError && (
           <Typography sx={{ ml: 1, fontSize: 11, color: 'error.main' }} noWrap>
-            导入失败: {importError}
+            操作失败: {importError}
           </Typography>
         )}
       </Toolbar>
@@ -534,6 +539,12 @@ export default function TopBar() {
             />
           </Box>
 
+          <Typography variant="caption" sx={{display:'block',mb:1}}>游戏时间与固定步</Typography>
+          <Box sx={{display:'flex',gap:1,mb:2}}>
+            <TextField size="small" type="number" label="时间倍率" value={localSettings.timeScale} onChange={e=>setLocalSettings(s=>({...s,timeScale:Number(e.target.value)}))} />
+            <TextField size="small" type="number" label="固定步 Hz" value={Math.round(1/localSettings.fixedTimeStep)} onChange={e=>setLocalSettings(s=>({...s,fixedTimeStep:1/Number(e.target.value)}))} />
+            <TextField size="small" type="number" label="最大追赶步数" value={localSettings.maxSubSteps} onChange={e=>setLocalSettings(s=>({...s,maxSubSteps:Number(e.target.value)}))} />
+          </Box>
           {/* 帧率上限 */}
           <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
             帧率上限 (0 = 无限制)

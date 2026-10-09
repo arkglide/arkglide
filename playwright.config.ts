@@ -1,6 +1,8 @@
 import { defineConfig } from '@playwright/test';
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 export default defineConfig({
+  // Minimal single-process Chromium builds need a fresh worker/browser per suite.
+  projects: executablePath ? [{name:'editor',testMatch:'**/editor.spec.ts'},{name:'batch1',testMatch:'**/batch1.spec.ts'}] : undefined,
   testDir: './tests/browser', timeout: 120000, workers: 1,
   use: {
     baseURL: 'http://127.0.0.1:5196', viewport: { width: 1440, height: 1000 },

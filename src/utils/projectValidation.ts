@@ -1,7 +1,10 @@
 import type { SceneNode } from '../store/useEditorStore';
+import type { StoredProject } from './projectStorage';
+export const PROJECT_VERSION = '0.2';
 import { DEFAULT_SETTINGS, type ProjectSettings } from '../types/project';
 
 export function validateProject(data: any): { nodes: SceneNode[]; scripts: Record<string, string>; activeFileId: string; settings: ProjectSettings } {
+  if (data && data.version !== undefined && !['0.1', PROJECT_VERSION].includes(data.version)) throw new Error('项目格式版本 '+data.version+' 暂不支持，请使用对应版本编辑器打开');
   if (!data || !Array.isArray(data.scene?.nodes) || !data.scripts || typeof data.scripts !== 'object' || Array.isArray(data.scripts)) throw new Error('无效项目结构');
   const vector = (v: any, fallback: {x:number;y:number;z:number}) => {
     v ??= fallback;
@@ -37,5 +40,22 @@ export function validateProject(data: any): { nodes: SceneNode[]; scripts: Recor
   const activeFileId = Object.hasOwn(scripts,data.activeFileId) ? data.activeFileId : 'main.js';
   const settings = {...DEFAULT_SETTINGS,...data.settings,gravity:vector(data.settings?.gravity,DEFAULT_SETTINGS.gravity)};
   if (![settings.ambientIntensity,settings.fpsCap].every(Number.isFinite) || settings.ambientIntensity<0 || settings.fpsCap<0 || !/^#[0-9a-f]{6}$/i.test(settings.backgroundColor) || !/^#[0-9a-f]{6}$/i.test(settings.ambientColor)) throw new Error('无效项目设置');
+  if (!Number.isFinite(settings.fixedTimeStep) || settings.fixedTimeStep<1/240 || settings.fixedTimeStep>0.1 || !Number.isInteger(settings.maxSubSteps) || settings.maxSubSteps<1 || settings.maxSubSteps>32 || !Number.isFinite(settings.timeScale) || settings.timeScale<0 || settings.timeScale>100) throw new Error('无效时间设置');
   return {nodes,scripts,activeFileId,settings};
+}
+
+/** Migrate legacy 0.1 before replacing live state; unknown future versions are rejected. */
+export function normalizeProject(data: any): StoredProject {
+  const valid=validateProject(data);
+  const models=new Map(valid.nodes.filter(n=>n.type==='model').map(n=>[n.id,n]));
+  if(data.modelRefs!==undefined&&!Array.isArray(data.modelRefs))throw new Error('无效模型引用列表');
+  const seen=new Set<string>();
+  const modelRefs=(data.modelRefs ?? []).map((ref:any)=>{
+    if(!ref || typeof ref.assetId!=='string' || !models.has(ref.assetId) || seen.has(ref.assetId) || typeof ref.fileName!=='string' || !ref.fileName || ref.fileName.includes('\\') || ref.fileName.startsWith('/') || ref.fileName.includes(':') || ref.fileName.split('/').includes('..'))throw new Error('无效或重复的模型引用');
+    seen.add(ref.assetId);return {assetId:ref.assetId,fileName:ref.fileName};
+  });
+  for(const [id,node] of models)if(!seen.has(id))modelRefs.push({assetId:id,fileName:node.modelUrl || id+'.glb'});
+  return {projectId:typeof data.projectId==='string'?data.projectId:'',name:typeof data.name==='string'&&data.name.trim()?data.name:'未命名项目',
+    version:PROJECT_VERSION,updatedAt:Number.isFinite(data.updatedAt)?data.updatedAt:Date.now(),scene:{nodes:valid.nodes},scripts:valid.scripts,
+    activeFileId:valid.activeFileId,modelRefs,settings:valid.settings};
 }

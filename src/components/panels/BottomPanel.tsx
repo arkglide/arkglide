@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Tabs, Tab, Typography, IconButton, Tooltip } from '@mui/material';
 import { DeleteSweep } from '@mui/icons-material';
+import DiagnosticsPanel from './DiagnosticsPanel';
 import AssetBrowser from './AssetBrowser';
 import CodeEditor from './CodeEditor';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -48,6 +49,7 @@ function ConsolePanel() {
               wordBreak: 'break-all',
             }}
           >
+            {log.location?.file&&<Box component="button" onClick={()=>useEditorStore.getState().navigateToScript(log.location!.file!,log.location?.line || 1,log.location?.column || 1)} sx={{color:'inherit',background:'none',border:0,p:0,mr:1,cursor:'pointer',textDecoration:'underline',font:'inherit'}}>{log.location.file}{log.location.line?':'+log.location.line:''} · {log.location.hook}</Box>}
             {log.text}
           </Box>
         ))}
@@ -59,6 +61,8 @@ function ConsolePanel() {
 // 底部 Tab 面板：控制台 / 代码编辑器 / 项目资源
 export default function BottomPanel() {
   const [tab, setTab] = useState(0);
+  const navigation=useEditorStore(s=>s.scriptNavigation);
+  useEffect(()=>{if(navigation)setTab(1);},[navigation]);
   const editing = useEditorStore(s => s.playState === 'stopped');
   const resources = useRef<HTMLDivElement>(null);
   useEffect(() => { if(resources.current) resources.current.inert = !editing; }, [editing,tab]);
@@ -69,10 +73,12 @@ export default function BottomPanel() {
         <Tab label="控制台" />
         <Tab label="代码编辑器" />
         <Tab label="项目资源" />
+        <Tab label="运行诊断" />
       </Tabs>
       <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {tab === 0 && <ConsolePanel />}
         {tab === 1 && <CodeEditor />}
+        {tab === 3 && <DiagnosticsPanel />}
         {tab === 2 && <Box ref={resources} sx={{height:'100%',opacity:editing ? 1 : 0.6}}><AssetBrowser /></Box>}
       </Box>
     </Box>

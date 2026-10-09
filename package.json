@@ -13,7 +13,8 @@
     "benchmark:math": "node scripts/benchmark-math.mjs",
     "test:browser": "playwright test",
     "sync:runtime": "node scripts/sync-runtime.mjs",
-    "predev": "npm run sync:runtime"
+    "predev": "npm run sync:runtime",
+    "analyze:build": "node scripts/analyze-build.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",

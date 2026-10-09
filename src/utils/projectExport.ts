@@ -2,7 +2,7 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { useEditorStore } from '../store/useEditorStore';
 import type { SceneNode } from '../store/useEditorStore';
 import type { ProjectSettings } from '../types/project';
-import { validateProject } from './projectValidation';
+import { normalizeProject, PROJECT_VERSION } from './projectValidation';
 
 // 导出项目 JSON 结构（.arkglide 包内的 project.json）
 interface ExportedProject {
@@ -36,7 +36,7 @@ export function createProjectArchive(): Uint8Array {
 
   // project.json 元数据
   const projectData: ExportedProject = {
-    version: '0.1',
+    version: PROJECT_VERSION,
     name: state.currentProjectName || '未命名项目',
     exportedAt: Date.now(),
     scene: { nodes },
@@ -105,7 +105,12 @@ export async function importProject(file: File): Promise<void> {
   // 读取文件为 ArrayBuffer
   const arrayBuffer = await file.arrayBuffer();
   // 解压 ZIP
-  const files = unzipSync(new Uint8Array(arrayBuffer));
+  let expandedSize=0;
+  const files = unzipSync(new Uint8Array(arrayBuffer), {filter(entry) {
+    expandedSize+=entry.originalSize;
+    if(expandedSize>512*1024*1024)throw new Error('项目解压大小超过 512 MiB');
+    return true;
+  }});
 
   // 解析 project.json
   const projectJsonBytes = files['project.json'];
@@ -113,9 +118,8 @@ export async function importProject(file: File): Promise<void> {
     throw new Error('无效的 .arkglide 文件：缺少 project.json');
   }
   const projectJsonText = strFromU8(projectJsonBytes);
-  const projectData: ExportedProject = JSON.parse(projectJsonText);
+  const projectData = normalizeProject(JSON.parse(projectJsonText));
 
-  validateProject(projectData);
   if (!Array.isArray(projectData.modelRefs)) throw new Error('无效模型引用列表');
   const modelBuffers = new Map<string, ArrayBuffer>(), missing = new Set<string>();
   const modelIds = new Set(projectData.scene.nodes.filter(n => n.type === 'model').map(n => n.id));

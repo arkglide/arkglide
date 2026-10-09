@@ -62,6 +62,7 @@ export default function CodeEditor() {
   const activeFileId = useEditorStore((s) => s.activeFileId);
   const updateScript = useEditorStore((s) => s.updateScript);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
+  const navigation=useEditorStore(s=>s.scriptNavigation);
   const playState = useEditorStore(s => s.playState);
   const renameScript = useEditorStore(s => s.renameScript);
   const deleteScript = useEditorStore((s) => s.deleteScript);
@@ -124,6 +125,15 @@ export default function CodeEditor() {
     }
   }
 
+  function revealDiagnostic(){
+    const editor=editorRef.current,request=useEditorStore.getState().scriptNavigation;
+    if(!editor||!request)return;
+    const model=modelMapRef.current.get(request.file);if(!model)return;
+    editor.setModel(model);
+    const line=Math.min(request.line,model.getLineCount()),column=Math.min(request.column,model.getLineMaxColumn(line));
+    editor.setPosition({lineNumber:line,column});editor.revealLineInCenter(line);editor.focus();
+  }
+  useEffect(()=>{revealDiagnostic();},[navigation]);
   useEffect(() => { syncModels(); }, [scripts, activeFileId]);
   useEffect(() => () => {
     editorRef.current?.setModel(null);
@@ -187,7 +197,7 @@ export default function CodeEditor() {
           onMount={(editor) => {
             editorRef.current = editor;
             const defaultModel = editor.getModel();
-            syncModels();
+            syncModels();revealDiagnostic();
             if (defaultModel && defaultModel !== editor.getModel()) defaultModel.dispose();
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
               const currentModel = editor.getModel();
