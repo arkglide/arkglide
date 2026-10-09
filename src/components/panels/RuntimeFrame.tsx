@@ -2,10 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import type { ProjectJSON } from '../../types/project';
 
-// WASM 数学模块源码和 URL（Vite ?raw 编译时嵌入字符串，?url 运行时解析为正确路径）
-import wasmJsRaw from '../../wasm/arkglide_math.js?raw';
-import wasmUrl from '../../wasm/arkglide_math.wasm?url';
-
 // iframe 运行时沙箱容器：常驻不卸载，postMessage 收发桥梁
 export default function RuntimeFrame() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -15,8 +11,6 @@ export default function RuntimeFrame() {
   const pendingModelDataRef = useRef<Record<string, ArrayBuffer> | null>(null);
   const pendingTransferRef = useRef<Transferable[] | null>(null);
   const prevPlayStateRef = useRef(useEditorStore.getState().playState);
-  // WASM 模块是否已发送给 iframe（只发一次，避免重复传输大数据）
-  const wasmInitSentRef = useRef(false);
 
   const project = useEditorStore((s) => s.project);
   const playState = useEditorStore((s) => s.playState);
@@ -35,22 +29,6 @@ export default function RuntimeFrame() {
     }
   };
 
-  // 发送 WASM 初始化数据给 iframe（只发送一次）
-  const sendWasmInit = async () => {
-    if (wasmInitSentRef.current) return; // 已发送，跳过
-    try {
-      const resp = await fetch(wasmUrl);
-      const wasmBinary = await resp.arrayBuffer();
-      postToIframe(
-        { type: 'wasm_init', wasmJs: wasmJsRaw, wasmBinary },
-        [wasmBinary], // Transferable 零拷贝
-      );
-      wasmInitSentRef.current = true;
-    } catch (err) {
-      console.error('[RuntimeFrame] Failed to send WASM init:', err);
-    }
-  };
-
   // 监听 iframe → 编辑器消息（source 验证）
   useEffect(() => {
     const handler = (ev: MessageEvent) => {
@@ -64,8 +42,6 @@ export default function RuntimeFrame() {
           readyRef.current = true;
           // iframe 就绪后立即获取焦点，确保键盘事件能被捕获
           iframeRef.current?.focus();
-          // iframe 就绪后发送 WASM 初始化（如果尚未发送）
-          sendWasmInit();
           if (pendingProjectRef.current) {
             // 发送暂存的项目（含模型 ArrayBuffer，通过 Transferable 零拷贝传递）
             if (pendingTransferRef.current && pendingTransferRef.current.length > 0) {
@@ -105,8 +81,6 @@ export default function RuntimeFrame() {
 
     if (playState === 'playing') {
       if (prev === 'stopped') {
-        // 首次播放：先发送 WASM 初始化数据（异步，不阻塞播放）
-        sendWasmInit();
         // 收集所有 model 节点的 ArrayBuffer，通过 Transferable 零拷贝传递给 iframe
         const modelData: Record<string, ArrayBuffer> = {};
         const transferList: ArrayBuffer[] = [];

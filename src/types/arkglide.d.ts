@@ -1,103 +1,98 @@
-// ArkGlide 引擎 API 声明（供 Monaco 智能提示使用）
-// 这些 API 通过 new Function('entity', 'input', 'scene', 'time', 'console', code) 注入用户脚本
+// Script-facing API. Loaded into both Monaco language services as an ambient lib.
+// Keep in sync with public/arkglide-api.js and public/runtime.html.
+interface Vec3 { x: number; y: number; z: number; }
+interface Vec2 { x: number; y: number; }
+type PrimitiveType = 'box' | 'sphere' | 'plane' | 'cylinder' | 'capsule' | 'torus';
 
-// 三维向量
-interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
-
-// 二维向量（鼠标位置/增量）
-interface Vec2 {
-  x: number;
-  y: number;
-}
-
-// ArkGlide Entity 抽象类
-// 注意：不暴露底层渲染引擎对象（Babylon Mesh 等），确保未来可替换为 WASM 内核
-declare class Entity {
-  /** 获取实体唯一标识 */
+/** Engine-independent entity handle. Obtain via this.entity or scene, not new Entity(). */
+interface Entity {
+  readonly id: string;
+  readonly destroyed: boolean;
+  name: string;
+  /** Live local position. Component edits and full-vector assignment update the entity. */
+  position: Vec3;
+  /** Legacy alias for position. */
+  transform: Vec3;
+  /** Live Euler rotation in radians. */
+  rotation: Vec3;
+  scale: Vec3;
+  visible: boolean;
   getId(): string;
-  /** 获取实体名称 */
   getName(): string;
-  /** 设置实体名称 */
   setName(name: string): void;
-  /** 获取位置坐标 */
+  /** Returns a copy. Change position/transform or use a setter to write back. */
   getPosition(): Vec3;
-  /** 设置位置坐标 */
   setPosition(x: number, y: number, z: number): void;
-  /** 获取旋转角度（弧度） */
+  setPosition(value: Vec3): void;
   getRotation(): Vec3;
-  /** 设置旋转角度（弧度） */
   setRotation(x: number, y: number, z: number): void;
-  /** 获取缩放比例 */
+  setRotation(value: Vec3): void;
   getScale(): Vec3;
-  /** 设置缩放比例 */
   setScale(x: number, y: number, z: number): void;
-  /** 是否可见 */
+  setScale(value: Vec3): void;
+  /** Add a local-position offset; use time.deltaTime for speed in units/second. */
+  translate(x: number, y: number, z: number): void;
+  translate(offset: Vec3): void;
+  /** Add Euler angles in radians. */
+  rotate(x: number, y: number, z: number): void;
+  rotate(angles: Vec3): void;
   isVisible(): boolean;
-  /** 设置可见性 */
   setVisible(visible: boolean): void;
-  /** 销毁实体（从场景中移除并释放资源） */
+  /** Idempotent. Other operations on a destroyed entity throw an error. */
   destroy(): void;
 }
 
-// ArkGlide Input API —— 键盘/鼠标输入
-declare const input: {
-  /** 检测按键是否持续按下 */
+interface InputAPI {
+  /** Keys use KeyboardEvent.key, case insensitive: 'w', 'ArrowUp', ' ' (space). */
   isKeyDown(key: string): boolean;
-  /** 检测按键是否在本帧新按下（边沿检测，只触发一次） */
   wasKeyPressed(key: string): boolean;
-  /** 检测按键是否在本帧释放（边沿检测，只触发一次） */
   wasKeyReleased(key: string): boolean;
-  /** 获取鼠标当前位置（屏幕坐标，无 z 分量） */
+  /** -1, 0 or 1. Opposite keys cancel each other. */
+  getAxis(negativeKey: string, positiveKey: string): number;
   getMousePosition(): Vec2;
-  /** 获取鼠标移动增量（仅鼠标按下时累积，无 z 分量） */
+  /** Accumulated movement this frame while a mouse button is held. */
   getMouseDelta(): Vec2;
-  /** 检测鼠标按键是否持续按下 */
   isMouseDown(): boolean;
-  /** 检测鼠标按键是否在本帧新按下 */
   wasMousePressed(): boolean;
-  /** 检测鼠标按键是否在本帧释放 */
   wasMouseReleased(): boolean;
-};
-
-// ArkGlide Scene API —— 场景/实体管理
-declare const scene: {
-  /** 按 ID 查找实体 */
-  find(id: string): Entity | null;
-  /** 创建新实体。type: 'box' | 'sphere' | 'plane' | 'cylinder' | 'capsule' | 'torus' */
-  create(type: string, id?: string): Entity;
-  /** 获取所有实体 */
-  findAll(): Entity[];
-  /** 按 ID 销毁实体 */
-  destroy(id: string): void;
-  /** 销毁所有实体 */
-  destroyAll(): void;
-  /** 获取实体数量 */
-  getEntityCount(): number;
-};
-
-// ArkGlide Time API —— 时间信息
-declare const time: {
-  /** 上一帧到当前帧的时间间隔（秒） */
-  deltaTime: number;
-  /** 脚本启动以来的总时间（秒） */
-  totalTime: number;
-  /** 帧计数 */
-  frameCount: number;
-};
-
-// 脚本生命周期约定：return { onStart, onUpdate }
-// onStart(): 启动时调用一次，用于初始化
-// onUpdate(): 每帧调用，用于更新逻辑
-/**
- * 脚本生命周期 this 上下文
- * 在 onStart/onUpdate 中，this.entity 指向挂载此脚本的实体
- * 运行时 this.entity 由 runtime.html 注入，包含 name/transform 等可直接读写的属性
- * （Entity 类的方法 getName/getPosition 等同样可用）
- */
-declare interface ScriptThis {
-  entity: Entity;
 }
+
+interface SceneAPI {
+  /** Find by stable ID (not display name). Returns null when absent. */
+  find(id: string): Entity | null;
+  /** First entity with this display name; names need not be unique. */
+  findByName(name: string): Entity | null;
+  findAllByName(name: string): Entity[];
+  /** Create a primitive. Duplicate explicit IDs throw; generated IDs are unique. */
+  create(type: PrimitiveType, id?: string): Entity;
+  findAll(): Entity[];
+  destroy(id: string): void;
+  destroyAll(): void;
+  getEntityCount(): number;
+}
+
+interface TimeAPI {
+  /** Frame interval in seconds; zero on start and the first frame after resume. */
+  readonly deltaTime: number;
+  /** Simulation time in seconds, excluding pauses. */
+  readonly totalTime: number;
+  readonly frameCount: number;
+}
+
+interface ScriptThis { entity: Entity; }
+interface ScriptLifecycle {
+  onStart?(this: ScriptInstance): void;
+  onUpdate?(this: ScriptInstance): void;
+  // Scripts can keep per-instance state on the returned object.
+  [key: string]: any;
+}
+interface ScriptInstance extends ScriptLifecycle, ScriptThis {}
+
+/** Optional helper: infer custom state while supplying a typed this.entity. */
+declare function defineScript<T extends object>(script: T & ThisType<T & ScriptThis>): T;
+// Injected factory arguments. In legacy scripts with an empty scene, entity is null.
+// Bound entity scripts always receive an Entity.
+declare const entity: Entity;
+declare const input: InputAPI;
+declare const scene: SceneAPI;
+declare const time: TimeAPI;
