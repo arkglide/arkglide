@@ -66,10 +66,12 @@ export default function SceneTree() {
   // Delete 键监听：删除选中节点（重命名中或焦点在输入框时不触发）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (useEditorStore.getState().playState !== 'stopped') return;
       if (e.key === 'Delete' && selectedNodeId && renamingId === null) {
         const target = e.target as HTMLElement;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          removeNode(selectedNodeId);
+          const store = useEditorStore.getState();
+          store.removeNodes(store.selectedNodeIds);
         }
       }
     };
@@ -82,6 +84,7 @@ export default function SceneTree() {
   // 使用 useEditorStore.getState() 取最新值，handler 无需依赖项
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (useEditorStore.getState().playState !== 'stopped') return;
       const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
@@ -105,7 +108,7 @@ export default function SceneTree() {
       } else if (e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         const selectedId = useEditorStore.getState().selectedNodeId;
-        if (selectedId) useEditorStore.getState().duplicateNode(selectedId);
+        if (selectedId) { const store = useEditorStore.getState(); store.copyToClipboard(); store.pasteFromClipboard(); }
       }
     };
     window.addEventListener('keydown', handler);
@@ -313,7 +316,7 @@ export default function SceneTree() {
         <Tooltip title="删除选中">
           <IconButton
             size="small"
-            onClick={() => selectedNodeId && removeNode(selectedNodeId)}
+            onClick={() => useEditorStore.getState().removeNodes(selectedNodeIds)}
             disabled={!selectedNodeId}
           >
             <DeleteOutline fontSize="small" />

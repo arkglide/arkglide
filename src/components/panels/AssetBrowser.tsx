@@ -109,7 +109,8 @@ function traverseFileList(files: FileList): AssetEntry[] {
 // 项目资源管理器：File System Access API + 回退 input[file]
 export default function AssetBrowser() {
   const [keyword, setKeyword] = useState('');
-  const [assets, setAssets] = useState<AssetEntry[]>([]);
+  const assets = useEditorStore(s => s.assets);
+  const setAssets = useEditorStore(s => s.setAssets);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -298,16 +299,23 @@ export default function AssetBrowser() {
               key={a.id}
               title={a.path}
               draggable={a.type === 'model'}
-              onClick={() => {
+              onClick={async () => {
                 if (a.isUserScript) {
                   // 用户脚本：直接切换 activeFileId
                   setActiveFile(a.name);
                   setSelectedAsset(a.id);
                 } else if (a.type === 'script') {
                   // 文件系统中的 .js 文件：若已在 scripts 中则切换 activeFileId
-                  if (scripts[a.name]) {
+                  try {
+                    if (!Object.hasOwn(scripts,a.name)) {
+                      const file = a.fileHandle ? await a.fileHandle.getFile() : a.file;
+                      if (!file) throw new Error('无法读取脚本');
+                      const code = await file.text();
+                      createScript(a.name);
+                      useEditorStore.getState().updateScript(a.name,code);
+                    }
                     setActiveFile(a.name);
-                  }
+                  } catch(error) { setError(String(error)); }
                   setSelectedAsset(a.id);
                 } else {
                   setSelectedAsset(a.id);

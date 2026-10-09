@@ -62,6 +62,8 @@ export default function CodeEditor() {
   const activeFileId = useEditorStore((s) => s.activeFileId);
   const updateScript = useEditorStore((s) => s.updateScript);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
+  const playState = useEditorStore(s => s.playState);
+  const renameScript = useEditorStore(s => s.renameScript);
   const deleteScript = useEditorStore((s) => s.deleteScript);
 
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -150,11 +152,17 @@ export default function CodeEditor() {
             key={name}
             value={name}
             label={name}
+            onDoubleClick={() => {
+              if (name === 'main.js' || playState !== 'stopped') return;
+              const next = window.prompt('脚本文件名',name)?.trim();
+              if (next) renameScript(name,next.endsWith('.js') ? next : next+'.js');
+            }}
             icon={
               // main.js 不可关闭，不渲染关闭按钮
               name !== 'main.js' ? (
                 <IconButton
                   size="small"
+                  disabled={playState !== 'stopped'}
                   // 阻止冒泡到 Tab onChange，仅触发 deleteScript
                   onClick={(e) => {
                     e.stopPropagation();
@@ -190,6 +198,7 @@ export default function CodeEditor() {
             });
           }}
           options={{
+            readOnly: playState !== 'stopped',
             fontSize: 13,
             lineHeight: 18,
             minimap: { enabled: false },

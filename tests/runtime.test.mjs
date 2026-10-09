@@ -20,11 +20,12 @@ function setup() {
     setTimeout: () => 1, clearTimeout() {}, URL, Blob,
   });
   vm.runInContext(fs.readFileSync(new URL('../public/arkglide-api.js', import.meta.url), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(new URL('../public/arkglide-scene.js', import.meta.url), 'utf8'), context);
   const html = fs.readFileSync(new URL('../public/runtime.html', import.meta.url), 'utf8');
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
   return {
     context, messages, canvasHandlers, handlers,
-    async send(message) { handlers.message({ source: parent, data: message }); await Promise.resolve(); },
+    async send(message) { handlers.message({ source: parent, data: message }); await new Promise(resolve => setImmediate(resolve)); },
     tick(ms = 100) { clock += ms; render(); },
   };
 }

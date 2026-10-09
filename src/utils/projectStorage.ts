@@ -1,13 +1,7 @@
-import { get, set, del, keys, createStore } from 'idb-keyval';
+import { get, set, keys } from 'idb-keyval';
 import type { SceneNode } from '../store/useEditorStore';
 import type { ProjectSettings } from '../types/project';
 
-// 项目元数据 store 和模型 Blob store
-// 两个 store 共享同一个数据库 'arkglide-db'，但分别存放项目元数据和模型 ArrayBuffer
-const projectStore = createStore('arkglide-db', 'projects');
-const modelStore = createStore('arkglide-db', 'models');
-
-// 项目元数据结构（存入 IndexedDB 的数据）
 export interface StoredProject {
   projectId: string;
   name: string;
@@ -16,94 +10,86 @@ export interface StoredProject {
   scene: { nodes: SceneNode[] };
   scripts: Record<string, string>;
   activeFileId: string;
-  // 模型资源引用列表（assetId → 文件名，实际 ArrayBuffer 在 modelStore 中）
   modelRefs: { assetId: string; fileName: string }[];
-  settings?: ProjectSettings; // 项目设置（可选，兼容旧数据）
+  settings?: ProjectSettings;
 }
-
-// ============================================================================
-// 项目元数据持久化 API
-// ============================================================================
-
-/**
- * 保存项目元数据到 IndexedDB。
- * @param projectId 项目唯一标识
- * @param data 项目元数据（不含模型 ArrayBuffer）
- */
+let database: Promise<IDBDatabase> | undefined;
+function openDatabase(): Promise<IDBDatabase> {
+  if (database) return database;
+  database = new Promise((resolve, reject) => {
+    function open(version?: number) {
+      const request = indexedDB.open('arkglide-db', version);
+      request.onupgradeneeded = () => {
+        for (const name of ['projects', 'models']) {
+          if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name);
+        }
+      };
+      request.onerror = () => { database = undefined; reject(request.error); };
+      request.onblocked = () => { database = undefined; reject(new Error('请关闭其他 ArkGlide 标签页后重试保存')); };
+      request.onsuccess = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('projects') || !db.objectStoreNames.contains('models')) {
+          const nextVersion = db.version + 1;
+          db.close(); open(nextVersion); return;
+        }
+        db.onversionchange = () => { db.close(); database = undefined; };
+        resolve(db);
+      };
+    }
+    open();
+  });
+  return database;
+}
+function store(name: string) {
+  return <T>(mode: IDBTransactionMode, callback: (store: IDBObjectStore) => T | PromiseLike<T>): Promise<T> =>
+    openDatabase().then(db => callback(db.transaction(name, mode).objectStore(name)));
+}
+const projectStore = store('projects'), modelStore = store('models');
+const modelKey = (projectId: string, assetId: string) => projectId + '/' + assetId;
+function complete(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = transaction.onabort = () => reject(transaction.error || new Error('数据库事务已取消'));
+  });
+}
 export async function saveProject(projectId: string, data: StoredProject): Promise<void> {
   await set(projectId, data, projectStore);
 }
-
-/**
- * 从 IndexedDB 加载单个项目元数据。
- * @param projectId 项目唯一标识
- * @returns 项目元数据；若不存在返回 undefined
- */
-export async function loadProject(projectId: string): Promise<StoredProject | undefined> {
-  return get<StoredProject>(projectId, projectStore);
+/** Metadata and model binaries commit together; projects cannot overwrite each other's models. */
+export async function saveProjectSnapshot(data: StoredProject, buffers: Map<string, ArrayBuffer>): Promise<void> {
+  const db = await openDatabase();
+  const tx = db.transaction(['projects', 'models'], 'readwrite');
+  const finished = complete(tx);
+  tx.objectStore('projects').put(data, data.projectId);
+  for (const ref of data.modelRefs) {
+    const buffer = buffers.get(ref.assetId);
+    if (buffer) tx.objectStore('models').put(buffer, modelKey(data.projectId, ref.assetId));
+    else tx.objectStore('models').delete(modelKey(data.projectId, ref.assetId));
+  }
+  await finished;
 }
-
-/**
- * 列出所有项目元数据，按 updatedAt 降序排序（最近更新的在前）。
- * 实现：用 keys(projectStore) 获取所有 key，逐个 get 后按 updatedAt 降序排序返回。
- */
+export function loadProject(projectId: string): Promise<StoredProject | undefined> { return get(projectId, projectStore); }
 export async function listProjects(): Promise<StoredProject[]> {
-  const allKeys = await keys<string>(projectStore);
-  const projects: StoredProject[] = [];
-  for (const key of allKeys) {
-    const project = await get<StoredProject>(key, projectStore);
-    if (project) {
-      projects.push(project);
-    }
-  }
-  // 按 updatedAt 降序排序（最近更新的项目排在最前）
-  projects.sort((a, b) => b.updatedAt - a.updatedAt);
-  return projects;
+  const projects = await Promise.all((await keys<string>(projectStore)).map(loadProject));
+  return projects.filter((p): p is StoredProject => !!p).sort((a, b) => b.updatedAt - a.updatedAt);
 }
-
-/**
- * 删除项目及其关联的所有模型 Blob。
- * 实现：先 del(projectId, projectStore)，再遍历 modelRefs 调用 deleteModelBlob 删除关联模型。
- * @param projectId 项目唯一标识
- */
 export async function deleteProject(projectId: string): Promise<void> {
-  const project = await get<StoredProject>(projectId, projectStore);
-  if (project) {
-    // 先删除关联的所有模型 Blob
-    for (const ref of project.modelRefs) {
-      await deleteModelBlob(ref.assetId);
-    }
-  }
-  // 最后删除项目元数据本身
-  await del(projectId, projectStore);
+  const db = await openDatabase();
+  const tx = db.transaction(['projects', 'models'], 'readwrite');
+  const finished = complete(tx);
+  tx.objectStore('projects').delete(projectId);
+  const cursor = tx.objectStore('models').openCursor();
+  cursor.onsuccess = () => {
+    const entry = cursor.result;
+    if (!entry) return;
+    if (String(entry.key).startsWith(projectId + '/')) entry.delete();
+    entry.continue();
+  };
+  await finished;
 }
-
-// ============================================================================
-// 模型 Blob 持久化 API
-// ============================================================================
-
-/**
- * 保存模型 ArrayBuffer 到 IndexedDB 的 modelStore。
- * @param assetId 模型资源唯一标识（通常为节点 id）
- * @param buffer 模型二进制数据
- */
-export async function saveModelBlob(assetId: string, buffer: ArrayBuffer): Promise<void> {
-  await set(assetId, buffer, modelStore);
-}
-
-/**
- * 从 IndexedDB 加载模型 ArrayBuffer。
- * @param assetId 模型资源唯一标识
- * @returns 模型二进制数据；若不存在返回 undefined
- */
-export async function loadModelBlob(assetId: string): Promise<ArrayBuffer | undefined> {
-  return get<ArrayBuffer>(assetId, modelStore);
-}
-
-/**
- * 删除单个模型 Blob。
- * @param assetId 模型资源唯一标识
- */
-export async function deleteModelBlob(assetId: string): Promise<void> {
-  await del(assetId, modelStore);
+export function saveModelBlob(assetId: string, buffer: ArrayBuffer): Promise<void> { return set(assetId, buffer, modelStore); }
+export async function loadModelBlob(assetId: string, projectId?: string): Promise<ArrayBuffer | undefined> {
+  // Keep the old unscoped keys readable when migrating existing projects.
+  const scoped = projectId ? await get<ArrayBuffer>(modelKey(projectId, assetId), modelStore) : undefined;
+  return scoped ?? get<ArrayBuffer>(assetId, modelStore);
 }

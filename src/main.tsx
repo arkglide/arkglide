@@ -24,6 +24,7 @@ loadMathModule()
     const c = math.addVectors(a, b);
     console.log('ArkGlide WASM Vector3:', c.x, c.y, c.z);
     console.log('ArkGlide WASM length:', c.length());
+    c.delete(); b.delete(); a.delete();
   })
   .catch((err) => {
     console.error('ArkGlide WASM load failed:', err);

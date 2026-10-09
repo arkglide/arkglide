@@ -1,0 +1,59 @@
+# 前端路线图与验收边界
+
+本轮补齐原有编辑器功能并接入 ArkGlide 的 WASM 数学 API。状态按下面列出的阶段目标判断，后续新阶段继续保留待实现。
+
+| 阶段 | 状态 | 已实现的阶段目标 |
+| --- | --- | --- |
+| F1 编辑器骨架 | ✅ | 深色主题、Dockview、场景树、属性、视口、底部面板 |
+| F2 核心链路 | ✅ | Zustand、Babylon、Monaco、iframe、脚本执行与日志回传 |
+| F3 物体设置 | ✅ | Gizmo、属性同步、灯光类型/强度/颜色、相机 FOV/运行相机、空节点变换 |
+| F4 场景与资源 | ✅ | 节点增删改、父子层级、文件夹读取、GLB 拖入、glTF 本地关联资源打包 |
+| F5 多脚本与绑定 | ✅ | 多 Tab、独立实例、所有节点类型挂脚本、this.entity、脚本重命名/删除同步绑定 |
+| F6 项目持久化 | ✅ | IndexedDB 表迁移、项目与模型原子保存、模型隔离、ZIP 导入导出、模型恢复 |
+| F7 编辑/运行隔离 | ✅ | 播放快照、编辑入口锁定、暂停/恢复、停止取消异步加载及待发项目 |
+| F8 视口与场景编辑 | ✅ | F/W/E/R、飞行、树/视口多选、组移动/旋转/缩放、Global/Local、复制模型及子树、设置 |
+| F9 WASM 最小验证 | ✅ | C++ Vector3 运算，实际输出 (5,7,9) |
+| F10 WASM 数学库 | ✅ 阶段目标 | Vector3/Matrix4/Quaternion；脚本 math、实体增量运算和世界矩阵使用 WASM；CLI/浏览器基准 |
+| F11 物理引擎 | ⏳ | 尚未接入 Jolt/Bullet、刚体、碰撞体 |
+| F12 场景图迁移 | ⏳ | 尚未把场景、生命周期和实体管理迁到 C++ |
+| F13 静态导出 | ⏳ | 尚未支持独立可玩项目导出与部署；Vite build 仍是编辑器构建 |
+| F14 Network Adapter | ⏳ | 尚未实现 Mock/Local/Relay Adapter |
+
+## 使用与验收
+
+- 模型从「项目资源」拖入视口。GLB 为自包含资源；glTF 的 bin/贴图需要一起挂载，导入时会内嵌到存储文档。
+- 双击代码 Tab 重命名脚本，`main.js` 保留；文件删除会解除绑定，撤销可恢复。
+- 场景树 Ctrl/Cmd 点击切换选中，Shift 范围选择；视口 Ctrl/Cmd/Shift 点击加选或减选。Delete 删除全部选中节点。
+- 多选 Gizmo 以选中根节点的中心为轴；选中的子节点随父节点变换一次。Inspector 按轴批量输入仍是各节点的局部属性修改。
+- Global/Local 控制 Gizmo 坐标轴。F 聚焦世界包围盒；右键按住配合 WASD/QE 飞行，松开或窗口失焦退出。
+- 「运行相机」决定播放视角。编辑相机独立于运行相机；场景旧数据未指定运行相机时选择首个可见相机。
+- IndexedDB 兼容旧版只有一个表的数据库。项目模型采用项目 ID 隔离，保存元数据与二进制使用同一事务。
+- 新建、打开、导入项目清空历史，损坏的 ZIP/场景层级在替换当前项目之前报错。
+- 实体销毁会清理后代句柄；模型加载在停止、替换或卸载后完成时会释放过期容器。
+
+## F10 的具体范围
+
+WASM 接管 ArkGlide 脚本 API 的数学计算：`math.vec3`、`math.mat4`、`math.quat`、实体的 `translate/rotate` 与 `getWorldMatrix/getWorldPosition`。返回普通数值对象；内部 Embind 对象由适配层释放。Babylon 的渲染器内部运算与场景图仍归 Babylon，属于后续 F12 的范围。
+
+`npm run benchmark:math` 与菜单「数学性能基准」比较同一 API 边界：预热、5 次采样中位数，计入参数检查、跨 WASM 调用、分配、结果复制和释放。当前小粒度调用可能明显慢于 JS；没有声称 WASM 必然更快。批量内存接口与减少跨边界调用是后续优化方向。
+
+## 自动验证
+
+```sh
+npm ci
+npm test
+npx playwright install chromium
+npm run test:browser
+npm run benchmark:math
+npm run build
+```
+
+浏览器回归覆盖有效 GLB、保存/打开、真实场景几何、灯光相机、各类节点脚本、WASM 后端、组 Gizmo 的拖拽观察器及提交、停止加载、ZIP 恢复、Monaco 数学补全和基准页面。
+
+## 仍存在的边界
+
+- 脚本运行 JavaScript 函数体，不能执行 TS 类型语法或 ES module import/export。
+- 资源浏览器支持读取、模型和脚本导入；没有新增贴图编辑器、材质编辑器或资源写回。
+- Draco/KTX 等压缩资源依赖额外解码器；本轮验收使用标准 GLB/glTF，不宣称已提供所有压缩格式的离线解码。
+- 重力值是项目设置；刚体重力和碰撞效果要等 F11。
+- 编辑器 bundle 仍较大，Node 默认内存不够时可设置 `NODE_OPTIONS=--max-old-space-size=6144`。

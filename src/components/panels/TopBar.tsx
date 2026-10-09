@@ -131,9 +131,13 @@ export default function TopBar() {
     setSaving(true);
     try {
       await saveCurrentProject(name);
-      console.log('项目已保存');
+      useEditorStore.getState().addConsoleLog('log','项目已保存');
+      setImportError(null);
+      return true;
     } catch (err) {
       console.error('保存项目失败:', err);
+      setImportError('保存项目失败: ' + String(err));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -143,8 +147,7 @@ export default function TopBar() {
   const handleSaveConfirm = async () => {
     const name = projectNameInput.trim();
     if (!name) return; // 空名称不操作
-    await doSave(name);
-    setSaveDialogOpen(false);
+    if (await doSave(name)) setSaveDialogOpen(false);
   };
 
   // 加载项目：调用 loadProjectById → 关 Dialog
@@ -154,6 +157,7 @@ export default function TopBar() {
       setOpenDialogOpen(false);
     } catch (err) {
       console.error('加载项目失败:', err);
+      setImportError('加载项目失败: ' + String(err));
     }
   };
 
@@ -270,27 +274,27 @@ export default function TopBar() {
             </Box>
           </MenuItem>
           <MenuItem onClick={handleSave}>保存</MenuItem>
-          <MenuItem onClick={handleOpenSettings}>
+          <MenuItem disabled={playState !== 'stopped'} onClick={handleOpenSettings}>
             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
               <SettingsIcon fontSize="small" />
               项目设置
             </Box>
           </MenuItem>
-          <MenuItem onClick={closeMenu}>退出</MenuItem>
+          <MenuItem component="a" href="/math-benchmark.html" target="_blank" rel="noopener" onClick={closeMenu}>数学性能基准</MenuItem>
         </Menu>
         <Divider orientation="vertical" flexItem sx={{ mx: 1, my: 0.5 }} />
         <Tooltip title="播放">
-          <IconButton onClick={play} color={playState === 'playing' ? 'primary' : 'default'}>
+          <IconButton disabled={playState === 'playing'} onClick={play} color={playState === 'playing' ? 'primary' : 'default'}>
             <PlayArrow />
           </IconButton>
         </Tooltip>
         <Tooltip title="暂停">
-          <IconButton onClick={pause} color={playState === 'paused' ? 'primary' : 'default'}>
+          <IconButton disabled={playState !== 'playing'} onClick={pause} color={playState === 'paused' ? 'primary' : 'default'}>
             <Pause />
           </IconButton>
         </Tooltip>
         <Tooltip title="停止">
-          <IconButton onClick={stop} color={playState === 'stopped' ? 'primary' : 'default'}>
+          <IconButton disabled={playState === 'stopped'} onClick={stop} color={playState === 'stopped' ? 'primary' : 'default'}>
             <Stop />
           </IconButton>
         </Tooltip>
@@ -298,14 +302,14 @@ export default function TopBar() {
         {/* 撤销/重做按钮：span 包裹解决 disabled 时 Tooltip 不显示问题 */}
         <Tooltip title="撤销 (Ctrl+Z)">
           <span>
-            <IconButton onClick={undo} disabled={!canUndo} size="small">
+            <IconButton onClick={undo} disabled={!canUndo || playState !== 'stopped'} size="small">
               <Undo />
             </IconButton>
           </span>
         </Tooltip>
         <Tooltip title="重做 (Ctrl+Y)">
           <span>
-            <IconButton onClick={redo} disabled={!canRedo} size="small">
+            <IconButton onClick={redo} disabled={!canRedo || playState !== 'stopped'} size="small">
               <Redo />
             </IconButton>
           </span>

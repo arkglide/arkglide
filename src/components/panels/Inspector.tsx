@@ -112,7 +112,7 @@ export default function Inspector() {
   }
 
   // 单选时的 update 辅助函数
-  const update = (partial: Partial<Pick<SceneNode, 'transform' | 'rotation' | 'scale' | 'visible' | 'color' | 'intensity' | 'fov' | 'modelUrl'>>) =>
+  const update = (partial: Partial<Pick<SceneNode, 'transform' | 'rotation' | 'scale' | 'visible' | 'color' | 'intensity' | 'fov' | 'modelUrl' | 'lightType' | 'activeCamera' | 'primitive'>>) =>
     node ? updateTransform(node.id, partial) : undefined;
 
   // 多选时批量更新某个 Vec3 字段的单个轴（保留每个节点其他轴的当前值）
@@ -301,7 +301,7 @@ export default function Inspector() {
       {currentNode.type === 'light' && (
         <Stack spacing={1} sx={{ mt: 1 }}>
           <Typography variant="caption">Type</Typography>
-          <TextField select size="small" fullWidth defaultValue="hemispheric">
+          <TextField select size="small" fullWidth value={currentNode.lightType ?? 'directional'} onChange={(e) => update({ lightType: e.target.value as SceneNode['lightType'] })}>
             <MenuItem value="hemispheric">Hemispheric</MenuItem>
             <MenuItem value="directional">Directional</MenuItem>
             <MenuItem value="point">Point</MenuItem>
@@ -309,11 +309,11 @@ export default function Inspector() {
 
           <Typography variant="caption">Intensity</Typography>
           <Slider
-            value={currentNode.intensity || 1}
+            value={currentNode.intensity ?? 1}
             min={0} max={3} step={0.1} size="small"
             onChange={(_, v) => update({ intensity: v as number })}
           />
-          <Typography variant="caption" sx={{ fontSize: 11 }}>{(currentNode.intensity || 1).toFixed(2)}</Typography>
+          <Typography variant="caption" sx={{ fontSize: 11 }}>{(currentNode.intensity ?? 1).toFixed(2)}</Typography>
 
           <Typography variant="caption">Color</Typography>
           <TextField
@@ -355,12 +355,12 @@ export default function Inspector() {
       {/* === Model 面板 === */}
       {currentNode.type === 'model' && (
         <Stack spacing={1} sx={{ mt: 1 }}>
-          <Typography variant="caption">Model URL</Typography>
+          <Typography variant="caption">模型文件</Typography>
           <TextField
             size="small"
             fullWidth
             value={currentNode.modelUrl || ''}
-            onChange={(e) => update({ modelUrl: e.target.value })}
+            InputProps={{ readOnly: true }}
             sx={{ '& .MuiInputBase-input': { fontSize: 12 } }}
           />
 
@@ -396,6 +396,15 @@ export default function Inspector() {
         </Stack>
       )}
 
+      {['light', 'camera', 'empty'].includes(currentNode.type) && (
+        <Stack spacing={1}>
+          {currentNode.type === 'empty' && <Vec3Input label="Pos" value={currentNode.transform} onAxisChange={(axis,v) => update({transform:{...currentNode.transform,[axis]:v}})} />}
+          <Vec3Input label="Rot" value={currentNode.rotation} isAngle onAxisChange={(axis,v) => update({rotation:{...currentNode.rotation,[axis]:v}})} />
+          <Vec3Input label="Scl" value={currentNode.scale} onAxisChange={(axis,v) => update({scale:{...currentNode.scale,[axis]:v}})} />
+          <FormControlLabel control={<Switch checked={currentNode.visible} onChange={e => update({visible:e.target.checked})} />} label="Visible" />
+        </Stack>
+      )}
+      {currentNode.type === 'camera' && <FormControlLabel control={<Switch checked={!!currentNode.activeCamera} onChange={e => update({activeCamera:e.target.checked})} />} label="运行相机" />}
       {/* === 脚本组件区域（所有节点类型通用） === */}
       <Divider sx={{ my: 0.5 }} />
       <Typography variant="caption">脚本组件</Typography>

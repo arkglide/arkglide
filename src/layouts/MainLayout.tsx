@@ -1,4 +1,6 @@
 import type { FC } from 'react';
+import { useEffect, useRef } from 'react';
+import { useEditorStore } from '../store/useEditorStore';
 import { Box } from '@mui/material';
 import { DockviewReact, type IDockviewPanelProps } from 'dockview-react';
 import TopBar from '../components/panels/TopBar';
@@ -7,11 +9,18 @@ import Inspector from '../components/panels/Inspector';
 import Viewport from '../components/panels/Viewport';
 import BottomPanel from '../components/panels/BottomPanel';
 
+function EditingPanel({ children }: { children: React.ReactNode }) {
+  const editing = useEditorStore(s => s.playState === 'stopped');
+  const element = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (element.current) element.current.inert = !editing; }, [editing]);
+  return <Box ref={element} sx={{height:'100%',opacity:editing ? 1 : 0.6}}>{children}</Box>;
+}
+
 // Dockview 面板组件注册
 const components: Record<string, FC<IDockviewPanelProps>> = {
-  sceneTree: () => <SceneTree />,
+  sceneTree: () => <EditingPanel><SceneTree /></EditingPanel>,
   viewport: () => <Viewport />,
-  inspector: () => <Inspector />,
+  inspector: () => <EditingPanel><Inspector /></EditingPanel>,
   bottomPanel: () => <BottomPanel />,
 };
 

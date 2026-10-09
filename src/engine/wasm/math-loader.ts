@@ -10,9 +10,36 @@ export interface ArkGlideMathVec3 {
   scale(s: number): ArkGlideMathVec3;
   length(): number;
   normalize(): ArkGlideMathVec3;
+  cross(other: ArkGlideMathVec3): ArkGlideMathVec3;
+  dot(other: ArkGlideMathVec3): number;
+  lerp(other: ArkGlideMathVec3, t: number): ArkGlideMathVec3;
+  distance(other: ArkGlideMathVec3): number;
+  equals(other: ArkGlideMathVec3, epsilon: number): boolean;
+  delete(): void;
 }
 
+export interface ArkGlideMathMatrix {
+  get(index: number): number; set(index: number, value: number): void;
+  multiply(other: ArkGlideMathMatrix): ArkGlideMathMatrix; delete(): void;
+}
+export interface ArkGlideMathQuaternion {
+  x: number; y: number; z: number; w: number;
+  normalize(): ArkGlideMathQuaternion;
+  slerp(other: ArkGlideMathQuaternion, t: number): ArkGlideMathQuaternion;
+  toMatrix(): ArkGlideMathMatrix; delete(): void;
+}
 export interface ArkGlideMathModule {
+  Matrix4: {
+    new (): ArkGlideMathMatrix;
+    identity(): ArkGlideMathMatrix;
+    translate(x:number,y:number,z:number): ArkGlideMathMatrix;
+    rotate(angle:number,x:number,y:number,z:number): ArkGlideMathMatrix;
+    scale(x:number,y:number,z:number): ArkGlideMathMatrix;
+  };
+  Quaternion: {
+    new (x:number,y:number,z:number,w:number): ArkGlideMathQuaternion;
+    fromEuler(x:number,y:number,z:number): ArkGlideMathQuaternion;
+  };
   Vector3: {
     new (x: number, y: number, z: number): ArkGlideMathVec3;
   };
@@ -26,7 +53,11 @@ export interface ArkGlideMathModule {
  *
  * 使用相对路径让 Vite 全权处理模块解析与打包，避免 public 目录限制。
  */
-export async function loadMathModule(): Promise<ArkGlideMathModule> {
+let loaded: Promise<ArkGlideMathModule> | undefined;
+export function loadMathModule(): Promise<ArkGlideMathModule> {
+  return loaded ??= load().catch(error => { loaded = undefined; throw error; });
+}
+async function load(): Promise<ArkGlideMathModule> {
   const factory = (await import('../../wasm/arkglide_math.js')).default;
   return (await factory()) as ArkGlideMathModule;
 }

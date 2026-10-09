@@ -1,6 +1,7 @@
 // Script-facing API. Loaded into both Monaco language services as an ambient lib.
 // Keep in sync with public/arkglide-api.js and public/runtime.html.
 interface Vec3 { x: number; y: number; z: number; }
+interface Quat { x:number; y:number; z:number; w:number; }
 interface Vec2 { x: number; y: number; }
 type PrimitiveType = 'box' | 'sphere' | 'plane' | 'cylinder' | 'capsule' | 'torus';
 
@@ -27,6 +28,9 @@ interface Entity {
   getRotation(): Vec3;
   setRotation(x: number, y: number, z: number): void;
   setRotation(value: Vec3): void;
+  getWorldPosition(): Vec3;
+  /** Column-major world matrix, including ancestor transforms. */
+  getWorldMatrix(): number[];
   getScale(): Vec3;
   setScale(x: number, y: number, z: number): void;
   setScale(value: Vec3): void;
@@ -96,3 +100,25 @@ declare const entity: Entity;
 declare const input: InputAPI;
 declare const scene: SceneAPI;
 declare const time: TimeAPI;
+
+/** Plain values; the runtime releases all internal WASM allocations. */
+interface MathAPI {
+  readonly backend: 'wasm' | 'javascript';
+  vec3: {
+    add(a:Vec3,b:Vec3):Vec3; sub(a:Vec3,b:Vec3):Vec3;
+    dot(a:Vec3,b:Vec3):number; cross(a:Vec3,b:Vec3):Vec3;
+    length(a:Vec3):number; distance(a:Vec3,b:Vec3):number;
+    scale(a:Vec3,s:number):Vec3; normalize(a:Vec3):Vec3; lerp(a:Vec3,b:Vec3,t:number):Vec3;
+  };
+  mat4: {
+    identity():number[]; multiply(a:readonly number[],b:readonly number[]):number[];
+    translation(p:Vec3):number[]; scaling(s:Vec3):number[]; rotation(angle:number,axis:Vec3):number[];
+    compose(position:Vec3,rotation:Vec3,scale:Vec3):number[];
+    transformPoint(matrix:readonly number[],point:Vec3):Vec3;
+  };
+  quat: {
+    normalize(q:Quat):Quat; fromEuler(euler:Vec3):Quat;
+    slerp(a:Quat,b:Quat,t:number):Quat; toMatrix(q:Quat):number[];
+  };
+}
+declare const math: MathAPI;

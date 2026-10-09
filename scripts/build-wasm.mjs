@@ -156,3 +156,5 @@ if (runWithEmsdkEnv(emCommand) !== 0) {
 }
 
 console.log(`\n完成: ${outJs}`);
+
+if (run(process.execPath, ['scripts/sync-runtime.mjs'], { cwd: root }) !== 0) fail('运行时 WASM 同步失败');
