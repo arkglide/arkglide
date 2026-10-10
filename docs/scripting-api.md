@@ -3,7 +3,7 @@
 脚本是 JavaScript **函数体**，由运行时工厂执行；不是 ES module。
 在属性面板把脚本挂到实体，每个「实体 × 脚本」有独立实例。
 `onStart` 在启动时调用一次，`onUpdate` 在播放期间每帧调用；暂停时不执行。
-运行时注入 `entity`、`input`、`scene`、`time`、`console`、`defineScript`、`math`。
+运行时注入 `entity`、`input`、`scene`、`time`、`console`、`defineScript`、`math`、`events`、`timers`、`prefabs`。
 
 ## 推荐写法
 
@@ -124,3 +124,7 @@ return defineScript({
 ## 固定步、销毁、时间与资源管理
 
 新增 `onFixedUpdate`、`onDestroy`、`time.timeScale`、`timers` 和 `events`。完整示例及暂停、清理、异常行为见 [第一批说明](first-batch.md)。原有 `onStart/onUpdate` 脚本继续有效。
+
+## 运行时预制体
+
+`prefabs.list/findByName/instantiate` 支持带模型与嵌套内容的动态生成。`instantiate` 返回 Promise，完成后可使用根实体、实例内查找和销毁接口。参数、生命周期、取消与完整示例见 [第二批补齐说明](second-batch-completion.md#运行时生成-api)。

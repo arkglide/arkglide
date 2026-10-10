@@ -1,8 +1,9 @@
 import type { SceneNode } from "../store/useEditorStore";
 import type { StoredProject } from "./projectStorage";
 import { emptyContent, type ProjectContent } from "../types/content";
+import { assertPrefabGraph, inferInstanceParents } from "../engine/prefabs";
 import { collectModelRefs } from "./contentResources";
-export const PROJECT_VERSION = "0.3";
+export const PROJECT_VERSION = "0.4";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 
 export function validateProject(data: any): {
@@ -15,7 +16,7 @@ export function validateProject(data: any): {
   if (
     data &&
     data.version !== undefined &&
-    !["0.1", "0.2", PROJECT_VERSION].includes(data.version)
+    !["0.1", "0.2", "0.3", PROJECT_VERSION].includes(data.version)
   )
     throw new Error(
       "项目格式版本 " + data.version + " 暂不支持，请使用对应版本编辑器打开",
@@ -258,6 +259,18 @@ function validateContent(
           !["mesh", "model"].includes(n.type))
       )
         throw new Error("节点引用的材质不存在");
+      if (n.materialSlots !== undefined) {
+        if (n.type !== "model" || !record(n.materialSlots))
+          throw new Error("无效模型材质槽");
+        for (const [key, ref] of Object.entries(n.materialSlots))
+          if (
+            !/^mesh:\d+\/slot:\d+$/.test(key) ||
+            (ref !== null &&
+              (typeof ref !== "string" ||
+                !Object.hasOwn(content.materials, ref)))
+          )
+            throw new Error("无效部件材质引用");
+      }
       if (n.scripts?.some((name) => !Object.hasOwn(scripts, name)))
         throw new Error("节点引用的脚本不存在");
     }
@@ -277,7 +290,7 @@ function validateContent(
     )
       throw new Error("无效预制体");
     if (p.nodes.some((n) => n.prefab))
-      throw new Error("预制体不能包含嵌套关联");
+      throw new Error("模板节点关联应存储在嵌套映射中");
     p.nodes = validateNodeSubtree(p.nodes, scripts, settings);
     if (
       !p.nodes.some((n) => n.id === p.rootId) ||
@@ -302,8 +315,68 @@ function validateContent(
     }
     if (expected.size) throw new Error("预制体模型引用缺失");
   }
-  const scene = new Map(nodes.map((n) => [n.id, n])),
-    mapped = new Set<string>();
+  assertPrefabGraph(content.prefabs);
+  for (const p of Object.values(content.prefabs)) {
+    if (p.nestedInstances !== undefined && !record(p.nestedInstances))
+      throw new Error("无效嵌套预制体结构");
+    const mounted = new Set<string>();
+    for (const [key, mount] of Object.entries(p.nestedInstances || {})) {
+      const child = content.prefabs[mount?.prefabId];
+      if (
+        !mount ||
+        !child ||
+        key !== mount.id ||
+        key !== mount.rootId ||
+        !p.nodes.some((n) => n.id === key) ||
+        !record(mount.nodeMap) ||
+        !Array.isArray(mount.baseline) ||
+        !Number.isInteger(mount.revision) ||
+        mount.revision < 1 ||
+        mount.revision > child.revision ||
+        mount.parentInstanceId !== undefined
+      )
+        throw new Error("无效嵌套预制体引用");
+      mount.baseline = validateNodeSubtree(mount.baseline, scripts, settings);
+      checkNodes(mount.baseline);
+      if (
+        mount.nodeMap[child.rootId] !== mount.rootId ||
+        !mount.baseline.some((n) => n.id === child.rootId) ||
+        mount.baseline.some((n) => !Object.hasOwn(mount.nodeMap, n.id))
+      )
+        throw new Error("嵌套预制体根节点或基线不一致");
+      for (const [local, outer] of Object.entries(mount.nodeMap)) {
+        if (
+          !mount.baseline.some((n) => n.id === local) ||
+          !id(outer) ||
+          mounted.has(outer)
+        )
+          throw new Error("无效嵌套节点映射");
+        mounted.add(outer);
+        const node = p.nodes.find((n) => n.id === outer);
+        if (node && node.id !== mount.rootId) {
+          let ancestor = node.parentId;
+          while (ancestor && ancestor !== mount.rootId)
+            ancestor = p.nodes.find((n) => n.id === ancestor)?.parentId;
+          if (ancestor !== mount.rootId)
+            throw new Error("嵌套节点已移出挂载点");
+        }
+      }
+    }
+  }
+  const scene = new Map(nodes.map((n) => [n.id, n]));
+  const roots = new Set<string>();
+  const owners = new Map<string, string[]>();
+  const inferred = inferInstanceParents(nodes, content.prefabInstances);
+  const ancestorOf = (parent: string, child: string) => {
+    let current = content.prefabInstances[child]?.parentInstanceId;
+    const seen = new Set<string>();
+    while (current && !seen.has(current)) {
+      if (current === parent) return true;
+      seen.add(current);
+      current = content.prefabInstances[current]?.parentInstanceId;
+    }
+    return false;
+  };
   for (const [key, i] of Object.entries(content.prefabInstances)) {
     const p = content.prefabs[i?.prefabId];
     if (
@@ -312,13 +385,21 @@ function validateContent(
       i.id !== key ||
       !p ||
       !scene.has(i.rootId) ||
+      roots.has(i.rootId) ||
       !record(i.nodeMap) ||
       !Array.isArray(i.baseline) ||
       !Number.isInteger(i.revision) ||
       i.revision < 1 ||
-      i.revision > p.revision
+      i.revision > p.revision ||
+      i.parentInstanceId !== inferred[key]?.parentInstanceId
     )
-      throw new Error("无效预制体实例");
+      throw new Error("无效预制体实例或嵌套父关联");
+    roots.add(i.rootId);
+    if (
+      i.unpackedMounts !== undefined &&
+      (!Array.isArray(i.unpackedMounts) || i.unpackedMounts.some((m) => !id(m)))
+    )
+      throw new Error("无效解除嵌套标记");
     if (i.baseline.some((n) => n.prefab))
       throw new Error("实例基线不应包含关联");
     i.baseline = validateNodeSubtree(i.baseline, scripts, settings);
@@ -328,20 +409,21 @@ function validateContent(
       !i.baseline.some((n) => n.id === p.rootId)
     )
       throw new Error("实例根节点引用不一致");
-    const baselineIds = new Set(i.baseline.map((n) => n.id));
+    const baselineIds = new Set(i.baseline.map((n) => n.id)),
+      mapped = new Set<string>();
     for (const [local, sceneId] of Object.entries(i.nodeMap)) {
       if (!baselineIds.has(local) || !id(sceneId) || mapped.has(sceneId))
         throw new Error("重复或无效实例节点映射");
       mapped.add(sceneId);
-      const node = scene.get(sceneId);
+      const prior = owners.get(sceneId) || [];
       if (
-        node &&
-        (!node.prefab ||
-          node.prefab.instanceId !== key ||
-          node.prefab.prefabId !== p.id ||
-          node.prefab.nodeId !== local)
+        prior.some(
+          (other) => !ancestorOf(other, key) && !ancestorOf(key, other),
+        )
       )
-        throw new Error("实例节点关联不一致");
+        throw new Error("实例映射仅可在嵌套祖先之间重叠");
+      owners.set(sceneId, [...prior, key]);
+      const node = scene.get(sceneId);
       if (node && node.id !== i.rootId) {
         let parent = node.parentId;
         while (parent && parent !== i.rootId)
@@ -352,16 +434,19 @@ function validateContent(
     if (i.baseline.some((n) => !Object.hasOwn(i.nodeMap, n.id)))
       throw new Error("实例基线映射缺失");
   }
-  for (const n of nodes)
+  for (const n of nodes) {
+    const mapped = owners.get(n.id) || [];
     if (n.prefab) {
       const i = content.prefabInstances[n.prefab.instanceId];
       if (
         !i ||
         i.prefabId !== n.prefab.prefabId ||
-        i.nodeMap[n.prefab.nodeId] !== n.id
+        i.nodeMap[n.prefab.nodeId] !== n.id ||
+        mapped.some((other) => ancestorOf(i.id, other))
       )
-        throw new Error("无效节点预制体关联");
-    }
+        throw new Error("无效节点预制体关联或最内层所有权");
+    } else if (mapped.length) throw new Error("实例节点关联缺失");
+  }
   return content;
 }
 
@@ -373,6 +458,7 @@ function validateNodeSubtree(
   const plain = nodes.map((n) => {
     const copy = { ...n };
     delete copy.materialId;
+    delete copy.materialSlots;
     delete copy.prefab;
     return copy;
   });
@@ -383,5 +469,8 @@ function validateNodeSubtree(
   }).nodes.map((n, index) => ({
     ...n,
     ...(nodes[index].materialId ? { materialId: nodes[index].materialId } : {}),
+    ...(nodes[index].materialSlots
+      ? { materialSlots: structuredClone(nodes[index].materialSlots) }
+      : {}),
   }));
 }

@@ -12,7 +12,8 @@
   function createMaterialLibrary(B, scene, options) {
     const materials = new Map(),
       slots = new Map(),
-      originals = new WeakMap();
+      originals = new WeakMap(),
+      wrappers = new Map();
     let content = {},
       buffers = new Map();
     function release(slot) {
@@ -143,27 +144,75 @@
         node.type === "mesh"
           ? [object]
           : node.type === "model"
-            ? object.getChildMeshes(false)
+            ? object
+                .getChildMeshes(false)
+                .filter((mesh) => mesh.metadata?.arkglideId === node.id)
             : [];
       for (const mesh of targets) {
-        const mat = materials.get(node.materialId);
-        if (mat) {
-          if (!mesh.material?.metadata?.arkglideManagedMaterial)
-            originals.set(mesh, mesh.material || null);
-          mesh.material = mat;
-        } else restore(mesh);
+        if (!mesh.material?.metadata?.arkglideManagedMaterial)
+          originals.set(mesh, mesh.material || null);
+        const original = originals.get(mesh) || null;
+        const part = mesh.metadata?.arkglidePartKey;
+        const source = original?.subMaterials || [original];
+        const resolved = source.map((mat, index) => {
+          const key = part + "/slot:" + index;
+          const id = Object.hasOwn(node.materialSlots || {}, key)
+            ? node.materialSlots[key]
+            : node.materialId;
+          return id === null ? mat : materials.get(id) || mat;
+        });
+        const old = wrappers.get(mesh);
+        if (resolved.every((mat, i) => mat === source[i])) {
+          mesh.material = original;
+          if (old) {
+            old.dispose(false, false);
+            wrappers.delete(mesh);
+          }
+        } else if (source.length > 1) {
+          let wrapper = old;
+          if (!wrapper) {
+            wrapper = new B.MultiMaterial(
+              "arkglide:slots:" + node.id + ":" + part,
+              scene,
+            );
+            wrapper.metadata = { arkglideManagedMaterial: true };
+            wrappers.set(mesh, wrapper);
+          }
+          wrapper.subMaterials = resolved;
+          mesh.material = wrapper;
+        } else {
+          mesh.material = resolved[0];
+          if (old) {
+            old.dispose(false, false);
+            wrappers.delete(mesh);
+          }
+        }
       }
     }
     function prepareDestroy(object) {
       if (!object) return;
       restore(object);
-      for (const child of object.getChildMeshes?.(false) || []) restore(child);
+      const owner = object.metadata?.arkglideId;
+      for (const mesh of [object, ...(object.getChildMeshes?.(false) || [])]) {
+        if (mesh !== object && owner && mesh.metadata?.arkglideId !== owner)
+          continue;
+        restore(mesh);
+        const wrapper = wrappers.get(mesh);
+        if (wrapper) {
+          wrapper.dispose(false, false);
+          wrappers.delete(mesh);
+        }
+      }
     }
     function clear() {
+      for (const wrapper of wrappers.values()) wrapper.dispose(false, false);
+      wrappers.clear();
       for (const s of slots.values()) release(s);
       slots.clear();
       for (const m of materials.values()) m.dispose(false, false);
       materials.clear();
+      content = {};
+      buffers = new Map();
     }
     return { sync, apply, prepareDestroy, clear, materials };
   }
@@ -181,6 +230,8 @@
       const resource = resources.get(id);
       resources.delete(id);
       if (resource) resource.dispose();
+      if (definitions.find((n) => n.id === id)?.type === "model")
+        options.onParts?.(id, []);
     }
     function decorate(mesh, id) {
       mesh.metadata = { ...(mesh.metadata || {}), arkglideId: id };
@@ -335,9 +386,24 @@
           object !== nodes.get(node.id)
         ) {
           container.dispose();
-          return;
+          return false;
         }
         container.addAllToScene();
+        const parts = [];
+        container.meshes.forEach((mesh, index) => {
+          if (!mesh.getTotalVertices?.()) return;
+          const key = "mesh:" + index;
+          mesh.metadata = { ...(mesh.metadata || {}), arkglidePartKey: key };
+          (mesh.material?.subMaterials || [mesh.material]).forEach(
+            (mat, slot) => {
+              parts.push({
+                key: key + "/slot:" + slot,
+                name: mesh.name + " · " + (mat?.name || "材质 " + slot),
+              });
+            },
+          );
+        });
+        options.onParts?.(node.id, parts);
         const imported = new Set([
           ...container.meshes,
           ...container.transformNodes,
@@ -356,6 +422,7 @@
         container?.dispose();
         if (!disposed && pending.get(node.id) === token)
           options.onError?.(node, error);
+        return false;
       } finally {
         URL.revokeObjectURL(url);
         if (pending.get(node.id) === token) pending.delete(node.id);
@@ -400,7 +467,8 @@
           nodes.delete(node.id);
         }
         if (!nodes.has(node.id)) make(node);
-        update(node);
+        if (!old || old.definition !== node || old.kind !== kind) update(node);
+        else materialLibrary.apply(node, nodes.get(node.id));
         if (
           node.type === "model" &&
           (!old || old.buffer !== buffer || old.url !== node.modelUrl)
@@ -408,7 +476,12 @@
           disposeContent(node.id);
           if (buffer) loads.push(loadModel(node, buffer));
         }
-        records.set(node.id, { kind, buffer, url: node.modelUrl });
+        records.set(node.id, {
+          kind,
+          buffer,
+          url: node.modelUrl,
+          definition: node,
+        });
       });
       linkParents();
       return Promise.all(loads);
@@ -436,6 +509,18 @@
       nodes,
       resources,
       sync,
+      add(next, buffers, content, textureBuffers) {
+        definitions = definitions.filter((n) => nodes.has(n.id));
+        return sync(
+          [...definitions, ...next],
+          buffers,
+          content,
+          textureBuffers,
+        ).then((results) => {
+          if (results?.some((result) => result === false))
+            throw new Error("预制体模型加载失败或已取消");
+        });
+      },
       clear,
       dispose,
       activeCamera,

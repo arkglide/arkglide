@@ -7,6 +7,7 @@ export default defineConfig({
         { name: "editor", testMatch: "**/editor.spec.ts" },
         { name: "batch1", testMatch: "**/batch1.spec.ts" },
         { name: "batch2", testMatch: "**/batch2.spec.ts" },
+        { name: "batch2-complete", testMatch: "**/batch2-complete.spec.ts" },
       ]
     : undefined,
   testDir: "./tests/browser",

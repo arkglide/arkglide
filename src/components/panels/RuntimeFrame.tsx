@@ -127,19 +127,11 @@ export default function RuntimeFrame() {
         const modelData: Record<string, ArrayBuffer> = {};
         const transferList: ArrayBuffer[] = [];
         const modelBuffers = useEditorStore.getState().modelBuffers;
-        const nodes = useEditorStore.getState().nodes;
-        nodes.forEach((n) => {
-          if (n.type === "model") {
-            const buf = modelBuffers.get(n.id);
-            if (buf) {
-              // 复制一份：Transferable 会转移所有权，原 ArrayBuffer 的 byteLength 将变为 0
-              // 复制避免播放后编辑器中的模型数据失效（停止播放后仍可编辑）
-              const copy = buf.slice(0);
-              modelData[n.id] = copy;
-              transferList.push(copy);
-            }
-          }
-        });
+        for (const [id, buf] of modelBuffers) {
+          const copy = buf.slice(0);
+          modelData[id] = copy;
+          transferList.push(copy);
+        }
 
         const textureData: Record<string, ArrayBuffer> = {};
         for (const [id, b] of useEditorStore.getState().textureBuffers) {

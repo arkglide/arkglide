@@ -15,6 +15,7 @@
   <script src="/arkglide-api.js"></script>
   <script src="/arkglide-lifecycle.js"></script>
   <script src="/arkglide-scene.js"></script>
+  <script src="/arkglide-prefabs.js"></script>
 </head>
 <body>
   <canvas id="renderCanvas"></canvas>
@@ -54,11 +55,20 @@
     var sceneAdapter = null, runGeneration = 0, desiredState = 'stopped';
     var session = ArkGlideLifecycle.createSession({onError: reportScriptError});
     var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; }, function() { return math; }, {
-      onBeforeDestroy: function(id) { session.destroyEntity(id);sceneAdapter?.prepareDestroy(id); }
+      onBeforeDestroy: function(id) { prefabLibrary?.onEntityDestroyed(id);session.destroyEntity(id);sceneAdapter?.prepareDestroy(id); }
     });
     var entityMap = entityAPI.entities;
     var sceneAPI = entityAPI.sceneAPI;
     var defineScript = ArkGlideRuntime.defineScript;
+    var runtimeContent = {}, runtimeModelData = {}, runtimeTextureData = {}, runtimeScripts = {};
+    var prefabLibrary = ArkGlidePrefabs.createPrefabAPI({
+      sceneAPI: sceneAPI, getContent: function(){return runtimeContent;},
+      getBuffers: function(){return runtimeModelData;}, getTextureBuffers: function(){return runtimeTextureData;},
+      getAdapter: function(){return sceneAdapter;}, getGeneration: function(){return runGeneration;},
+      isRunning: function(){return desiredState !== 'stopped';},
+      attachScripts: function(nodes){var batch=attachEntityScripts(runtimeScripts,nodes);session.startRecords(batch);}
+    });
+    var prefabs = prefabLibrary.api;
 
     // ===== ArkGlide Input API —— 键盘/鼠标状态追踪 =====
     var inputState = {
@@ -298,48 +308,47 @@
       initialized = true;
     }
 
-    function runEntityScripts(scripts, nodes, legacyCode) {
-      resetInput();
-      session = ArkGlideLifecycle.createSession({onError:reportScriptError});
-      time=session.time;lifecycleInstances=session.records;
-      var factoryCache=Object.create(null);
-      var definitions=nodes.slice();
-      function depth(node) {
-        var n=node,count=0;
-        while(n && n.parentId && count<nodes.length){count++;n=nodes.find(function(p){return p.id===n.parentId;});}
-        return count;
-      }
+    function attachEntityScripts(scripts, nodes, legacyCode) {
+      var batch=[], factoryCache=Object.create(null), definitions=nodes.slice();
+      function depth(node) {var n=node,count=0;while(n && n.parentId && count<nodes.length){count++;n=nodes.find(function(p){return p.id===n.parentId;});}return count;}
       definitions.sort(function(a,b){return depth(a)-depth(b);});
-      if(legacyCode !== undefined) definitions=[{id:entityMap.size ? entityMap.keys().next().value : null,scripts:['main.js']}];
-      definitions.forEach(function(node) {
+      if(legacyCode !== undefined)definitions=[{id:entityMap.size ? entityMap.keys().next().value : null,scripts:['main.js']}];
+      definitions.forEach(function(node){
         var entity=entityMap.get(node.id) || null;
-        (node.scripts || []).forEach(function(file) {
-          var owner=session.owner(entity,file);
+        if (!entity && legacyCode === undefined) return;
+        (node.scripts || []).forEach(function(file){
+          var owner=session.owner(entity,file);batch.push(owner.record);
           try {
             var code=legacyCode !== undefined ? legacyCode : scripts[file];
             if(typeof code!=='string')throw new Error('脚本不存在: '+file);
-            if(!factoryCache[file]) factoryCache[file]=new Function('entity','input','scene','time','console','defineScript','math','events','timers','setTimeout','clearTimeout','setInterval','clearInterval',
+            if(!factoryCache[file])factoryCache[file]=new Function('entity','input','scene','time','console','defineScript','math','events','timers','setTimeout','clearTimeout','setInterval','clearInterval','prefabs',
               code+'\n//# sourceURL=arkglide-script:///'+encodeURIComponent(file));
             var globals=owner.globals;
             var instance=factoryCache[file].call({entity:entity},entity,input,sceneAPI,time,console,defineScript,math,owner.events,owner.timers,
-              globals.setTimeout,globals.clearTimeout,globals.setInterval,globals.clearInterval);
-            if(instance && typeof instance==='object') {instance.entity=entity;owner.attach(instance);}
-            else owner.attach({entity:entity});
-          } catch(error) { reportScriptError({file:file,entityId:node.id,hook:'factory',error:error});owner.abort(); }
+              globals.setTimeout,globals.clearTimeout,globals.setInterval,globals.clearInterval,prefabLibrary.forOwner(owner));
+            if(instance && typeof instance==='object'){instance.entity=entity;owner.attach(instance);}else owner.attach({entity:entity});
+          }catch(error){reportScriptError({file:file,entityId:node.id,hook:'factory',error:error});owner.abort();}
         });
       });
-      session.start(runtimeSettings);
-      running=true;
+      return batch;
+    }
+    function runEntityScripts(scripts, nodes, legacyCode) {
+      resetInput();session = ArkGlideLifecycle.createSession({onError:reportScriptError});
+      time=session.time;lifecycleInstances=session.records;
+      attachEntityScripts(scripts,nodes,legacyCode);
+      session.start(runtimeSettings);running=true;
       if(desiredState==='paused'){session.pause();running=false;}
       telemetry(true);
     }
     var runtimeSettings={};
     function stopRun() {
       running=false;
+      prefabLibrary.stop();
       session.stop();
       sceneAPI.destroyAll();sceneAdapter?.clear();
       if(scene)scene.activeCamera=camera;
       lifecycle=null;lifecycleInstances=[];
+      runtimeContent={};runtimeModelData={};runtimeTextureData={};runtimeScripts={};
       resetInput();
       if(_noKeyWarnTimer){clearTimeout(_noKeyWarnTimer);_noKeyWarnTimer=null;}
       telemetry(true);
@@ -356,6 +365,7 @@
           stopRun();currentRunId=msg.runId;
           desiredState='playing';scriptErrors=0;_renderFrames=0;_lastTelemetry=performance.now();measuredFps=0;peakFrameMs=0;frameMs=0;renderMs=0;
           initBabylon();
+          runtimeContent=msg.project.content || {};runtimeModelData=msg.modelData || {};runtimeTextureData=msg.textureData || {};runtimeScripts=msg.project.scripts || {};
           runtimeSettings=msg.project.settings || {};
           applySettings(runtimeSettings);
           Promise.all([mathReady,sceneAdapter.sync(msg.project.scene.nodes,msg.modelData || {},msg.project.content || {},msg.textureData || {})]).then(function(){

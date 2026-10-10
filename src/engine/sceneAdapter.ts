@@ -21,6 +21,7 @@ export function createSceneAdapter(
     editor: boolean;
     onLoading?: (delta: number) => void;
     onLoaded?: (id: string) => void;
+    onParts?: (id: string, parts: { key: string; name: string }[]) => void;
     onError?: (node: SceneNode, error: unknown) => void;
   },
 ): SceneAdapter {

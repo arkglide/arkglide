@@ -26,8 +26,14 @@ export interface PrefabAsset {
   rootId: string;
   nodes: SceneNode[];
   modelKeys: Record<string, string>;
+  /** Nested instance maps use this template’s local node IDs. */
+  nestedInstances?: Record<string, PrefabInstance>;
 }
 export interface PrefabInstance {
+  parentInstanceId?: string;
+  unpackedMounts?: string[];
+  /** Stable mount identity in the parent template. */
+  mountId?: string;
   id: string;
   prefabId: string;
   rootId: string;

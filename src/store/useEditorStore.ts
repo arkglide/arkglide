@@ -8,7 +8,11 @@ import {
   type PrefabInstance,
 } from "../types/content";
 import {
-  capturePrefab,
+  captureNestedPrefab,
+  inferInstanceParents,
+  linkNestedInstances,
+  assertPrefabGraph,
+  refreshDependentTemplates,
   createInstance,
   applyPrefab,
   cloneInstanceLinks,
@@ -59,6 +63,8 @@ export interface SceneNode {
   modelRevision?: string;
   modelUrl?: string; // 模型文件 URL（type='model' 时用）
   materialId?: string;
+  /** mesh:<import index>/slot:<material index>; null explicitly restores original. */
+  materialSlots?: Record<string, string | null>;
   prefab?: { prefabId: string; instanceId: string; nodeId: string };
   scripts?: string[]; // 挂载的脚本文件名列表，如 ['player.js', 'physics.js']
 }
@@ -177,6 +183,13 @@ export interface EditorState {
   createMaterial: (name?: string, sourceId?: string) => string;
   updateMaterial: (id: string, patch: Partial<MaterialAsset>) => void;
   deleteMaterial: (id: string) => void;
+  modelParts: Record<string, { key: string; name: string }[]>;
+  setModelParts: (id: string, parts: { key: string; name: string }[]) => void;
+  setModelSlotMaterial: (
+    nodeId: string,
+    key: string,
+    materialId?: string | null,
+  ) => void;
   setNodeMaterial: (nodeId: string, materialId?: string) => void;
   importTexture: (asset: TextureAsset, bytes: ArrayBuffer) => void;
   deleteTexture: (id: string) => void;
@@ -484,7 +497,13 @@ function rewriteContentScripts(
     prefabs: Object.fromEntries(
       Object.entries(content.prefabs).map(([id, p]) => [
         id,
-        { ...p, nodes: p.nodes.map((n) => rewriteNodeScripts(n, fn)) },
+        {
+          ...p,
+          nodes: p.nodes.map((n) => rewriteNodeScripts(n, fn)),
+          nestedInstances: p.nestedInstances
+            ? rewriteInstancesScripts(p.nestedInstances, fn)
+            : undefined,
+        },
       ]),
     ),
     prefabInstances: rewriteInstancesScripts(content.prefabInstances, fn),
@@ -568,12 +587,24 @@ function restoreClipboardResources(
     content = structuredClone(state.content),
     buffers = new Map(state.modelBuffers),
     textures = new Map(state.textureBuffers);
-  content.prefabInstances = { ...content.prefabInstances, ...instances };
+  content.prefabInstances = inferInstanceParents([...state.nodes, ...nodes], {
+    ...content.prefabInstances,
+    ...instances,
+  });
   const materialIds = new Set(
-    nodes.flatMap((n) => (n.materialId ? [n.materialId] : [])),
+    nodes.flatMap((n) =>
+      [n.materialId, ...Object.values(n.materialSlots || {})].filter(
+        (id): id is string => !!id,
+      ),
+    ),
   );
-  for (const instance of Object.values(instances)) {
-    const id = instance.prefabId;
+  const pending = Object.values(instances).map((i) => i.prefabId),
+    seen = new Set<string>();
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const instance = Object.values(instances).find((i) => i.prefabId === id);
     if (!content.prefabs[id] && snapshot?.prefabs[id]) {
       content.prefabs[id] = structuredClone(snapshot.prefabs[id]);
       for (const key of Object.values(content.prefabs[id].modelKeys)) {
@@ -581,11 +612,20 @@ function restoreClipboardResources(
         if (b) buffers.set(key, b.slice(0));
       }
     }
+    pending.push(
+      ...Object.values(content.prefabs[id]?.nestedInstances || {}).map(
+        (i) => i.prefabId,
+      ),
+    );
     for (const n of [
       ...(content.prefabs[id]?.nodes || []),
-      ...instance.baseline,
+      ...Object.values(content.prefabs[id]?.nestedInstances || {}).flatMap(
+        (i) => i.baseline,
+      ),
+      ...(instance?.baseline || []),
     ])
-      if (n.materialId) materialIds.add(n.materialId);
+      for (const id of [n.materialId, ...Object.values(n.materialSlots || {})])
+        if (id) materialIds.add(id);
   }
   for (const id of materialIds)
     if (!content.materials[id] && snapshot?.materials[id])
@@ -609,6 +649,27 @@ function restoreClipboardResources(
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
+  modelParts: {},
+  setModelParts: (id, parts) =>
+    set((s) => ({ modelParts: { ...s.modelParts, [id]: parts } })),
+  setModelSlotMaterial: (nodeId, key, materialId) => {
+    const s = get();
+    assertEditing(s);
+    const node = s.nodes.find((n) => n.id === nodeId);
+    if (node?.type !== "model" || !/^mesh:\d+\/slot:\d+$/.test(key))
+      throw new Error("无效模型材质槽");
+    if (materialId && !s.content.materials[materialId])
+      throw new Error("材质不存在");
+    const slots = { ...node.materialSlots };
+    if (materialId === undefined) delete slots[key];
+    else slots[key] = materialId;
+    pushHistory(get, set);
+    set({
+      nodes: s.nodes.map((n) =>
+        n.id === nodeId ? { ...n, materialSlots: slots } : n,
+      ),
+    });
+  },
   content: emptyContent(),
   textureBuffers: new Map(),
   clipboardPrefabInstances: {},
@@ -888,7 +949,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({
       content: {
         ...s.content,
-        prefabInstances: { ...s.content.prefabInstances, ...links.instances },
+        prefabInstances: inferInstanceParents([...s.nodes, ...links.nodes], {
+          ...s.content.prefabInstances,
+          ...links.instances,
+        }),
       },
       nodes: [...s.nodes, ...links.nodes],
       modelBuffers: new Map([
@@ -960,7 +1024,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? state.selectedNodeId
         : null;
       return {
-        ...restoreClipboardScripts(state,next.scriptChange,false),
+        ...restoreClipboardScripts(state, next.scriptChange, false),
         content: next.content,
         textureBuffers: next.textureBuffers,
         nodes: next.nodes,
@@ -1091,25 +1155,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 设置父节点（拖拽层级）
   setParent: (id, parentId) => {
-    const state = get(),
-      movingRoots = subtree(state.nodes, id).filter(
-        (n) =>
-          n.prefab &&
-          state.content.prefabInstances[n.prefab.instanceId]?.rootId === n.id,
-      );
-    if (movingRoots.length) {
+    const state = get();
+    const moved = Object.values(state.content.prefabInstances).find(
+      (i) => i.rootId === id,
+    );
+    if (moved) {
       let ancestor = parentId;
       while (ancestor) {
-        const n = state.nodes.find((n) => n.id === ancestor);
+        const enclosing = Object.values(state.content.prefabInstances).find(
+          (i) => i.rootId === ancestor,
+        );
         if (
-          n?.prefab &&
-          !movingRoots.some(
-            (r) => r.prefab?.instanceId === n.prefab?.instanceId,
-          )
+          enclosing &&
+          (enclosing.prefabId === moved.prefabId ||
+            prefabDependsOn(
+              state.content.prefabs,
+              moved.prefabId,
+              enclosing.prefabId,
+            ))
         )
-          throw new Error("暂不支持嵌套预制体，请先解除关联");
-        ancestor = n?.parentId || null;
+          throw new Error("预制体嵌套依赖包含循环");
+        ancestor = state.nodes.find((n) => n.id === ancestor)?.parentId || null;
       }
+    }
+    for (const i of Object.values(state.content.prefabInstances)) {
+      if (
+        i.rootId !== id &&
+        Object.values(i.nodeMap).includes(id) &&
+        !subtree(state.nodes, i.rootId).some((n) => n.id === parentId)
+      )
+        throw new Error("请先解除外层预制体关联，再移出继承节点");
     }
     const linked = get().nodes.find((n) => n.id === id)?.prefab;
     if (linked) {
@@ -1131,10 +1206,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       (parentId && !get().nodes.some((n) => n.id === parentId))
     )
       return;
+    const nodes = state.nodes.map((n) =>
+      n.id === id ? { ...n, parentId } : n,
+    );
+    const content = {
+      ...state.content,
+      prefabInstances: inferInstanceParents(
+        nodes,
+        state.content.prefabInstances,
+      ),
+    };
+    validateProject({ ...state, scene: { nodes }, content });
     pushHistory(get, set);
-    set((state) => ({
-      nodes: state.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)),
-    }));
+    set({ nodes, content });
   },
   // 给节点挂载脚本（进入历史栈，可撤销）
   attachScript: (nodeId, scriptFile) => {
@@ -1469,6 +1553,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newProject: () => {
     ++projectEpoch;
     set({
+      modelParts: {},
+      setModelParts: (id, parts) =>
+        set((s) => ({ modelParts: { ...s.modelParts, [id]: parts } })),
+      setModelSlotMaterial: (nodeId, key, materialId) => {
+        const s = get();
+        assertEditing(s);
+        const node = s.nodes.find((n) => n.id === nodeId);
+        if (node?.type !== "model" || !/^mesh:\d+\/slot:\d+$/.test(key))
+          throw new Error("无效模型材质槽");
+        if (materialId && !s.content.materials[materialId])
+          throw new Error("材质不存在");
+        const slots = { ...node.materialSlots };
+        if (materialId === undefined) delete slots[key];
+        else slots[key] = materialId;
+        pushHistory(get, set);
+        set({
+          nodes: s.nodes.map((n) =>
+            n.id === nodeId ? { ...n, materialSlots: slots } : n,
+          ),
+        });
+      },
       content: emptyContent(),
       textureBuffers: new Map(),
       clipboardPrefabInstances: {},
@@ -1543,9 +1648,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (
       [
         ...s.nodes,
-        ...Object.values(s.content.prefabs).flatMap((p) => p.nodes),
+        ...Object.values(s.content.prefabs).flatMap((p) => [
+          ...p.nodes,
+          ...Object.values(p.nestedInstances || {}).flatMap((i) => i.baseline),
+        ]),
         ...Object.values(s.content.prefabInstances).flatMap((i) => i.baseline),
-      ].some((n) => n.materialId === id)
+      ].some(
+        (n) =>
+          n.materialId === id ||
+          Object.values(n.materialSlots || {}).includes(id),
+      )
     )
       throw new Error("材质仍被节点或预制体引用，请先解除引用");
     const materials = { ...s.content.materials };
@@ -1609,14 +1721,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selected = subtree(s.nodes, rootId);
     if (!selected.length || !s.nodes.some((n) => n.id === rootId))
       throw new Error("请选择节点");
-    if (selected.some((n) => n.prefab))
-      throw new Error("请先解除原有预制体关联，再创建新模板");
+    if (selected.find((n) => n.id === rootId)?.prefab)
+      throw new Error("根节点已关联预制体，请使用普通父节点创建复合模板");
     const id = crypto.randomUUID(),
-      prefab = capturePrefab(
+      prefab = captureNestedPrefab(
         s.nodes,
         rootId,
         id,
         name || selected.find((n) => n.id === rootId)!.name,
+        s.content.prefabInstances,
       ),
       created = createInstance(prefab, s.nodes, undefined, selected);
     const buffers = new Map(s.modelBuffers);
@@ -1625,19 +1738,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (n.type === "model" && b)
         buffers.set(prefab.modelKeys[n.id], b.slice(0));
     });
+    const prefabs = { ...s.content.prefabs, [id]: prefab };
+    assertPrefabGraph(prefabs);
+    const linked = linkNestedInstances(
+      s.nodes.map((n) => created.nodes.find((c) => c.id === n.id) || n),
+      { ...s.content.prefabInstances, [created.instance.id]: created.instance },
+      prefabs,
+    );
+    const content = {
+      ...s.content,
+      prefabs,
+      prefabInstances: linked.instances,
+    };
+    validateProject({ ...s, scene: { nodes: linked.nodes }, content });
     pushHistory(get, set);
-    set({
-      content: {
-        ...s.content,
-        prefabs: { ...s.content.prefabs, [id]: prefab },
-        prefabInstances: {
-          ...s.content.prefabInstances,
-          [created.instance.id]: created.instance,
-        },
-      },
-      nodes: s.nodes.map((n) => created.nodes.find((c) => c.id === n.id) || n),
-      modelBuffers: buffers,
-    });
+    set({ content, nodes: linked.nodes, modelBuffers: buffers });
     return id;
   },
   instantiatePrefab: (id) => {
@@ -1652,14 +1767,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const b = buffers.get(prefab.modelKeys[n.id]);
         if (b) buffers.set(created.instance.nodeMap[n.id], b.slice(0));
       }
-    const nodes = [...s.nodes, ...created.nodes],
-      content = {
-        ...s.content,
-        prefabInstances: {
-          ...s.content.prefabInstances,
-          [created.instance.id]: created.instance,
-        },
-      };
+    const linked = linkNestedInstances(
+      [...s.nodes, ...created.nodes],
+      { ...s.content.prefabInstances, [created.instance.id]: created.instance },
+      s.content.prefabs,
+    );
+    const nodes = linked.nodes,
+      content = { ...s.content, prefabInstances: linked.instances };
     validateProject({ ...s, scene: { nodes }, content });
     pushHistory(get, set);
     set({
@@ -1679,11 +1793,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!source) throw new Error("实例不存在");
     const previous = s.content.prefabs[source.prefabId],
       selected = subtree(s.nodes, source.rootId),
-      prefab = capturePrefab(
+      prefab = captureNestedPrefab(
         s.nodes,
         source.rootId,
         previous.id,
         previous.name,
+        s.content.prefabInstances,
         source,
       );
     prefab.revision = previous.revision + 1;
@@ -1699,11 +1814,54 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const sourceMap = { ...source.nodeMap };
     prefab.nodes.forEach((n, index) => (sourceMap[n.id] = selected[index].id));
     let nodes = s.nodes;
-    const instances = { ...s.content.prefabInstances };
-    instances[instanceId] = { ...source, nodeMap: sourceMap };
+    let instances = inferInstanceParents(nodes, {
+      ...s.content.prefabInstances,
+      [source.id]: { ...source, nodeMap: sourceMap },
+    });
+    const candidates = structuredClone({
+      ...s.content.prefabs,
+      [prefab.id]: prefab,
+    });
+    // A scene-only child may already have been saved in an enclosing template.
+    // Promote its existing enclosing local ID into the child mount before merging.
+    let mountSource = instances[source.id];
+    while (mountSource?.parentInstanceId) {
+      const parent = instances[mountSource.parentInstanceId];
+      const mount = Object.values(
+        candidates[parent.prefabId].nestedInstances || {},
+      ).find((m) => parent.nodeMap[m.rootId] === mountSource.rootId);
+      if (mount)
+        for (const [local, sceneId] of Object.entries(mountSource.nodeMap)) {
+          const outer = Object.entries(parent.nodeMap).find(
+            ([, scene]) => scene === sceneId,
+          )?.[0];
+          if (outer && !mount.nodeMap[local]) mount.nodeMap[local] = outer;
+        }
+      mountSource = parent;
+    }
+    const refreshed = refreshDependentTemplates(candidates, prefab.id, buffers);
+    // Align newly inherited source nodes through all enclosing mounts, preserving their scene IDs.
+    let current = instances[source.id];
+    while (current?.parentInstanceId) {
+      const parent = instances[current.parentInstanceId];
+      const parentTemplate = refreshed.prefabs[parent.prefabId];
+      const mount = Object.values(parentTemplate.nestedInstances || {}).find(
+        (m) => parent.nodeMap[m.rootId] === current.rootId,
+      );
+      if (mount)
+        for (const [local, outer] of Object.entries(mount.nodeMap))
+          if (current.nodeMap[local])
+            parent.nodeMap[outer] = current.nodeMap[local];
+      current = parent;
+    }
     for (const i of Object.values(instances))
-      if (i.prefabId === prefab.id) {
-        const next = applyPrefab(prefab, i, nodes, i.id === instanceId);
+      if (!i.parentInstanceId && refreshed.affected.has(i.prefabId)) {
+        const next = applyPrefab(
+          refreshed.prefabs[i.prefabId],
+          i,
+          nodes,
+          i.id === instanceId,
+        );
         nodes = next.nodes;
         instances[i.id] = next.instance;
         for (const [scene, key] of next.modelCopies) {
@@ -1712,9 +1870,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           else buffers.delete(scene);
         }
       }
+    const linked = linkNestedInstances(nodes, instances, refreshed.prefabs);
+    nodes = linked.nodes;
+    instances = linked.instances;
     const content = {
       ...s.content,
-      prefabs: { ...s.content.prefabs, [prefab.id]: prefab },
+      prefabs: refreshed.prefabs,
       prefabInstances: instances,
     };
     validateProject({ ...s, scene: { nodes }, content });
@@ -1746,6 +1907,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (b) buffers.set(scene, b.slice(0));
       else buffers.delete(scene);
     }
+    for (const child of Object.values(content.prefabInstances))
+      if (subtree(next.nodes, i.rootId).some((n) => n.id === child.rootId))
+        delete child.unpackedMounts;
+    const linked = linkNestedInstances(
+      next.nodes,
+      content.prefabInstances,
+      content.prefabs,
+    );
+    content.prefabInstances = linked.instances;
+    next.nodes = linked.nodes;
     validateProject({ ...s, scene: { nodes: next.nodes }, content });
     pruneModels(next.nodes, content, buffers);
     pushHistory(get, set);
@@ -1759,17 +1930,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   unpackPrefabInstance: (instanceId) => {
     const s = get();
     assertEditing(s);
-    const instances = { ...s.content.prefabInstances };
+    const removed = s.content.prefabInstances[instanceId];
+    if (!removed) return;
+    const instances = structuredClone(s.content.prefabInstances);
     delete instances[instanceId];
+    if (
+      removed.parentInstanceId &&
+      removed.mountId &&
+      instances[removed.parentInstanceId]
+    ) {
+      const parent = instances[removed.parentInstanceId];
+      parent.unpackedMounts = [
+        ...(parent.unpackedMounts || []),
+        removed.mountId,
+      ];
+    }
+    for (const i of Object.values(instances))
+      if (i.parentInstanceId === instanceId)
+        i.parentInstanceId = removed.parentInstanceId;
+    const nodes = s.nodes.map((n) => {
+      const copy = { ...n };
+      if (copy.prefab?.instanceId === instanceId) delete copy.prefab;
+      return copy;
+    });
+    const linked = linkNestedInstances(nodes, instances, s.content.prefabs);
     pushHistory(get, set);
     set({
-      content: { ...s.content, prefabInstances: instances },
-      nodes: s.nodes.map((n) => {
-        if (n.prefab?.instanceId !== instanceId) return n;
-        const copy = { ...n };
-        delete copy.prefab;
-        return copy;
-      }),
+      content: { ...s.content, prefabInstances: linked.instances },
+      nodes: linked.nodes,
     });
   },
   deletePrefab: (id) => {
@@ -1777,6 +1965,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     assertEditing(s);
     if (Object.values(s.content.prefabInstances).some((i) => i.prefabId === id))
       throw new Error("预制体仍有实例，请先删除实例或解除关联");
+    if (
+      Object.values(s.content.prefabs).some((p) =>
+        Object.values(p.nestedInstances || {}).some((i) => i.prefabId === id),
+      )
+    )
+      throw new Error("预制体仍被其他模板嵌套引用，请先解除嵌套关联并应用模板");
     const prefabs = { ...s.content.prefabs };
     delete prefabs[id];
     const content = { ...s.content, prefabs },
@@ -1805,3 +1999,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 }));
+
+function prefabDependsOn(
+  prefabs: ProjectContent["prefabs"],
+  id: string,
+  target: string,
+  seen = new Set<string>(),
+): boolean {
+  if (seen.has(id)) return false;
+  seen.add(id);
+  return Object.values(prefabs[id]?.nestedInstances || {}).some(
+    (i) =>
+      i.prefabId === target ||
+      prefabDependsOn(prefabs, i.prefabId, target, seen),
+  );
+}
