@@ -109,8 +109,10 @@ function overrides(current: SceneNode, base: SceneNode): Record<string, any> {
     if (["id", "prefab"].includes(key)) continue;
     const a = (current as any)[key],
       b = (base as any)[key];
-    if (["transform", "rotation", "scale"].includes(key)) {
-      for (const axis of ["x", "y", "z"])
+    if (["transform", "rotation", "scale", "materialSlots"].includes(key)) {
+      for (const axis of key === "materialSlots"
+        ? new Set([...Object.keys(a || {}), ...Object.keys(b || {})])
+        : ["x", "y", "z"])
         if (!equal(a?.[axis], b?.[axis]))
           (result[key] ??= {})[axis] = a?.[axis];
     } else if (!equal(a, b)) result[key] = clone(a);
@@ -182,9 +184,12 @@ export function applyPrefab(
         : {};
     const n: any = clone(definition);
     for (const [key, value] of Object.entries(patch))
-      n[key] = ["transform", "rotation", "scale"].includes(key)
+      n[key] = ["transform", "rotation", "scale", "materialSlots"].includes(key)
         ? { ...n[key], ...value }
         : value;
+    if (n.materialSlots)
+      for (const key of Object.keys(n.materialSlots))
+        if (n.materialSlots[key] === undefined) delete n.materialSlots[key];
     n.id = map[definition.id];
     n.parentId = n.parentId?.startsWith("external:")
       ? n.parentId.slice(9)
@@ -257,10 +262,222 @@ export function cloneInstanceLinks(
         i = Object.values(copied).find((i) =>
           Object.values(i.nodeMap).includes(n.id),
         );
-      if (i && n.prefab) n.prefab = { ...n.prefab, instanceId: i.id };
+      const original =
+        n.prefab &&
+        Object.values(copied).find(
+          (c) =>
+            c.prefabId === n.prefab!.prefabId &&
+            c.nodeMap[n.prefab!.nodeId] === n.id,
+        );
+      if (original && n.prefab)
+        n.prefab = { ...n.prefab, instanceId: original.id };
       else delete n.prefab;
       return n;
     }),
-    instances: copied,
+    instances: inferInstanceParents(nodes, copied),
   };
+}
+
+/** Closest containing instance owns the nested root; maps may overlap only along this ancestry. */
+export function inferInstanceParents(
+  nodes: SceneNode[],
+  instances: Record<string, PrefabInstance>,
+) {
+  const result = clone(instances);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const roots = new Map(Object.values(result).map((i) => [i.rootId, i.id]));
+  for (const i of Object.values(result)) {
+    delete i.parentInstanceId;
+    let parent = byId.get(i.rootId)?.parentId;
+    while (parent) {
+      const enclosing = roots.get(parent);
+      if (enclosing) {
+        i.parentInstanceId = enclosing;
+        break;
+      }
+      parent = byId.get(parent)?.parentId;
+    }
+  }
+  return result;
+}
+export function assertPrefabGraph(prefabs: Record<string, PrefabAsset>) {
+  const done = new Set<string>(),
+    visiting = new Set<string>();
+  function visit(id: string, depth = 0) {
+    if (depth > 64) throw new Error("预制体嵌套超过 64 层");
+    if (visiting.has(id)) throw new Error("预制体嵌套依赖包含循环");
+    if (done.has(id)) return;
+    const p = prefabs[id];
+    if (!p) throw new Error("嵌套预制体不存在");
+    visiting.add(id);
+    for (const i of Object.values(p.nestedInstances || {}))
+      visit(i.prefabId, depth + 1);
+    visiting.delete(id);
+    done.add(id);
+  }
+  Object.keys(prefabs).forEach((id) => visit(id));
+}
+/** Capture direct nested mounts using enclosing-template local IDs, retaining child baselines. */
+export function captureNestedPrefab(
+  nodes: SceneNode[],
+  rootId: string,
+  id: string,
+  name: string,
+  instances: Record<string, PrefabInstance>,
+  previous?: PrefabInstance,
+): PrefabAsset {
+  const p = capturePrefab(nodes, rootId, id, name, previous);
+  const selected = subtree(nodes, rootId);
+  const ids = new Map(selected.map((n, index) => [n.id, p.nodes[index].id]));
+  const inferred = inferInstanceParents(nodes, instances);
+  const nested = Object.values(inferred).filter(
+    (i) => i.rootId !== rootId && ids.has(i.rootId),
+  );
+  const nestedIds = new Set(nested.map((i) => i.id));
+  p.nestedInstances = {};
+  for (const child of nested.filter(
+    (i) => !i.parentInstanceId || !nestedIds.has(i.parentInstanceId),
+  )) {
+    const key = ids.get(child.rootId)!;
+    p.nestedInstances[key] = {
+      ...clone(child),
+      id: key,
+      rootId: key,
+      parentInstanceId: undefined,
+      mountId: undefined,
+      nodeMap: Object.fromEntries(
+        Object.entries(child.nodeMap).map(([local, scene]) => [
+          local,
+          ids.get(scene) || crypto.randomUUID(),
+        ]),
+      ),
+    };
+  }
+  return p;
+}
+/** Restore deepest ownership and nested records after enclosing instances merge. */
+export function linkNestedInstances(
+  nodes: SceneNode[],
+  instances: Record<string, PrefabInstance>,
+  prefabs: Record<string, PrefabAsset>,
+) {
+  const existing = inferInstanceParents(nodes, instances),
+    result: Record<string, PrefabInstance> = {};
+  const ids = new Set(nodes.map((n) => n.id));
+  const owned = new Map<string, SceneNode["prefab"]>();
+  const used = new Set<string>();
+  function link(i: PrefabInstance, depth = 0) {
+    if (depth > 64) throw new Error("预制体嵌套超过 64 层");
+    if (!ids.has(i.rootId) || used.has(i.id)) return;
+    used.add(i.id);
+    result[i.id] = i;
+    for (const [local, scene] of Object.entries(i.nodeMap))
+      if (ids.has(scene))
+        owned.set(scene, {
+          prefabId: i.prefabId,
+          instanceId: i.id,
+          nodeId: local,
+        });
+    const p = prefabs[i.prefabId];
+    for (const [mount, definition] of Object.entries(
+      p?.nestedInstances || {},
+    )) {
+      if (i.unpackedMounts?.includes(mount)) continue;
+      const rootId = i.nodeMap[definition.rootId];
+      if (!rootId || !ids.has(rootId)) continue;
+      const old = Object.values(existing).find(
+        (child) =>
+          child.rootId === rootId && child.prefabId === definition.prefabId,
+      );
+      const child: PrefabInstance = {
+        ...clone(definition),
+        id: old?.id || crypto.randomUUID(),
+        rootId,
+        parentInstanceId: i.id,
+        mountId: mount,
+        unpackedMounts: old?.unpackedMounts,
+        nodeMap: Object.fromEntries(
+          Object.entries(definition.nodeMap).map(([local, outer]) => [
+            local,
+            i.nodeMap[outer] || old?.nodeMap[local] || crypto.randomUUID(),
+          ]),
+        ),
+      };
+      link(child, depth + 1);
+    }
+    // Scene-only linked children have not yet been applied to the enclosing template.
+    for (const child of Object.values(existing))
+      if (
+        child.parentInstanceId === i.id &&
+        !used.has(child.id) &&
+        !Object.values(i.nodeMap).includes(child.rootId)
+      )
+        link(child, depth + 1);
+  }
+  for (const i of Object.values(existing)) if (!i.parentInstanceId) link(i);
+  // Unpacked mounts can retain deeper linked instances as scene-only children.
+  for (const i of Object.values(existing))
+    if (
+      !used.has(i.id) &&
+      ids.has(i.rootId) &&
+      (!i.parentInstanceId || !existing[i.parentInstanceId])
+    )
+      link({ ...i, parentInstanceId: undefined });
+  return {
+    nodes: nodes.map((n) => {
+      const copy = { ...n };
+      delete copy.prefab;
+      if (owned.has(n.id)) copy.prefab = owned.get(n.id);
+      return copy;
+    }),
+    instances: result,
+  };
+}
+/** Propagate a child revision through template snapshots in dependency order. */
+export function refreshDependentTemplates(
+  prefabs: Record<string, PrefabAsset>,
+  changed: string,
+  buffers: Map<string, ArrayBuffer>,
+) {
+  assertPrefabGraph(prefabs);
+  const result = clone(prefabs),
+    affected = new Set([changed]),
+    done = new Set<string>();
+  function refresh(id: string) {
+    if (done.has(id)) return;
+    done.add(id);
+    const p = result[id];
+    for (const nested of Object.values(p.nestedInstances || {}))
+      refresh(nested.prefabId);
+    if (id === changed) return;
+    let updated = false;
+    for (const [key, nested] of Object.entries(p.nestedInstances || {})) {
+      if (!affected.has(nested.prefabId)) continue;
+      const next = applyPrefab(result[nested.prefabId], nested, p.nodes);
+      p.nodes = next.nodes.map((n) => {
+        const copy = { ...n };
+        delete copy.prefab;
+        return copy;
+      });
+      p.nestedInstances![key] = next.instance;
+      for (const [local, source] of next.modelCopies) {
+        const destination = "prefab:" + p.id + ":" + local,
+          b = buffers.get(source);
+        if (b) buffers.set(destination, b.slice(0));
+        else buffers.delete(destination);
+      }
+      updated = true;
+    }
+    if (updated) {
+      p.modelKeys = Object.fromEntries(
+        p.nodes
+          .filter((n) => n.type === "model")
+          .map((n) => [n.id, "prefab:" + id + ":" + n.id]),
+      );
+      p.revision++;
+      affected.add(id);
+    }
+  }
+  Object.keys(result).forEach(refresh);
+  return { prefabs: result, affected };
 }

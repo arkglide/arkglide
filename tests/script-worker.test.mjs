@@ -203,3 +203,21 @@ test("formatting is stable and does not add hidden-wrapper indentation", async (
   );
   assert.ok(completions.entries.some((entry) => entry.name === "position"));
 });
+
+test("prefab factory completion and async result types work in JS and TS at saved source offsets", async () => {
+  const code = `const template = prefabs.findByName('Enemy');\nif (template) prefabs.instantiate(template.id, {position:{x:1,y:2,z:3}}).then(result => {result.root.translate(1,0,0); result.findByName('Body')?.destroy();});\nreturn {};`;
+  const { worker, file } = setup({ "spawn.js": code, "spawn.ts": code });
+  for (const name of ["spawn.js", "spawn.ts"])
+    assert.deepEqual(await diagnostics(worker, file(name)), []);
+  const items = await worker.getCompletionsAtPosition(
+    file("spawn.js"),
+    code.indexOf("prefabs.") + 8,
+  );
+  for (const name of ["instantiate", "list", "findByName"])
+    assert.ok(items.entries.some((e) => e.name === name));
+  const bad = `prefabs.instantiate('id',{position:{x:'bad',y:0,z:0}});return {};`;
+  const invalid = setup({ "bad-spawn.js": bad });
+  assert.ok(
+    (await diagnostics(invalid.worker, invalid.file("bad-spawn.js"))).length,
+  );
+});

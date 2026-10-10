@@ -153,6 +153,8 @@ export function NodeContentInspector({ node }: { node: SceneNode }) {
       : undefined,
     prefab = instance ? content.prefabs[instance.prefabId] : undefined;
   const stats = instance ? instanceOverrides(instance, nodes) : null;
+  const partCatalog = useEditorStore((s) => s.modelParts);
+  const parts = partCatalog[node.id] || [];
   const state = () => useEditorStore.getState();
   return (
     <Stack data-testid="node-content" spacing={1} sx={{ my: 1 }}>
@@ -218,9 +220,75 @@ export function NodeContentInspector({ node }: { node: SceneNode }) {
           )}
         </>
       )}
+      {node.type === "model" && (
+        <Stack spacing={1} data-testid="model-material-slots">
+          <Typography variant="caption">模型分部件材质</Typography>
+          {!parts.length && (
+            <Typography variant="caption">
+              模型加载后显示材质槽。重新链接不同模型后请检查部件编号。
+            </Typography>
+          )}
+          {[
+            ...parts,
+            ...Object.keys(node.materialSlots || {})
+              .filter((key) => !parts.some((p) => p.key === key))
+              .map((key) => ({ key, name: "缺失部件 · " + key })),
+          ].map((part) => (
+            <TextField
+              key={part.key}
+              label={part.name}
+              select
+              size="small"
+              value={
+                Object.hasOwn(node.materialSlots || {}, part.key)
+                  ? (node.materialSlots![part.key] ?? "__original")
+                  : "__inherit"
+              }
+              onChange={(e) =>
+                void action.run(() =>
+                  state().setModelSlotMaterial(
+                    node.id,
+                    part.key,
+                    e.target.value === "__inherit"
+                      ? undefined
+                      : e.target.value === "__original"
+                        ? null
+                        : e.target.value,
+                  ),
+                )
+              }
+            >
+              <MenuItem value="__inherit">跟随整体材质</MenuItem>
+              <MenuItem value="__original">使用此部件原始材质</MenuItem>
+              {Object.values(content.materials).map((m) => (
+                <MenuItem key={m.id} value={m.id}>
+                  {m.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          ))}
+        </Stack>
+      )}
       <Divider />
       {prefab && instance && stats ? (
         <>
+          {instance.parentInstanceId && (
+            <Button
+              size="small"
+              onClick={() =>
+                state().selectNode(
+                  content.prefabInstances[instance.parentInstanceId!].rootId,
+                )
+              }
+            >
+              选择外层预制体：
+              {
+                content.prefabs[
+                  content.prefabInstances[instance.parentInstanceId].prefabId
+                ].name
+              }
+            </Button>
+          )}
           <Typography variant="caption">
             预制体：{prefab.name} · v{instance.revision}
           </Typography>
@@ -501,7 +569,7 @@ export default function ContentPanel() {
               从选中子树创建预制体
             </Button>
             <Typography variant="caption" color="text.secondary">
-              在场景中选择实例，使用属性面板“应用到模板”同步修改。实例位置保留，属性覆盖可重置。
+              将预制体实例拖到普通父节点下，再从父节点创建复合模板，即可保留嵌套关联。子模板更新会传到父模板与实例；本地覆盖保留。
             </Typography>
             {Object.values(content.prefabs).map((p) => (
               <Box
@@ -552,6 +620,24 @@ export default function ContentPanel() {
                     删除模板
                   </Button>
                 </Stack>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: "block",
+                    userSelect: "text",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  模板 ID：{p.id}
+                </Typography>
+                {!!Object.keys(p.nestedInstances || {}).length && (
+                  <Typography variant="caption">
+                    嵌套：
+                    {Object.values(p.nestedInstances || {})
+                      .map((i) => content.prefabs[i.prefabId]?.name)
+                      .join("、")}
+                  </Typography>
+                )}
                 {Object.values(p.modelKeys).some(
                   (key) => !state().modelBuffers.has(key),
                 ) && (

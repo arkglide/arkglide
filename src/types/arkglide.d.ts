@@ -1,9 +1,27 @@
 // Script-facing API. Loaded into both Monaco language services as an ambient lib.
 // Keep in sync with public/arkglide-api.js and public/runtime.html.
-interface Vec3 { x: number; y: number; z: number; }
-interface Quat { x:number; y:number; z:number; w:number; }
-interface Vec2 { x: number; y: number; }
-type PrimitiveType = 'box' | 'sphere' | 'plane' | 'cylinder' | 'capsule' | 'torus';
+interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+interface Quat {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+}
+interface Vec2 {
+  x: number;
+  y: number;
+}
+type PrimitiveType =
+  | "box"
+  | "sphere"
+  | "plane"
+  | "cylinder"
+  | "capsule"
+  | "torus";
 
 /** Engine-independent entity handle. Obtain via this.entity or scene, not new Entity(). */
 interface Entity {
@@ -81,31 +99,35 @@ interface TimeAPI {
   /** Simulation time in seconds, excluding pauses. */
   readonly totalTime: number;
   readonly frameCount: number;
-  readonly unscaledDeltaTime:number;
-  readonly unscaledTotalTime:number;
-  readonly fixedDeltaTime:number;
-  readonly fixedTotalTime:number;
-  readonly fixedFrameCount:number;
-  readonly interpolationAlpha:number;
+  readonly unscaledDeltaTime: number;
+  readonly unscaledTotalTime: number;
+  readonly fixedDeltaTime: number;
+  readonly fixedTotalTime: number;
+  readonly fixedFrameCount: number;
+  readonly interpolationAlpha: number;
   /** 0 freezes simulation time and timers; range 0..100. */
-  timeScale:number;
+  timeScale: number;
 }
 
-interface ScriptThis { entity: Entity; }
+interface ScriptThis {
+  entity: Entity;
+}
 interface ScriptLifecycle {
   onStart?(this: ScriptInstance): void;
   onUpdate?(this: ScriptInstance): void;
   /** Use time.fixedDeltaTime; runs zero or multiple times before onUpdate. */
-  onFixedUpdate?(this: ScriptInstance):void;
+  onFixedUpdate?(this: ScriptInstance): void;
   /** Once, before entity disposal or when stopping the run. */
-  onDestroy?(this: ScriptInstance):void;
+  onDestroy?(this: ScriptInstance): void;
   // Scripts can keep per-instance state on the returned object.
   [key: string]: any;
 }
 interface ScriptInstance extends ScriptLifecycle, ScriptThis {}
 
 /** Optional helper: infer custom state while supplying a typed this.entity. */
-declare function defineScript<T extends object>(script: T & ThisType<T & ScriptThis>): T;
+declare function defineScript<T extends object>(
+  script: T & ThisType<T & ScriptThis>,
+): T;
 // Injected factory arguments. In legacy scripts with an empty scene, entity is null.
 // Bound entity scripts always receive an Entity.
 declare const entity: Entity;
@@ -115,38 +137,85 @@ declare const time: TimeAPI;
 
 /** Plain values; the runtime releases all internal WASM allocations. */
 interface MathAPI {
-  readonly backend: 'wasm' | 'javascript';
+  readonly backend: "wasm" | "javascript";
   vec3: {
-    add(a:Vec3,b:Vec3):Vec3; sub(a:Vec3,b:Vec3):Vec3;
-    dot(a:Vec3,b:Vec3):number; cross(a:Vec3,b:Vec3):Vec3;
-    length(a:Vec3):number; distance(a:Vec3,b:Vec3):number;
-    scale(a:Vec3,s:number):Vec3; normalize(a:Vec3):Vec3; lerp(a:Vec3,b:Vec3,t:number):Vec3;
+    add(a: Vec3, b: Vec3): Vec3;
+    sub(a: Vec3, b: Vec3): Vec3;
+    dot(a: Vec3, b: Vec3): number;
+    cross(a: Vec3, b: Vec3): Vec3;
+    length(a: Vec3): number;
+    distance(a: Vec3, b: Vec3): number;
+    scale(a: Vec3, s: number): Vec3;
+    normalize(a: Vec3): Vec3;
+    lerp(a: Vec3, b: Vec3, t: number): Vec3;
   };
   mat4: {
-    identity():number[]; multiply(a:readonly number[],b:readonly number[]):number[];
-    translation(p:Vec3):number[]; scaling(s:Vec3):number[]; rotation(angle:number,axis:Vec3):number[];
-    compose(position:Vec3,rotation:Vec3,scale:Vec3):number[];
-    transformPoint(matrix:readonly number[],point:Vec3):Vec3;
+    identity(): number[];
+    multiply(a: readonly number[], b: readonly number[]): number[];
+    translation(p: Vec3): number[];
+    scaling(s: Vec3): number[];
+    rotation(angle: number, axis: Vec3): number[];
+    compose(position: Vec3, rotation: Vec3, scale: Vec3): number[];
+    transformPoint(matrix: readonly number[], point: Vec3): Vec3;
   };
   quat: {
-    normalize(q:Quat):Quat; fromEuler(euler:Vec3):Quat;
-    slerp(a:Quat,b:Quat,t:number):Quat; toMatrix(q:Quat):number[];
+    normalize(q: Quat): Quat;
+    fromEuler(euler: Vec3): Quat;
+    slerp(a: Quat, b: Quat, t: number): Quat;
+    toMatrix(q: Quat): number[];
   };
 }
 declare const math: MathAPI;
 
 interface TimersAPI {
   /** Scaled game seconds. Returned function cancels this timer. */
-  after(seconds:number,callback:()=>void):()=>void;
+  after(seconds: number, callback: () => void): () => void;
   /** Coalesces missed intervals to one callback per frame. */
-  every(seconds:number,callback:()=>void):()=>void;
+  every(seconds: number, callback: () => void): () => void;
 }
 interface EventsAPI {
-  on<T=unknown>(name:string,callback:(payload:T)=>void):()=>void;
-  once<T=unknown>(name:string,callback:(payload:T)=>void):()=>void;
-  emit(name:string,payload?:unknown):void;
+  on<T = unknown>(name: string, callback: (payload: T) => void): () => void;
+  once<T = unknown>(name: string, callback: (payload: T) => void): () => void;
+  emit(name: string, payload?: unknown): void;
   /** Track a native listener; it is removed on script/entity destruction. */
-  listen(target:EventTarget,name:string,callback:(event:Event)=>void,options?:boolean|AddEventListenerOptions):()=>void;
+  listen(
+    target: EventTarget,
+    name: string,
+    callback: (event: Event) => void,
+    options?: boolean | AddEventListenerOptions,
+  ): () => void;
 }
-declare const timers:TimersAPI;
-declare const events:EventsAPI;
+declare const timers: TimersAPI;
+declare const events: EventsAPI;
+
+interface PrefabDescriptor {
+  readonly id: string;
+  readonly name: string;
+  readonly revision: number;
+  readonly nodeCount: number;
+}
+interface PrefabSpawnOptions {
+  position?: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
+  parent?: Entity;
+}
+interface PrefabHandle {
+  readonly root: Entity;
+  readonly entities: readonly Entity[];
+  /** ID within the template, not the generated scene ID. */
+  find(localNodeId: string): Entity | null;
+  findByName(name: string): Entity | null;
+  /** Destroy root, descendants, scripts, timers and subscriptions. */
+  destroy(): void;
+}
+interface PrefabsAPI {
+  list(): PrefabDescriptor[];
+  findByName(name: string): PrefabDescriptor | null;
+  /** Resolves after models load and all factories/onStart run; rejects on stop or owner destruction. */
+  instantiate(
+    prefabId: string,
+    options?: PrefabSpawnOptions,
+  ): Promise<PrefabHandle>;
+}
+declare const prefabs: PrefabsAPI;
