@@ -137,6 +137,8 @@ export default function Viewport() {
         setModelLoading(loadingCountRef.current > 0);
       },
       onLoaded: () => setSceneRevision((v) => v + 1),
+      onAnimations: (id, names) =>
+        useEditorStore.getState().setModelAnimations(id, names),
       onParts: (id, parts) =>
         useEditorStore.getState().setModelParts(id, parts),
       onError: (node, error) =>

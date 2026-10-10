@@ -1,3 +1,8 @@
+import {
+  defaultGameplay,
+  type AudioAsset,
+  type GameplayConfig,
+} from "./gameplay";
 import type { SceneNode } from "../store/useEditorStore";
 export interface MaterialAsset {
   id: string;
@@ -42,12 +47,16 @@ export interface PrefabInstance {
   revision: number;
 }
 export interface ProjectContent {
+  audio?: AudioAsset[];
+  gameplay?: GameplayConfig;
   materials: Record<string, MaterialAsset>;
   textures: TextureAsset[];
   prefabs: Record<string, PrefabAsset>;
   prefabInstances: Record<string, PrefabInstance>;
 }
 export const emptyContent = (): ProjectContent => ({
+  audio: [],
+  gameplay: defaultGameplay(),
   materials: {},
   textures: [],
   prefabs: {},

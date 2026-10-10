@@ -1,25 +1,27 @@
-import { useEffect, useRef } from 'react';
-import Editor, { loader } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
+import { useEffect, useRef } from "react";
+import Editor, { loader } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
 // Vite 原生 ?worker import：本地打包 Monaco worker（离线可用）
-import editorWorker from 'monaco-editor/editor/editor.worker?worker';
-import jsonWorker from 'monaco-editor/language/json/json.worker?worker';
-import cssWorker from 'monaco-editor/language/css/css.worker?worker';
-import htmlWorker from 'monaco-editor/language/html/html.worker?worker';
-import tsWorker from '../../editor/script.worker?worker';
+import editorWorker from "monaco-editor/editor/editor.worker?worker";
+import jsonWorker from "monaco-editor/language/json/json.worker?worker";
+import cssWorker from "monaco-editor/language/css/css.worker?worker";
+import htmlWorker from "monaco-editor/language/html/html.worker?worker";
+import tsWorker from "../../editor/script.worker?worker";
 // 以 raw 字符串读取 arkglide.d.ts，注入 Monaco language service
-import dtsContent from '../../types/arkglide.d.ts?raw';
-import { Box, Tabs, Tab, IconButton } from '@mui/material';
-import { Close } from '@mui/icons-material';
-import { useEditorStore } from '../../store/useEditorStore';
+import dtsContent from "../../types/arkglide.d.ts?raw";
+import { Box, Tabs, Tab, IconButton } from "@mui/material";
+import { Close } from "@mui/icons-material";
+import { useEditorStore } from "../../store/useEditorStore";
 
 // 配置 Monaco worker
 (self as any).MonacoEnvironment = {
   getWorker(_: string, label: string) {
-    if (label === 'json') return new jsonWorker();
-    if (label === 'css' || label === 'scss' || label === 'less') return new cssWorker();
-    if (label === 'html' || label === 'handlebars' || label === 'razor') return new htmlWorker();
-    if (label === 'typescript' || label === 'javascript') return new tsWorker();
+    if (label === "json") return new jsonWorker();
+    if (label === "css" || label === "scss" || label === "less")
+      return new cssWorker();
+    if (label === "html" || label === "handlebars" || label === "razor")
+      return new htmlWorker();
+    if (label === "typescript" || label === "javascript") return new tsWorker();
     return new editorWorker();
   },
 };
@@ -27,9 +29,12 @@ import { useEditorStore } from '../../store/useEditorStore';
 // 使用本地 monaco 实例（非 CDN）
 loader.config({ monaco });
 
-// JS factories and TS files share the same API declarations and compiler settings.
-for (const defaults of [monaco.typescript.javascriptDefaults, monaco.typescript.typescriptDefaults]) {
-  defaults.addExtraLib(dtsContent, 'file:///arkglide/api.d.ts');
+// JavaScript is the user scripting language; declarations provide completion only.
+for (const defaults of [
+  monaco.typescript.javascriptDefaults,
+  monaco.typescript.typescriptDefaults,
+]) {
+  defaults.addExtraLib(dtsContent, "file:///arkglide/api.d.ts");
   defaults.setCompilerOptions({
     target: monaco.typescript.ScriptTarget.ES2020,
     allowJs: true,
@@ -37,18 +42,23 @@ for (const defaults of [monaco.typescript.javascriptDefaults, monaco.typescript.
     strictNullChecks: true,
     noImplicitThis: true,
     allowNonTsExtensions: true,
+    module: monaco.typescript.ModuleKind.ESNext,
+    moduleResolution: monaco.typescript.ModuleResolutionKind.NodeJs,
   });
-  defaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false });
+  defaults.setDiagnosticsOptions({
+    noSemanticValidation: false,
+    noSyntaxValidation: false,
+  });
   defaults.setEagerModelSync(true);
 }
 
 // 根据文件名后缀推断 Monaco language id
 function inferLanguage(fileName: string): string {
-  if (fileName.endsWith('.ts')) return 'typescript';
-  if (fileName.endsWith('.json')) return 'json';
-  if (fileName.endsWith('.css')) return 'css';
-  if (fileName.endsWith('.html')) return 'html';
-  return 'javascript';
+  if (fileName.endsWith(".ts")) return "typescript";
+  if (fileName.endsWith(".json")) return "json";
+  if (fileName.endsWith(".css")) return "css";
+  if (fileName.endsWith(".html")) return "html";
+  return "javascript";
 }
 
 // Monaco 多 Tab 代码编辑器
@@ -62,17 +72,21 @@ export default function CodeEditor() {
   const activeFileId = useEditorStore((s) => s.activeFileId);
   const updateScript = useEditorStore((s) => s.updateScript);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
-  const navigation=useEditorStore(s=>s.scriptNavigation);
-  const playState = useEditorStore(s => s.playState);
-  const renameScript = useEditorStore(s => s.renameScript);
+  const navigation = useEditorStore((s) => s.scriptNavigation);
+  const playState = useEditorStore((s) => s.playState);
+  const renameScript = useEditorStore((s) => s.renameScript);
   const deleteScript = useEditorStore((s) => s.deleteScript);
 
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const modelMapRef = useRef(new Map<string, monaco.editor.ITextModel>());
   const listenersRef = useRef(new Map<string, monaco.IDisposable>());
-  const viewStatesRef = useRef(new Map<string, monaco.editor.ICodeEditorViewState>());
+  const viewStatesRef = useRef(
+    new Map<string, monaco.editor.ICodeEditorViewState>(),
+  );
   const syncingRef = useRef(false);
-  const modelRootRef = useRef(`file:///arkglide/scripts/${crypto.randomUUID()}/`);
+  const modelRootRef = useRef(
+    `file:///arkglide/scripts/${crypto.randomUUID()}/`,
+  );
   const fileNames = Object.keys(scripts);
 
   function syncModels() {
@@ -95,16 +109,27 @@ export default function CodeEditor() {
       for (const [name, content] of Object.entries(state.scripts)) {
         let model = models.get(name);
         if (!model) {
-          model = monaco.editor.createModel(content, inferLanguage(name),
-            monaco.Uri.parse(modelRootRef.current + encodeURIComponent(name)));
+          model = monaco.editor.createModel(
+            content,
+            inferLanguage(name),
+            monaco.Uri.parse(
+              modelRootRef.current +
+                name.split("/").map(encodeURIComponent).join("/"),
+            ),
+          );
           models.set(name, model);
           const ownedModel = model;
-          listenersRef.current.set(name, model.onDidChangeContent(() => {
-            if (!syncingRef.current) {
-              // Use the changed model's filename, never the currently selected tab.
-              useEditorStore.getState().updateScript(name, ownedModel.getValue());
-            }
-          }));
+          listenersRef.current.set(
+            name,
+            model.onDidChangeContent(() => {
+              if (!syncingRef.current) {
+                // Use the changed model's filename, never the currently selected tab.
+                useEditorStore
+                  .getState()
+                  .updateScript(name, ownedModel.getValue());
+              }
+            }),
+          );
         } else if (model.getValue() !== content) {
           // Project load/import/new and history restoration must reach Monaco too.
           model.setValue(content);
@@ -125,36 +150,55 @@ export default function CodeEditor() {
     }
   }
 
-  function revealDiagnostic(){
-    const editor=editorRef.current,request=useEditorStore.getState().scriptNavigation;
-    if(!editor||!request)return;
-    const model=modelMapRef.current.get(request.file);if(!model)return;
+  function revealDiagnostic() {
+    const editor = editorRef.current,
+      request = useEditorStore.getState().scriptNavigation;
+    if (!editor || !request) return;
+    const model = modelMapRef.current.get(request.file);
+    if (!model) return;
     editor.setModel(model);
-    const line=Math.min(request.line,model.getLineCount()),column=Math.min(request.column,model.getLineMaxColumn(line));
-    editor.setPosition({lineNumber:line,column});editor.revealLineInCenter(line);editor.focus();
+    const line = Math.min(request.line, model.getLineCount()),
+      column = Math.min(request.column, model.getLineMaxColumn(line));
+    editor.setPosition({ lineNumber: line, column });
+    editor.revealLineInCenter(line);
+    editor.focus();
   }
-  useEffect(()=>{revealDiagnostic();},[navigation]);
-  useEffect(() => { syncModels(); }, [scripts, activeFileId]);
-  useEffect(() => () => {
-    editorRef.current?.setModel(null);
-    for (const listener of listenersRef.current.values()) listener.dispose();
-    for (const model of modelMapRef.current.values()) model.dispose();
-    listenersRef.current.clear();
-    modelMapRef.current.clear();
-    viewStatesRef.current.clear();
-    editorRef.current = null;
-  }, []);
+  useEffect(() => {
+    revealDiagnostic();
+  }, [navigation]);
+  useEffect(() => {
+    syncModels();
+  }, [scripts, activeFileId]);
+  useEffect(
+    () => () => {
+      editorRef.current?.setModel(null);
+      for (const listener of listenersRef.current.values()) listener.dispose();
+      for (const model of modelMapRef.current.values()) model.dispose();
+      listenersRef.current.clear();
+      modelMapRef.current.clear();
+      viewStatesRef.current.clear();
+      editorRef.current = null;
+    },
+    [],
+  );
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <Tabs
         value={activeFileId}
         onChange={(_, v) => setActiveFile(String(v))}
         sx={{
           minHeight: 36,
           maxHeight: 36,
-          backgroundColor: '#1E1E1E',
-          borderBottom: '1px solid #333',
+          backgroundColor: "#1E1E1E",
+          borderBottom: "1px solid #333",
         }}
       >
         {fileNames.map((name) => (
@@ -163,16 +207,17 @@ export default function CodeEditor() {
             value={name}
             label={name}
             onDoubleClick={() => {
-              if (name === 'main.js' || playState !== 'stopped') return;
-              const next = window.prompt('脚本文件名',name)?.trim();
-              if (next) renameScript(name,next.endsWith('.js') ? next : next+'.js');
+              if (name === "main.js" || playState !== "stopped") return;
+              const next = window.prompt("脚本文件名", name)?.trim();
+              if (next)
+                renameScript(name, next.endsWith(".js") ? next : next + ".js");
             }}
             icon={
               // main.js 不可关闭，不渲染关闭按钮
-              name !== 'main.js' ? (
+              name !== "main.js" ? (
                 <IconButton
                   size="small"
-                  disabled={playState !== 'stopped'}
+                  disabled={playState !== "stopped"}
                   // 阻止冒泡到 Tab onChange，仅触发 deleteScript
                   onClick={(e) => {
                     e.stopPropagation();
@@ -185,11 +230,11 @@ export default function CodeEditor() {
               ) : undefined
             }
             iconPosition="end"
-            sx={{ minHeight: 36, textTransform: 'none' }}
+            sx={{ minHeight: 36, textTransform: "none" }}
           />
         ))}
       </Tabs>
-      <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <Box sx={{ flex: 1, overflow: "hidden", position: "relative" }}>
         <Editor
           height="100%"
           theme="vs-dark"
@@ -197,18 +242,30 @@ export default function CodeEditor() {
           onMount={(editor) => {
             editorRef.current = editor;
             const defaultModel = editor.getModel();
-            syncModels();revealDiagnostic();
-            if (defaultModel && defaultModel !== editor.getModel()) defaultModel.dispose();
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-              const currentModel = editor.getModel();
-              const entry = [...modelMapRef.current].find(([, model]) => model === currentModel);
-              if (entry && currentModel && useEditorStore.getState().scripts[entry[0]] !== currentModel.getValue()) {
-                updateScript(entry[0], currentModel.getValue());
-              }
-            });
+            syncModels();
+            revealDiagnostic();
+            if (defaultModel && defaultModel !== editor.getModel())
+              defaultModel.dispose();
+            editor.addCommand(
+              monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+              () => {
+                const currentModel = editor.getModel();
+                const entry = [...modelMapRef.current].find(
+                  ([, model]) => model === currentModel,
+                );
+                if (
+                  entry &&
+                  currentModel &&
+                  useEditorStore.getState().scripts[entry[0]] !==
+                    currentModel.getValue()
+                ) {
+                  updateScript(entry[0], currentModel.getValue());
+                }
+              },
+            );
           }}
           options={{
-            readOnly: playState !== 'stopped',
+            readOnly: playState !== "stopped",
             fontSize: 13,
             lineHeight: 18,
             minimap: { enabled: false },
@@ -216,7 +273,7 @@ export default function CodeEditor() {
             tabSize: 2,
             formatOnPaste: true,
             automaticLayout: true,
-            lineNumbers: 'on',
+            lineNumbers: "on",
             folding: true,
           }}
         />

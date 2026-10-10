@@ -1,0 +1,343 @@
+{
+  "version": "0.5",
+  "projectId": "",
+  "name": "JavaScript 模块示例：收集宝石",
+  "scene": {
+    "nodes": [
+      {
+        "id": "Player",
+        "name": "Player",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": 2,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "primitive": "box",
+        "color": "#58A6FF",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": true
+        },
+        "scripts": [
+          "main.js"
+        ]
+      },
+      {
+        "id": "Floor",
+        "name": "Floor",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": -0.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 12,
+          "y": 1,
+          "z": 12
+        },
+        "visible": true,
+        "primitive": "box",
+        "color": "#263B31",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": true
+        }
+      },
+      {
+        "id": "Wall",
+        "name": "Wall",
+        "type": "mesh",
+        "transform": {
+          "x": 4,
+          "y": 1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 3,
+          "z": 8
+        },
+        "visible": true,
+        "primitive": "box",
+        "color": "#A35445",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": true
+        }
+      },
+      {
+        "id": "Gem",
+        "name": "Gem",
+        "type": "model",
+        "transform": {
+          "x": 2,
+          "y": 0.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "modelUrl": "animated-gem.glb",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": true,
+          "lockRotation": true
+        },
+        "animation": {
+          "clip": "Idle",
+          "autoplay": true,
+          "loop": true,
+          "speed": 1
+        }
+      },
+      {
+        "id": "Camera",
+        "name": "Camera",
+        "type": "camera",
+        "transform": {
+          "x": 0,
+          "y": 7,
+          "z": -11
+        },
+        "rotation": {
+          "x": 0.5,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "activeCamera": true,
+        "fov": 60
+      }
+    ]
+  },
+  "scripts": {
+    "main.js": "import { movement } from './movement.js';\n// WASD / 方向键移动，空格跳跃；触屏按钮映射同一动作。\n// 走近黄色宝石可加分并播放音效；物理每个固定步推进一次。\nreturn defineScript({\n  score: 0, grounded: false, contacts: new Set(), gemMode: '',\n  onStart() {\n    physics.onContact(this.entity, event => {\n      if (event.other.name === 'Floor') {\n        if (event.phase === 'enter') this.contacts.add(event.other.id);\n        else this.contacts.delete(event.other.id);\n      }\n      if (event.phase === 'enter' && event.other.name === 'Gem') {\n        this.score++; ui.get('score').setText('分数：' + this.score);\n        audio.play('coin', {entity:this.entity,spatial:true,volume:.8});\n        event.other.destroy();\n        ui.get('hint').setText('收集成功！停止再播放可重新开始');\n      }\n    });\n  },\n  onFixedUpdate() {\n    const v=physics.getVelocity(this.entity);\n    const step=movement(input); physics.setVelocity(this.entity,{x:step.x,y:v.y,z:step.z});\n    if(input.isActionDown('jump') && this.contacts.size && v.y<.1)physics.addImpulse(this.entity,{x:0,y:5,z:0});\n    if(this.entity.position.y < -8)physics.teleport(this.entity,{x:0,y:3,z:0});\n  },\n  onUpdate() {\n    const gem=scene.findByName('Gem');\n    if(gem){const mode=input.isActionDown('moveX')||input.isActionDown('moveZ')?'Move':'Idle';\n      if(mode!==this.gemMode){animation.play(gem,mode,{loop:true,fade:.2});this.gemMode=mode;}}\n  }\n});",
+    "movement.js": "export const speed = 3;\nexport function movement(input) {\n  return {x:input.getAction('moveX')*speed, z:input.getAction('moveZ')*speed};\n}\n"
+  },
+  "activeFileId": "main.js",
+  "modelRefs": [
+    {
+      "assetId": "Gem",
+      "fileName": "animated-gem.glb"
+    }
+  ],
+  "settings": {
+    "gravity": {
+      "x": 0,
+      "y": -9.8,
+      "z": 0
+    },
+    "backgroundColor": "#0D1724",
+    "ambientIntensity": 0.8,
+    "ambientColor": "#FFFFFF",
+    "fpsCap": 60,
+    "fixedTimeStep": 0.016666666666666666,
+    "maxSubSteps": 8,
+    "timeScale": 1
+  },
+  "content": {
+    "materials": {},
+    "textures": [],
+    "prefabs": {},
+    "prefabInstances": {},
+    "audio": [
+      {
+        "id": "coin",
+        "name": "收集音效.wav",
+        "mime": "audio/wav",
+        "byteLength": 8864
+      }
+    ],
+    "gameplay": {
+      "captureInput": true,
+      "actions": [
+        {
+          "name": "moveX",
+          "positive": [
+            "KeyD",
+            "ArrowRight"
+          ],
+          "negative": [
+            "KeyA",
+            "ArrowLeft"
+          ]
+        },
+        {
+          "name": "moveZ",
+          "positive": [
+            "KeyW",
+            "ArrowUp"
+          ],
+          "negative": [
+            "KeyS",
+            "ArrowDown"
+          ]
+        },
+        {
+          "name": "jump",
+          "positive": [
+            "Space"
+          ],
+          "negative": []
+        }
+      ],
+      "hud": [
+        {
+          "id": "score",
+          "text": "分数：0",
+          "x": 3,
+          "y": 3,
+          "kind": "text",
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        },
+        {
+          "id": "hint",
+          "text": "WASD 移动 / 空格跳跃 / 收集黄色宝石",
+          "x": 3,
+          "y": 11,
+          "kind": "text",
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        },
+        {
+          "id": "left",
+          "text": "←",
+          "x": 3,
+          "y": 80,
+          "kind": "button",
+          "action": "moveX",
+          "direction": -1,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        },
+        {
+          "id": "right",
+          "text": "→",
+          "x": 18,
+          "y": 80,
+          "kind": "button",
+          "action": "moveX",
+          "direction": 1,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        },
+        {
+          "id": "forward",
+          "text": "↑",
+          "x": 10,
+          "y": 65,
+          "kind": "button",
+          "action": "moveZ",
+          "direction": 1,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        },
+        {
+          "id": "back",
+          "text": "↓",
+          "x": 10,
+          "y": 85,
+          "kind": "button",
+          "action": "moveZ",
+          "direction": -1,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        },
+        {
+          "id": "jump",
+          "text": "跳跃",
+          "x": 80,
+          "y": 80,
+          "kind": "button",
+          "action": "jump",
+          "direction": 1,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "fontSize": 18
+        }
+      ]
+    }
+  }
+}

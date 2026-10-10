@@ -38,3 +38,9 @@ F11 物理、F12 C++ 场景图、F13 可玩项目导出、F14 联机仍待实现
 底部新增「材质与预制体」，支持 PBR、三类贴图、实体子树模板、实例覆盖与模板更新。右侧属性可绑定材质、创建模板、应用到模板、重置覆盖和解除关联。项目格式 0.4 兼容旧的 0.1/0.2/0.3，保存、恢复和 ZIP 包含全部新增资源。详见 [第二批说明](docs/second-batch.md)。
 
 第二批补齐：模型分部件材质、嵌套预制体关联与运行时生成 API，详见 [使用与兼容说明](docs/second-batch-completion.md)。项目格式为 0.4，兼容旧项目。
+
+## 第三批可玩性
+
+支持 Jolt WASM 基础物理、音频、动作输入/触屏 HUD 和模型动画。启动后导入 `examples/collect-gems.arkglide`，播放并点击启用音频即可测试移动、碰撞、收集与计分。详见 [第三批说明](docs/third-batch.md)。
+
+用户脚本采用 JavaScript；[项目内 import/export 使用方法](docs/javascript-modules.md)。第三批基础玩法已完成，进阶任务见 [完整任务单](docs/third-batch-full-tasklist.md)。

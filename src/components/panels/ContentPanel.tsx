@@ -1,3 +1,8 @@
+import {
+  AudioPanel,
+  GameplayPanel,
+  NodeGameplayInspector,
+} from "./GameplayPanel";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -269,6 +274,7 @@ export function NodeContentInspector({ node }: { node: SceneNode }) {
           ))}
         </Stack>
       )}
+      <NodeGameplayInspector node={node} />
       <Divider />
       {prefab && instance && stats ? (
         <>
@@ -424,6 +430,8 @@ export default function ContentPanel() {
         <Tab label={"材质 (" + materials.length + ")"} />
         <Tab label={"贴图 (" + content.textures.length + ")"} />
         <Tab label={"预制体 (" + Object.keys(content.prefabs).length + ")"} />
+        <Tab label={"音频 (" + (content.audio?.length || 0) + ")"} />
+        <Tab label="输入与 HUD" />
       </Tabs>
       <Box
         component="fieldset"
@@ -443,6 +451,8 @@ export default function ContentPanel() {
             {action.error}
           </Alert>
         )}
+        {tab === 3 && <AudioPanel />}
+        {tab === 4 && <GameplayPanel />}
         {tab === 0 && (
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
             <Stack spacing={1} sx={{ width: 200 }}>

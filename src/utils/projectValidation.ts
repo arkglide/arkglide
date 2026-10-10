@@ -1,9 +1,13 @@
+import {
+  validateComponents,
+  validateGameplayContent,
+} from "./gameplayValidation";
 import type { SceneNode } from "../store/useEditorStore";
 import type { StoredProject } from "./projectStorage";
 import { emptyContent, type ProjectContent } from "../types/content";
 import { assertPrefabGraph, inferInstanceParents } from "../engine/prefabs";
 import { collectModelRefs } from "./contentResources";
-export const PROJECT_VERSION = "0.4";
+export const PROJECT_VERSION = "0.5";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 
 export function validateProject(data: any): {
@@ -16,7 +20,7 @@ export function validateProject(data: any): {
   if (
     data &&
     data.version !== undefined &&
-    !["0.1", "0.2", "0.3", PROJECT_VERSION].includes(data.version)
+    !["0.1", "0.2", "0.3", "0.4", PROJECT_VERSION].includes(data.version)
   )
     throw new Error(
       "项目格式版本 " + data.version + " 暂不支持，请使用对应版本编辑器打开",
@@ -48,6 +52,7 @@ export function validateProject(data: any): {
     )
       throw new Error("项目中包含无效或重复节点");
     ids.add(n.id);
+    validateComponents(n);
     if (
       n.scripts &&
       (!Array.isArray(n.scripts) ||
@@ -210,6 +215,7 @@ function validateContent(
     !record(content.prefabInstances)
   )
     throw new Error("无效项目资源结构");
+  validateGameplayContent(content);
   const textureIds = new Set<string>();
   for (const t of content.textures) {
     if (
@@ -253,6 +259,11 @@ function validateContent(
   }
   const checkNodes = (items: SceneNode[]) => {
     for (const n of items) {
+      if (
+        n.audioSource &&
+        !content.audio?.some((a) => a.id === n.audioSource!.assetId)
+      )
+        throw new Error("音源引用的音频不存在");
       if (
         n.materialId !== undefined &&
         (!Object.hasOwn(content.materials, n.materialId) ||
@@ -457,6 +468,8 @@ function validateNodeSubtree(
 ): SceneNode[] {
   const plain = nodes.map((n) => {
     const copy = { ...n };
+    validateComponents(copy);
+    delete copy.audioSource;
     delete copy.materialId;
     delete copy.materialSlots;
     delete copy.prefab;
@@ -468,6 +481,9 @@ function validateNodeSubtree(
     settings,
   }).nodes.map((n, index) => ({
     ...n,
+    ...(nodes[index].audioSource
+      ? { audioSource: structuredClone(nodes[index].audioSource) }
+      : {}),
     ...(nodes[index].materialId ? { materialId: nodes[index].materialId } : {}),
     ...(nodes[index].materialSlots
       ? { materialSlots: structuredClone(nodes[index].materialSlots) }

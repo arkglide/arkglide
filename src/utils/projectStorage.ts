@@ -28,6 +28,7 @@ function openDatabase(): Promise<IDBDatabase> {
           "recoveries",
           "recoveryInfo",
           "textures",
+          "audio",
         ]) {
           if (!request.result.objectStoreNames.contains(name))
             request.result.createObjectStore(name);
@@ -44,9 +45,14 @@ function openDatabase(): Promise<IDBDatabase> {
       request.onsuccess = () => {
         const db = request.result;
         if (
-          ["projects", "models", "recoveries", "recoveryInfo", "textures"].some(
-            (name) => !db.objectStoreNames.contains(name),
-          )
+          [
+            "projects",
+            "models",
+            "recoveries",
+            "recoveryInfo",
+            "textures",
+            "audio",
+          ].some((name) => !db.objectStoreNames.contains(name))
         ) {
           const nextVersion = db.version + 1;
           db.close();
@@ -75,7 +81,8 @@ function store(name: string) {
 }
 const projectStore = store("projects"),
   modelStore = store("models"),
-  textureStore = store("textures");
+  textureStore = store("textures"),
+  audioStore = store("audio");
 const modelKey = (projectId: string, assetId: string) =>
   projectId + "/" + assetId;
 function complete(transaction: IDBTransaction): Promise<void> {
@@ -96,9 +103,13 @@ export async function saveProjectSnapshot(
   data: StoredProject,
   buffers: Map<string, ArrayBuffer>,
   textures: Map<string, ArrayBuffer> = new Map(),
+  audio: Map<string, ArrayBuffer> = new Map(),
 ): Promise<void> {
   const db = await openDatabase();
-  const tx = db.transaction(["projects", "models", "textures"], "readwrite");
+  const tx = db.transaction(
+    ["projects", "models", "textures", "audio"],
+    "readwrite",
+  );
   const finished = complete(tx);
   tx.objectStore("projects").put(data, data.projectId);
   for (const ref of data.modelRefs) {
@@ -144,7 +155,33 @@ export async function saveProjectSnapshot(
       tx.objectStore("textures").delete(e.key);
     e.continue();
   };
+  const audioKeys = new Set(
+    (data.content?.audio || []).map((a) => modelKey(data.projectId, a.id)),
+  );
+  for (const a of data.content?.audio || []) {
+    const b = audio.get(a.id),
+      k = modelKey(data.projectId, a.id);
+    if (b) tx.objectStore("audio").put(b, k);
+    else tx.objectStore("audio").delete(k);
+  }
+  const ac = tx.objectStore("audio").openKeyCursor();
+  ac.onsuccess = () => {
+    const e = ac.result;
+    if (!e) return;
+    if (
+      String(e.key).startsWith(data.projectId + "/") &&
+      !audioKeys.has(String(e.key))
+    )
+      tx.objectStore("audio").delete(e.key);
+    e.continue();
+  };
   await finished;
+}
+export function loadAudioBlob(
+  id: string,
+  projectId: string,
+): Promise<ArrayBuffer | undefined> {
+  return get(modelKey(projectId, id), audioStore);
 }
 export function loadTextureBlob(
   id: string,
@@ -167,7 +204,10 @@ export async function listProjects(): Promise<StoredProject[]> {
 }
 export async function deleteProject(projectId: string): Promise<void> {
   const db = await openDatabase();
-  const tx = db.transaction(["projects", "models", "textures"], "readwrite");
+  const tx = db.transaction(
+    ["projects", "models", "textures", "audio"],
+    "readwrite",
+  );
   const finished = complete(tx);
   tx.objectStore("projects").delete(projectId);
   const cursor = tx.objectStore("models").openKeyCursor();
@@ -184,6 +224,14 @@ export async function deleteProject(projectId: string): Promise<void> {
     if (!e) return;
     if (String(e.key).startsWith(projectId + "/"))
       tx.objectStore("textures").delete(e.key);
+    e.continue();
+  };
+  const ac = tx.objectStore("audio").openKeyCursor();
+  ac.onsuccess = () => {
+    const e = ac.result;
+    if (!e) return;
+    if (String(e.key).startsWith(projectId + "/"))
+      tx.objectStore("audio").delete(e.key);
     e.continue();
   };
   await finished;
@@ -211,6 +259,7 @@ export interface RecoverySummary {
   updatedAt: number;
 }
 export interface RecoveryRecord extends RecoverySummary {
+  audioBuffers?: Map<string, ArrayBuffer>;
   textureBuffers?: Map<string, ArrayBuffer>;
   recoveryId: string;
   project: StoredProject;

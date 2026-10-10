@@ -4,6 +4,8 @@ import fs from "node:fs";
 import vm from "node:vm";
 import * as Babylon from "@babylonjs/core";
 
+import "../public/lib/jolt-physics.js";
+const Jolt = await globalThis.createArkGlideJolt();
 function setup() {
   let clock = 1000,
     render;
@@ -17,15 +19,23 @@ function setup() {
     }
   }
   const context = vm.createContext({
+    createArkGlideJolt: () => Promise.resolve(Jolt),
     BABYLON: { ...Babylon, Engine },
     window: {
       parent,
+      removeEventListener() {},
       addEventListener: (name, callback) => {
         handlers[name] = callback;
       },
     },
     document: {
+      addEventListener() {},
+      removeEventListener() {},
       getElementById: () => ({
+        style: {},
+        querySelectorAll: () => [],
+        replaceChildren() {},
+        removeEventListener() {},
         addEventListener: (name, callback) => {
           canvasHandlers[name] = callback;
         },
@@ -68,6 +78,22 @@ function setup() {
     ),
     context,
   );
+  for (const name of ["physics", "input-ui", "audio", "animation"])
+    vm.runInContext(
+      fs.readFileSync(
+        new URL("../public/arkglide-" + name + ".js", import.meta.url),
+        "utf8",
+      ),
+      context,
+    );
+  for (const name of ["lib/acorn", "arkglide-modules"])
+    vm.runInContext(
+      fs.readFileSync(
+        new URL("../public/" + name + ".js", import.meta.url),
+        "utf8",
+      ),
+      context,
+    );
   const html = fs.readFileSync(
     new URL("../public/runtime.html", import.meta.url),
     "utf8",
@@ -120,9 +146,9 @@ test("bound scripts receive factory context, axis input and pause-safe time", as
     assert.ok(Math.abs(context.sceneAPI.find("cube").position.x - 0.3) < 1e-6);
     handlers.keydown({ key: "a", preventDefault() {} });
     assert.equal(context.input.getAxis("a", "d"), 0);
-    canvasHandlers.mousedown({ clientX: 10, clientY: 10 });
-    canvasHandlers.mousemove({ clientX: 13, clientY: 12 });
-    canvasHandlers.mousemove({ clientX: 18, clientY: 15 });
+    canvasHandlers.pointerdown({ clientX: 10, clientY: 10 });
+    canvasHandlers.pointermove({ clientX: 13, clientY: 12 });
+    canvasHandlers.pointermove({ clientX: 18, clientY: 15 });
     assert.equal(context.input.getMouseDelta().x, 8);
     assert.equal(context.input.getMouseDelta().y, 5);
     const elapsed = context.time.totalTime;

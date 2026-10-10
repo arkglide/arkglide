@@ -48,6 +48,32 @@ before(async () => {
 after(async () => {
   await server?.close();
 });
+test("module renaming and history preserve import source through IndexedDB and ZIP roundtrip", async () => {
+  store.getState().newProject();
+  store.getState().createScript("tools.js");
+  store.getState().updateScript("tools.js", "export const speed=3;");
+  store
+    .getState()
+    .updateScript(
+      "main.js",
+      "import {speed} from './tools.js'; return {onStart(){this.entity.position.x=speed;}};",
+    );
+  store.getState().renameScript("tools.js", "utils.js");
+  assert.match(store.getState().scripts["main.js"], /\.\/utils.js/);
+  store.getState().undo();
+  assert.match(store.getState().scripts["main.js"], /\.\/tools.js/);
+  store.getState().redo();
+  const expected = structuredClone(store.getState().scripts);
+  await store.getState().saveCurrentProject("Modules");
+  const id = store.getState().currentProjectId;
+  const zip = archive.createProjectArchive();
+  store.getState().newProject();
+  await store.getState().loadProjectById(id);
+  assert.deepEqual({ ...store.getState().scripts }, { ...expected });
+  store.getState().newProject();
+  await archive.importProject(new File([zip], "modules.arkglide"));
+  assert.deepEqual({ ...store.getState().scripts }, { ...expected });
+});
 test("IndexedDB migrates old schema and isolates models shared by node ID across projects", async () => {
   const data = (id) => ({
     projectId: id,
@@ -269,13 +295,13 @@ test("legacy project migration adds time defaults; future versions and invalid r
     scripts: { "main.js": "" },
   };
   const upgraded = normalize(old);
-  assert.equal(upgraded.version, "0.4");
+  assert.equal(upgraded.version, "0.5");
   assert.equal(upgraded.settings.fixedTimeStep, 1 / 60);
   assert.equal(upgraded.settings.timeScale, 1);
-  assert.throws(() => normalize({ ...old, version: "0.5" }), /版本/);
+  assert.throws(() => normalize({ ...old, version: "0.6" }), /版本/);
   const { zipSync, strToU8 } = await import("fflate");
   const bytes = zipSync({
-    "project.json": strToU8(JSON.stringify({ ...old, version: "0.5" })),
+    "project.json": strToU8(JSON.stringify({ ...old, version: "0.6" })),
   });
   await assert.rejects(
     archive.importProject(new File([bytes], "future.arkglide")),
@@ -313,7 +339,7 @@ test("automatic recovery atomically stores script, scene and binary data without
     await controller.flush();
     const draft = await storage.loadRecovery(id);
     assert.ok(draft);
-    assert.equal(draft.project.version, "0.4");
+    assert.equal(draft.project.version, "0.5");
     assert.deepEqual([...new Uint8Array(draft.buffers.get(model))], [3, 4, 5]);
     assert.ok(
       !(await storage.loadProject(projectId)).scene.nodes.some(
@@ -461,4 +487,178 @@ test("unchanged playback does not create a recovery draft and draft retention is
   assert.equal((await storage.listRecoveries()).length, 20);
   assert.ok(await storage.loadRecovery("retention-21"));
   assert.equal(await storage.loadRecovery("retention-0"), undefined);
+});
+
+test("third batch components, audio bytes and action/HUD configuration persist in ZIP, IndexedDB and recovery", async () => {
+  store.getState().newProject();
+  const s = () => store.getState();
+  const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
+  s().importAudio(
+    { id: "audio", name: "test.wav", mime: "audio/wav", byteLength: 4 },
+    bytes,
+  );
+  const physics = {
+    motion: "dynamic",
+    shape: "box",
+    size: { x: 1, y: 2, z: 1 },
+    mass: 2,
+    friction: 0.4,
+    restitution: 0.2,
+    sensor: false,
+    lockRotation: true,
+  };
+  s().updateTransform("cube", {
+    physics,
+    audioSource: {
+      assetId: "audio",
+      autoplay: false,
+      loop: false,
+      volume: 0.5,
+      spatial: true,
+      refDistance: 1,
+    },
+  });
+  const gameplay = {
+    actions: [{ name: "walk", positive: ["KeyD"], negative: ["KeyA"] }],
+    hud: [
+      {
+        id: "score",
+        kind: "text",
+        text: "分数：0",
+        x: 2,
+        y: 3,
+        color: "#FFFFFF",
+        background: "#222222",
+        fontSize: 20,
+      },
+    ],
+    captureInput: true,
+  };
+  s().updateGameplay(gameplay);
+  await s().saveCurrentProject("third batch");
+  const projectId = s().currentProjectId;
+  assert.deepEqual(
+    new Uint8Array(await storage.loadAudioBlob("audio", projectId)),
+    new Uint8Array(bytes),
+  );
+  const zip = archive.createProjectArchive();
+  s().newProject();
+  await archive.importProject({
+    arrayBuffer: async () =>
+      zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength),
+  });
+  assert.equal(s().nodes.find((n) => n.id === "cube").physics.mass, 2);
+  assert.equal(s().content.gameplay.hud[0].text, "分数：0");
+  assert.deepEqual(
+    new Uint8Array(s().audioBuffers.get("audio")),
+    new Uint8Array(bytes),
+  );
+  const drafts = [],
+    controller = recovery.startProjectRecovery({
+      write: async (r) => drafts.push(r),
+      remove: async () => {},
+    });
+  try {
+    s().updateScript("main.js", "return {};");
+    await controller.flush();
+    assert.equal(drafts.at(-1).audioBuffers.get("audio").byteLength, 4);
+    await storage.saveRecovery(drafts.at(-1));
+    s().newProject();
+    await recovery.restoreRecovery(drafts.at(-1).recoveryId);
+    assert.equal(s().audioBuffers.get("audio").byteLength, 4);
+  } finally {
+    controller.dispose();
+  }
+  s().newProject();
+  await s().loadProjectById(projectId);
+  assert.equal(
+    s().nodes.find((n) => n.id === "cube").audioSource.spatial,
+    true,
+  );
+  assert.equal(s().audioBuffers.get("audio").byteLength, 4);
+});
+test("invalid gameplay imports are atomic; missing audio warns; audio replacement and deletion undo correctly", async () => {
+  store.getState().newProject();
+  const s = () => store.getState();
+  s().importAudio(
+    { id: "a", name: "a.wav", mime: "audio/wav", byteLength: 2 },
+    new Uint8Array([1, 2]).buffer,
+  );
+  s().importAudio(
+    { id: "a", name: "b.wav", mime: "audio/wav", byteLength: 3 },
+    new Uint8Array([3, 4, 5]).buffer,
+  );
+  s().undo();
+  assert.equal(s().audioBuffers.get("a").byteLength, 2);
+  s().redo();
+  assert.equal(s().audioBuffers.get("a").byteLength, 3);
+  const data = recovery.captureEditorProject(s());
+  const bad = structuredClone(data);
+  bad.scene.nodes[0].physics = {
+    motion: "dynamic",
+    shape: "box",
+    size: { x: -1, y: 1, z: 1 },
+    mass: 1,
+    friction: 0,
+    restitution: 0,
+    sensor: false,
+    lockRotation: false,
+  };
+  const before = s().nodes;
+  assert.throws(() => s().replaceProject(bad, new Map(), new Set()), /刚体/);
+  assert.equal(s().nodes, before);
+  const badHUD = structuredClone(data);
+  badHUD.content.gameplay.hud = [
+    {
+      id: "x",
+      kind: "button",
+      text: "x",
+      x: 1,
+      y: 1,
+      color: "#FFFFFF",
+      background: "#000000",
+      fontSize: 20,
+      action: "absent",
+    },
+  ];
+  assert.throws(() => normalize(badHUD), /HUD/);
+  s().deleteAudio("a");
+  s().undo();
+  assert.equal(s().audioBuffers.get("a").byteLength, 3);
+  s().replaceProject(data, new Map(), new Set(), true);
+  assert.ok(s().consoleLogs.some((l) => l.text.includes("音频丢失")));
+});
+test("prefab snapshots and clipboard preserve gameplay components and referenced audio", () => {
+  store.getState().newProject();
+  const s = () => store.getState();
+  s().importAudio(
+    { id: "sound", name: "sound.wav", mime: "audio/wav", byteLength: 2 },
+    new Uint8Array([1, 2]).buffer,
+  );
+  s().updateTransform("cube", {
+    audioSource: {
+      assetId: "sound",
+      autoplay: true,
+      loop: false,
+      volume: 1,
+      spatial: false,
+      refDistance: 1,
+    },
+  });
+  const id = s().createPrefab("cube", "sound prefab");
+  const clone = s().instantiatePrefab(id);
+  assert.equal(
+    s().nodes.find((n) => n.id === clone).audioSource.assetId,
+    "sound",
+  );
+  assert.throws(() => s().deleteAudio("sound"), /引用/);
+  s().selectNode(clone);
+  s().copyToClipboard();
+  s().removeNodes(["cube", clone]);
+  s().deletePrefab(id);
+  s().deleteAudio("sound");
+  s().pasteFromClipboard();
+  assert.equal(s().audioBuffers.get("sound").byteLength, 2);
+  assert.ok(s().nodes.some((n) => n.audioSource?.assetId === "sound"));
+  validate(recovery.captureEditorProject(s()));
 });

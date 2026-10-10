@@ -54,6 +54,7 @@ export function startProjectRecovery(
     project: StoredProject,
     buffers: Map<string, ArrayBuffer>,
     textures: Map<string, ArrayBuffer> = new Map(),
+    audio: Map<string, ArrayBuffer> = new Map(),
   ) {
     return JSON.stringify([
       project.name,
@@ -62,6 +63,11 @@ export function startProjectRecovery(
       project.activeFileId,
       project.settings,
       project.content,
+      (project.content?.audio || []).map((a) => {
+        const b = audio.get(a.id);
+        if (b && !bufferIds.has(b)) bufferIds.set(b, ++nextBuffer);
+        return [a.id, b ? bufferIds.get(b) : null];
+      }),
       (project.content?.textures || []).map((t) => {
         const b = textures.get(t.id);
         if (b && !bufferIds.has(b)) bufferIds.set(b, ++nextBuffer);
@@ -85,6 +91,7 @@ export function startProjectRecovery(
     const record: RecoveryRecord = {
       recoveryId: state.documentId,
       project: structuredClone(project),
+      audioBuffers: new Map(state.audioBuffers),
       textureBuffers: new Map(state.textureBuffers),
       buffers: new Map(
         project.modelRefs.flatMap((ref) => {
@@ -96,7 +103,12 @@ export function startProjectRecovery(
     };
     return {
       record,
-      digest: fingerprint(project, state.modelBuffers, state.textureBuffers),
+      digest: fingerprint(
+        project,
+        state.modelBuffers,
+        state.textureBuffers,
+        state.audioBuffers,
+      ),
     };
   }
   function current(id: string) {
@@ -207,6 +219,7 @@ export function startProjectRecovery(
           state.savedSnapshot.project,
           state.savedSnapshot.buffers,
           state.savedSnapshot.textures,
+          state.savedSnapshot.audio,
         ),
         id = state.documentId;
       clean.set(id, digest);
@@ -234,6 +247,7 @@ export function startProjectRecovery(
       return;
     }
     if (
+      state.audioBuffers !== previous.audioBuffers ||
       state.content !== previous.content ||
       state.textureBuffers !== previous.textureBuffers ||
       state.nodes !== previous.nodes ||
@@ -298,6 +312,20 @@ export async function restoreRecovery(id: string): Promise<void> {
     if (b instanceof ArrayBuffer) buffers.set(ref.assetId, b);
     else missing.add(ref.assetId);
   }
+  const audio = new Map<string, ArrayBuffer>();
+  if (
+    record.audioBuffers !== undefined &&
+    !(record.audioBuffers instanceof Map)
+  )
+    throw new Error("恢复记录音频损坏");
+  for (const a of project.content?.audio || []) {
+    const b = record.audioBuffers?.get(a.id);
+    if (b instanceof ArrayBuffer) {
+      if (b.byteLength !== a.byteLength)
+        throw new Error("恢复记录音频大小不一致");
+      audio.set(a.id, b);
+    }
+  }
   const textures = new Map<string, ArrayBuffer>();
   if (
     record.textureBuffers !== undefined &&
@@ -318,6 +346,7 @@ export async function restoreRecovery(id: string): Promise<void> {
       !project.projectId,
       record.recoveryId,
       textures,
+      audio,
     );
   useEditorStore.setState({
     recoveryStatus: "saved",

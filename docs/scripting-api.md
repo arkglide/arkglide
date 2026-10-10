@@ -1,6 +1,6 @@
 # ArkGlide 脚本 API
 
-脚本是 JavaScript **函数体**，由运行时工厂执行；不是 ES module。
+用户脚本使用 JavaScript：支持原有的**函数体工厂**，也支持项目内 ES `import/export`。模块工厂、导入规则与示例见 [JavaScript 模块](javascript-modules.md)。
 在属性面板把脚本挂到实体，每个「实体 × 脚本」有独立实例。
 `onStart` 在启动时调用一次，`onUpdate` 在播放期间每帧调用；暂停时不执行。
 运行时注入 `entity`、`input`、`scene`、`time`、`console`、`defineScript`、`math`、`events`、`timers`、`prefabs`。
@@ -118,7 +118,7 @@ return defineScript({
 - 更新 API 时同步运行实现与声明，运行 `npm test` 和 `npm run build`。
 - 完整构建包含 Monaco/Babylon 大包；若 Node 报 heap out of memory，可设置 `NODE_OPTIONS=--max-old-space-size=6144` 后构建，本次生产构建使用此配置验证。
 
-`.ts` 文件可获得类型提示；当前 runtime 的 `new Function` **不支持执行 TypeScript 类型语法或 import/export**。本次没有新增 TypeScript 转译链路。
+脚本只运行 JavaScript；类型声明和语言服务用于补全，不提供 TypeScript 编译。项目内 ES 模块由浏览器原生执行，旧式函数体脚本继续兼容。
 旧版只含 `project.script` 的单脚本项目继续执行，其空场景下 `entity` 可能为 `null`；绑定实体脚本始终接收有效实体。
 
 ## 固定步、销毁、时间与资源管理

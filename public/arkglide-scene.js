@@ -389,6 +389,11 @@
           return false;
         }
         container.addAllToScene();
+        container.animationGroups?.forEach((g) => g.stop());
+        options.onAnimations?.(
+          node.id,
+          (container.animationGroups || []).map((g) => g.name),
+        );
         const parts = [];
         container.meshes.forEach((mesh, index) => {
           if (!mesh.getTotalVertices?.()) return;

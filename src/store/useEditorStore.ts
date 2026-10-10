@@ -1,4 +1,13 @@
+import type {
+  PhysicsComponent,
+  AnimationComponent,
+  AudioSourceComponent,
+  AudioAsset,
+  GameplayConfig,
+} from "../types/gameplay";
 import { create } from "zustand";
+import "../vendor/acorn.js";
+import "../engine/module-runtime.js";
 import {
   emptyContent,
   defaultMaterial,
@@ -31,6 +40,7 @@ import {
   loadProject,
   loadModelBlob,
   loadTextureBlob,
+  loadAudioBlob,
   type StoredProject,
 } from "../utils/projectStorage";
 
@@ -62,6 +72,9 @@ export interface SceneNode {
   parentId?: string | null; // 父节点 ID（null 或 undefined = 根节点）
   modelRevision?: string;
   modelUrl?: string; // 模型文件 URL（type='model' 时用）
+  physics?: PhysicsComponent;
+  animation?: AnimationComponent;
+  audioSource?: AudioSourceComponent;
   materialId?: string;
   /** mesh:<import index>/slot:<material index>; null explicitly restores original. */
   materialSlots?: Record<string, string | null>;
@@ -103,6 +116,16 @@ export interface RuntimeStats {
   fixedSteps: number;
   timeScale: number;
   droppedTime: number;
+  physicsBodies?: number;
+  physicsContacts?: number;
+  physicsSubscriptions?: number;
+  physicsBackend?: string;
+  audioVoices?: number;
+  audioBuffers?: number;
+  audioState?: string;
+  animationPlayers?: number;
+  hudElements?: number;
+  inputHeld?: number;
   errors: number;
 }
 export interface ConsoleMessage {
@@ -165,6 +188,7 @@ interface ScriptHistoryChange {
 interface HistoryEntry {
   scriptChange?: ScriptHistoryChange;
   content: ProjectContent;
+  audioBuffers: Map<string, ArrayBuffer>;
   textureBuffers: Map<string, ArrayBuffer>;
   nodes: SceneNode[];
   scripts: Record<string, string>;
@@ -175,10 +199,17 @@ interface HistoryEntry {
 }
 
 export interface EditorState {
+  importAudio: (asset: AudioAsset, bytes: ArrayBuffer) => void;
+  deleteAudio: (id: string) => void;
+  updateGameplay: (value: GameplayConfig) => void;
+  modelAnimations: Record<string, string[]>;
+  setModelAnimations: (id: string, names: string[]) => void;
   content: ProjectContent;
+  audioBuffers: Map<string, ArrayBuffer>;
   textureBuffers: Map<string, ArrayBuffer>;
   clipboardPrefabInstances: Record<string, PrefabInstance>;
   clipboardContent: ProjectContent | null;
+  clipboardAudioBuffers: Map<string, ArrayBuffer>;
   clipboardTextureBuffers: Map<string, ArrayBuffer>;
   createMaterial: (name?: string, sourceId?: string) => string;
   updateMaterial: (id: string, patch: Partial<MaterialAsset>) => void;
@@ -205,6 +236,7 @@ export interface EditorState {
   savedSnapshot: {
     project: StoredProject;
     buffers: Map<string, ArrayBuffer>;
+    audio: Map<string, ArrayBuffer>;
     textures: Map<string, ArrayBuffer>;
   } | null;
   recoveryStatus: "idle" | "pending" | "saving" | "saved" | "error";
@@ -279,6 +311,9 @@ export interface EditorState {
         | "modelUrl"
         | "primitive"
         | "lightType"
+        | "physics"
+        | "animation"
+        | "audioSource"
         | "activeCamera"
       >
     >,
@@ -326,6 +361,7 @@ export interface EditorState {
     imported?: boolean,
     recoveryId?: string,
     textures?: Map<string, ArrayBuffer>,
+    audio?: Map<string, ArrayBuffer>,
   ) => void;
   // 项目设置：重力/背景色/环境光/帧率上限
   settings: ProjectSettings;
@@ -396,13 +432,7 @@ type EditorSet = (
 
 // 深拷贝 SceneNode（含嵌套 transform/rotation/scale/scripts）
 function deepCloneNodes(nodes: SceneNode[]): SceneNode[] {
-  return nodes.map((n) => ({
-    ...n,
-    transform: { ...n.transform },
-    rotation: { ...n.rotation },
-    scale: { ...n.scale },
-    scripts: n.scripts ? [...n.scripts] : undefined,
-  }));
+  return structuredClone(nodes);
 }
 
 // 深拷贝 scripts（Record<string, string>，string 不可变只需浅拷贝对象）
@@ -416,6 +446,7 @@ function deepCloneScripts(
 function createSnapshot(state: EditorState): HistoryEntry {
   return {
     content: structuredClone(state.content),
+    audioBuffers: new Map(state.audioBuffers),
     textureBuffers: new Map(state.textureBuffers),
     nodes: deepCloneNodes(state.nodes),
     scripts: deepCloneScripts(state.scripts),
@@ -645,10 +676,71 @@ function restoreClipboardResources(
         if (b) textures.set(textureId, b.slice(0));
       }
   }
-  return { content, buffers, textures };
+  const audio = new Map(state.audioBuffers);
+  for (const a of snapshot?.audio || [])
+    if (!content.audio?.some((v) => v.id === a.id)) {
+      (content.audio ??= []).push(structuredClone(a));
+      const b = state.clipboardAudioBuffers.get(a.id);
+      if (b) audio.set(a.id, b.slice(0));
+    }
+  return { content, buffers, textures, audio };
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
+  modelAnimations: {},
+  setModelAnimations: (id, names) =>
+    set((s) => ({ modelAnimations: { ...s.modelAnimations, [id]: names } })),
+  importAudio: (asset, bytes) => {
+    const s = get();
+    assertEditing(s);
+    if (bytes.byteLength !== asset.byteLength)
+      throw new Error("音频大小不一致");
+    const content = {
+      ...s.content,
+      audio: [
+        ...(s.content.audio || []).filter((a) => a.id !== asset.id),
+        asset,
+      ],
+    };
+    validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    pushHistory(get, set);
+    set({
+      content,
+      audioBuffers: new Map([...s.audioBuffers, [asset.id, bytes]]),
+    });
+  },
+  deleteAudio: (id) => {
+    const s = get();
+    assertEditing(s);
+    const all = [
+      ...s.nodes,
+      ...Object.values(s.content.prefabs).flatMap((p) => [
+        ...p.nodes,
+        ...Object.values(p.nestedInstances || {}).flatMap((i) => i.baseline),
+      ]),
+      ...Object.values(s.content.prefabInstances).flatMap((i) => i.baseline),
+    ];
+    if (all.some((n) => n.audioSource?.assetId === id))
+      throw new Error("音频仍被场景或预制体引用，请先解除音源绑定");
+    pushHistory(get, set);
+    const audioBuffers = new Map(s.audioBuffers);
+    audioBuffers.delete(id);
+    set({
+      audioBuffers,
+      content: {
+        ...s.content,
+        audio: s.content.audio?.filter((a) => a.id !== id),
+      },
+    });
+  },
+  updateGameplay: (value) => {
+    const s = get();
+    assertEditing(s);
+    const content = { ...s.content, gameplay: structuredClone(value) };
+    validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    pushHistory(get, set);
+    set({ content });
+  },
   modelParts: {},
   setModelParts: (id, parts) =>
     set((s) => ({ modelParts: { ...s.modelParts, [id]: parts } })),
@@ -671,9 +763,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   content: emptyContent(),
+  audioBuffers: new Map(),
   textureBuffers: new Map(),
   clipboardPrefabInstances: {},
   clipboardContent: null,
+  clipboardAudioBuffers: new Map(),
   clipboardTextureBuffers: new Map(),
   documentId: crypto.randomUUID(),
   documentOrigin: "new",
@@ -818,6 +912,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     set({
       clipboardContent: structuredClone(state.content),
+      clipboardAudioBuffers: new Map(state.audioBuffers),
       clipboardTextureBuffers: new Map(state.textureBuffers),
       clipboardPrefabInstances: structuredClone(state.content.prefabInstances),
       clipboard: deepCloneNodes(state.nodes.filter((node) => ids.has(node.id))),
@@ -889,6 +984,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       content: restored.content,
       nodes,
+      audioBuffers: restored.audio,
       textureBuffers: restored.textures,
       modelBuffers: buffers,
       missingModelIds: missingModels(nodes, restored.content, buffers),
@@ -995,6 +1091,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         ...restoreClipboardScripts(state, previous.scriptChange, true),
         content: previous.content,
+        audioBuffers: previous.audioBuffers,
         textureBuffers: previous.textureBuffers,
         nodes: previous.nodes,
         scripts: previous.scripts,
@@ -1026,6 +1123,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         ...restoreClipboardScripts(state, next.scriptChange, false),
         content: next.content,
+        audioBuffers: next.audioBuffers,
         textureBuffers: next.textureBuffers,
         nodes: next.nodes,
         scripts: next.scripts,
@@ -1046,6 +1144,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     pushHistory(get, set);
   },
   updateTransform: (id, partial, recordHistory = true) => {
+    if (
+      ["physics", "animation", "audioSource"].some((k) =>
+        Object.hasOwn(partial, k),
+      )
+    ) {
+      assertEditing(get());
+      validateProject({
+        ...get(),
+        scene: {
+          nodes: get().nodes.map((n) =>
+            n.id === id ? { ...n, ...partial } : n,
+          ),
+        },
+      });
+    }
     if (recordHistory) pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
@@ -1322,9 +1435,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         !Object.prototype.hasOwnProperty.call(state.scripts, oldName)
       )
         return {};
-      const newScripts = { ...state.scripts };
-      newScripts[newName] = newScripts[oldName];
-      delete newScripts[oldName];
+      const newScripts = globalThis.ArkGlideModules.rewriteRename(
+        state.scripts,
+        oldName,
+        newName,
+      );
       const newActive =
         state.activeFileId === oldName ? newName : state.activeFileId;
       return {
@@ -1437,7 +1552,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       settings: state.settings,
     };
     // 保存项目元数据
-    await saveProjectSnapshot(data, state.modelBuffers, state.textureBuffers);
+    await saveProjectSnapshot(
+      data,
+      state.modelBuffers,
+      state.textureBuffers,
+      state.audioBuffers,
+    );
     // 更新 currentProjectId / currentProjectName 状态
     if (epoch === projectEpoch)
       set({
@@ -1446,6 +1566,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         savedSnapshot: {
           project: data,
           buffers: state.modelBuffers,
+          audio: state.audioBuffers,
           textures: state.textureBuffers,
         },
       });
@@ -1474,7 +1595,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (b) textures.set(texture.id, b);
     }
     if (epoch !== projectEpoch) return;
-    get().replaceProject(data, buffers, missing, false, undefined, textures);
+    const audio = new Map<string, ArrayBuffer>();
+    for (const a of data.content?.audio || []) {
+      const b = await loadAudioBlob(a.id, projectId);
+      if (b) audio.set(a.id, b);
+    }
+    if (epoch !== projectEpoch) return;
+    get().replaceProject(
+      data,
+      buffers,
+      missing,
+      false,
+      undefined,
+      textures,
+      audio,
+    );
   },
   replaceProject: (
     data,
@@ -1483,15 +1618,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     imported = false,
     recoveryId,
     textures = new Map(),
+    audio = new Map(),
   ) => {
     const normalized = normalizeProject(data);
     const valid = validateProject(normalized);
     ++projectEpoch;
     set({
+      modelAnimations: {},
       content: valid.content,
+      audioBuffers: audio,
       textureBuffers: textures,
       clipboardPrefabInstances: {},
       clipboardContent: null,
+      clipboardAudioBuffers: new Map(),
       clipboardTextureBuffers: new Map(),
       documentId: recoveryId || crypto.randomUUID(),
       documentOrigin: recoveryId
@@ -1531,6 +1670,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           text: "资源丢失: " + id,
           time: Date.now(),
         })),
+        ...(valid.content.audio || [])
+          .filter((a) => !audio.has(a.id))
+          .map((a) => ({
+            id: ++logId,
+            level: "warn" as const,
+            text: "音频丢失: " + a.name,
+            time: Date.now(),
+          })),
         ...valid.content.textures
           .filter((t) => !textures.has(t.id))
           .map((t) => ({
@@ -1553,6 +1700,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newProject: () => {
     ++projectEpoch;
     set({
+      modelAnimations: {},
       modelParts: {},
       setModelParts: (id, parts) =>
         set((s) => ({ modelParts: { ...s.modelParts, [id]: parts } })),
@@ -1575,9 +1723,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         });
       },
       content: emptyContent(),
+      audioBuffers: new Map(),
       textureBuffers: new Map(),
       clipboardPrefabInstances: {},
       clipboardContent: null,
+      clipboardAudioBuffers: new Map(),
       clipboardTextureBuffers: new Map(),
       documentId: crypto.randomUUID(),
       documentOrigin: "new",

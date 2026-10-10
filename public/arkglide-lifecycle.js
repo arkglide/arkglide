@@ -287,7 +287,9 @@
         for (const record of [...records])
           if (record.started && !record.failed.has("onFixedUpdate"))
             call(record, "onFixedUpdate", record.instance?.onFixedUpdate);
+        options.onFixedStep?.(time.fixedDeltaTime);
       }
+      // Physics consumes the velocities/forces set by this fixed script batch.
       if (accumulator >= time.fixedDeltaTime) {
         const discarded =
           Math.floor(accumulator / time.fixedDeltaTime) * time.fixedDeltaTime;

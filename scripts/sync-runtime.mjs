@@ -13,3 +13,27 @@ copyFileSync(
   new URL("../src/engine/prefab-runtime.js", import.meta.url),
   new URL("../public/arkglide-prefabs.js", import.meta.url),
 );
+
+for (const [source, target] of [
+  ["physics-runtime", "physics"],
+  ["input-ui-runtime", "input-ui"],
+  ["audio-runtime", "audio"],
+  ["animation-runtime", "animation"],
+])
+  copyFileSync(
+    new URL("../src/engine/" + source + ".js", import.meta.url),
+    new URL("../public/arkglide-" + target + ".js", import.meta.url),
+  );
+
+copyFileSync(
+  new URL("../src/vendor/acorn.js", import.meta.url),
+  new URL("../public/lib/acorn.js", import.meta.url),
+);
+copyFileSync(
+  new URL("../src/vendor/ACORN_LICENSE.txt", import.meta.url),
+  new URL("../public/lib/ACORN_LICENSE.txt", import.meta.url),
+);
+copyFileSync(
+  new URL("../src/engine/module-runtime.js", import.meta.url),
+  new URL("../public/arkglide-modules.js", import.meta.url),
+);

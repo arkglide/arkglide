@@ -219,3 +219,126 @@ interface PrefabsAPI {
   ): Promise<PrefabHandle>;
 }
 declare const prefabs: PrefabsAPI;
+
+interface PhysicsOptions {
+  motion: "static" | "dynamic" | "kinematic";
+  shape: "box" | "sphere" | "capsule";
+  size: Vec3;
+  mass: number;
+  friction: number;
+  restitution: number;
+  sensor: boolean;
+  lockRotation: boolean;
+}
+interface ContactEvent {
+  phase: "enter" | "exit";
+  self: Entity;
+  other: Entity;
+  sensor: boolean;
+}
+interface PhysicsAPI {
+  readonly backend: "jolt-wasm";
+  has(entity: Entity): boolean;
+  /** Collision dimensions are local units; world scale is applied once. */
+  add(entity: Entity, options: PhysicsOptions): void;
+  remove(entity: Entity): void;
+  getVelocity(entity: Entity): Vec3;
+  setVelocity(entity: Entity, value: Vec3): void;
+  addImpulse(entity: Entity, value: Vec3): void;
+  /** World position, unlike Entity.position which is local. Velocity is preserved. */
+  teleport(entity: Entity, worldPosition: Vec3): void;
+  /** Contact callbacks run after the fixed step, outside the WASM solver. */
+  onContact(
+    entity: Entity | null,
+    callback: (event: ContactEvent) => void,
+  ): () => void;
+}
+interface AudioPlayOptions {
+  loop?: boolean;
+  volume?: number;
+  rate?: number;
+  spatial?: boolean;
+  entity?: Entity;
+  refDistance?: number;
+}
+interface AudioVoice {
+  readonly playing: boolean;
+  stop(): void;
+  setVolume(value: number): void;
+}
+interface AudioAPI {
+  readonly state: string;
+  list(): string[];
+  unlock(): Promise<boolean>;
+  play(assetId: string, options?: AudioPlayOptions): AudioVoice;
+  setMasterVolume(value: number): void;
+}
+interface HUDOptions {
+  id: string;
+  text?: string;
+  x?: number;
+  y?: number;
+  fontSize?: number;
+  color?: string;
+  background?: string;
+  action?: string;
+  direction?: 1 | -1;
+}
+interface HUDHandle {
+  readonly id: string;
+  readonly text: string;
+  setText(value: unknown): void;
+  setVisible(value: boolean): void;
+  destroy(): void;
+}
+interface UIAPI {
+  get(id: string): HUDHandle | null;
+  createText(options: HUDOptions): HUDHandle;
+  createButton(options: HUDOptions, onClick?: () => void): HUDHandle;
+}
+interface AnimationHandle {
+  readonly playing: boolean;
+  stop(): void;
+}
+interface AnimationAPI {
+  list(entity: Entity): string[];
+  play(
+    entity: Entity,
+    clip: string,
+    options?: { loop?: boolean; speed?: number; fade?: number },
+  ): AnimationHandle;
+  stop(entity: Entity): void;
+}
+interface InputAPI {
+  /** Action names from project resources; keyboard bindings use KeyboardEvent.code. */
+  getAction(name: string): number;
+  isActionDown(name: string): boolean;
+  wasActionPressed(name: string): boolean;
+  wasActionReleased(name: string): boolean;
+}
+declare const physics: PhysicsAPI;
+declare const audio: AudioAPI;
+declare const ui: UIAPI;
+declare const animation: AnimationAPI;
+
+/** Explicit ES-module factories receive APIs owned by the entity/script instance. */
+interface ScriptContext {
+  entity: Entity;
+  input: InputAPI;
+  scene: SceneAPI;
+  time: TimeAPI;
+  console: Console;
+  defineScript: typeof defineScript;
+  math: MathAPI;
+  events: EventsAPI;
+  timers: TimersAPI;
+  setTimeout: typeof setTimeout;
+  clearTimeout: typeof clearTimeout;
+  setInterval: typeof setInterval;
+  clearInterval: typeof clearInterval;
+  prefabs: PrefabsAPI;
+  physics: PhysicsAPI;
+  audio: AudioAPI;
+  ui: UIAPI;
+  animation: AnimationAPI;
+}

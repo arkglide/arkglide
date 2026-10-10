@@ -8,6 +8,8 @@ export default defineConfig({
         { name: "batch1", testMatch: "**/batch1.spec.ts" },
         { name: "batch2", testMatch: "**/batch2.spec.ts" },
         { name: "batch2-complete", testMatch: "**/batch2-complete.spec.ts" },
+        { name: "batch3", testMatch: "**/batch3.spec.ts" },
+        { name: "modules", testMatch: "**/modules.spec.ts" },
       ]
     : undefined,
   testDir: "./tests/browser",

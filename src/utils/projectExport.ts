@@ -28,6 +28,11 @@ export function createProjectArchive(): Uint8Array {
     const b = state.textureBuffers.get(t.id);
     if (b) files[texturePath(t.id)] = new Uint8Array(b);
   }
+  for (const a of data.content?.audio || []) {
+    const b = state.audioBuffers.get(a.id);
+    if (b)
+      files["audio/" + encodeURIComponent(a.id) + ".bin"] = new Uint8Array(b);
+  }
   files["project.json"] = strToU8(JSON.stringify(data, null, 2));
   return zipSync(files);
 }
@@ -79,6 +84,15 @@ export async function importProject(file: File): Promise<void> {
       textures.set(t.id, b.slice().buffer);
     }
   }
+  const audio = new Map<string, ArrayBuffer>();
+  for (const a of project.content?.audio || []) {
+    const b = files["audio/" + encodeURIComponent(a.id) + ".bin"];
+    if (b) {
+      if (b.byteLength !== a.byteLength)
+        throw new Error("音频文件大小不一致: " + a.name);
+      audio.set(a.id, b.slice().buffer);
+    }
+  }
   useEditorStore
     .getState()
     .replaceProject(
@@ -88,6 +102,7 @@ export async function importProject(file: File): Promise<void> {
       true,
       undefined,
       textures,
+      audio,
     );
   useEditorStore.getState().addConsoleLog("log", "项目已导入: " + project.name);
 }

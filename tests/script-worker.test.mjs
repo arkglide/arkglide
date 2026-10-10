@@ -29,6 +29,8 @@ function setup(sources) {
     {
       compilerOptions: {
         target: 7,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.NodeJs,
         allowJs: true,
         checkJs: true,
         strictNullChecks: true,
@@ -104,6 +106,91 @@ test("default return lifecycle has typed entity, globals and no top-level-return
     code.indexOf("input.getAxis(") + "input.getAxis(".length,
   );
   assert.equal(signature.items[0].parameters[0].name, "negativeKey");
+});
+
+test("project ES modules resolve named/default imports with completion, definition, rename and source offsets", async () => {
+  const utility =
+    "export const speed = 3; export function double(value) { return value * 2; } export default {speed, double};";
+  const code =
+    "import utils, { speed as velocity, double } from './utils.js';\nreturn defineScript({onUpdate(){ this.entity.translate(double(velocity) * time.deltaTime,0,0); }});";
+  const { worker, file } = setup({ "main.js": code, "utils.js": utility });
+  assert.deepEqual(await diagnostics(worker, file("main.js")), []);
+  assert.deepEqual(await diagnostics(worker, file("utils.js")), []);
+  const outline = await worker.getNavigationTree(file("main.js"));
+  assert.ok(outline.childItems.some((n) => n.text === "onUpdate"));
+  const hover = await worker.getQuickInfoAtPosition(
+    file("main.js"),
+    code.indexOf("velocity"),
+  );
+  assert.equal(
+    code.slice(
+      hover.textSpan.start,
+      hover.textSpan.start + hover.textSpan.length,
+    ),
+    "velocity",
+  );
+  const definitions = await worker.getDefinitionAtPosition(
+    file("main.js"),
+    code.indexOf("double(velocity)"),
+  );
+  assert.ok(
+    definitions.some(
+      (d) =>
+        d.fileName === file("utils.js") &&
+        utility.slice(
+          d.textSpan.start,
+          d.textSpan.start + d.textSpan.length,
+        ) === "double",
+    ),
+  );
+  const renames = await worker.findRenameLocations(
+    file("main.js"),
+    code.indexOf("velocity"),
+    false,
+    false,
+    false,
+  );
+  assert.equal(
+    renames.filter(
+      (d) =>
+        d.fileName === file("main.js") &&
+        code.slice(d.textSpan.start, d.textSpan.start + d.textSpan.length) ===
+          "velocity",
+    ).length,
+    2,
+  );
+  const incomplete = "import utils from './utils.js';\nutils.";
+  const partial = setup({ "main.js": incomplete, "utils.js": utility });
+  const completions = await partial.worker.getCompletionsAtPosition(
+    partial.file("main.js"),
+    incomplete.length,
+  );
+  for (const name of ["speed", "double"])
+    assert.ok(
+      completions.entries.some((e) => e.name === name),
+      name,
+    );
+});
+
+test("explicit JS module factory gets typed ScriptContext and original diagnostics without a hidden wrapper", async () => {
+  const code =
+    "/** @param {ScriptContext} context */\nexport default function(context) { const {entity, time, defineScript} = context; return defineScript({onUpdate(){this.entity.translate(time.deltaTime,0,0); entity.setPosition('bad',0,0);}}); }";
+  const { worker, file } = setup({ "player.js": code });
+  const issues = await diagnostics(worker, file("player.js"));
+  assert.equal(issues.length, 1);
+  assert.ok([2345, 2769].includes(issues[0].code));
+  assert.equal(
+    code.slice(issues[0].start, issues[0].start + issues[0].length),
+    "'bad'",
+  );
+  const partial =
+    "/** @param {ScriptContext} context */\nexport default function(context) { context.physics.";
+  const another = setup({ "player.js": partial });
+  const result = await another.worker.getCompletionsAtPosition(
+    another.file("player.js"),
+    partial.length,
+  );
+  assert.ok(result.entries.some((e) => e.name === "addImpulse"));
 });
 
 test("hidden factory declarations do not become invalid definition targets or completions", async () => {
@@ -220,4 +307,30 @@ test("prefab factory completion and async result types work in JS and TS at save
   assert.ok(
     (await diagnostics(invalid.worker, invalid.file("bad-spawn.js"))).length,
   );
+});
+
+test("physics, audio, UI, animation and action APIs are typed in both JS and TS factories", async () => {
+  const sources = {
+    "play.js":
+      "return {onFixedUpdate(){physics.setVelocity(this.entity,{x:input.getAction('moveX'),y:0,z:0});},onStart(){audio.play('coin');ui.createText({id:'score'}).setText(1);animation.play(this.entity,'Idle');}};",
+    "play.ts":
+      "return {onStart(){ physics.onContact(this.entity, e=>{console.log(e.other.id);}); }};",
+  };
+  const { worker, file } = setup(sources);
+  for (const name of Object.keys(sources))
+    assert.deepEqual(await diagnostics(worker, file(name)), []);
+  for (const [word, entry] of [
+    ["physics.", "addImpulse"],
+    ["audio.", "play"],
+    ["ui.", "createButton"],
+    ["animation.", "list"],
+    ["input.", "getAction"],
+  ]) {
+    const { worker: w, file: f } = setup({ "complete.js": word });
+    const r = await w.getCompletionsAtPosition(f("complete.js"), word.length);
+    assert.ok(
+      r.entries.some((e) => e.name === entry),
+      entry,
+    );
+  }
 });

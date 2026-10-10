@@ -13,6 +13,7 @@ export default function RuntimeFrame() {
   const pendingTextureDataRef = useRef<Record<string, ArrayBuffer> | null>(
     null,
   );
+  const pendingAudioDataRef = useRef<Record<string, ArrayBuffer> | null>(null);
   const pendingTransferRef = useRef<Transferable[] | null>(null);
   const prevPlayStateRef = useRef(useEditorStore.getState().playState);
 
@@ -69,6 +70,7 @@ export default function RuntimeFrame() {
                   project: pendingProjectRef.current,
                   modelData: pendingModelDataRef.current,
                   textureData: pendingTextureDataRef.current,
+                  audioData: pendingAudioDataRef.current,
                 },
                 pendingTransferRef.current,
               );
@@ -82,6 +84,8 @@ export default function RuntimeFrame() {
             pendingProjectRef.current = null;
             pendingModelDataRef.current = null;
             pendingTextureDataRef.current = null;
+            pendingAudioDataRef.current = null;
+            pendingAudioDataRef.current = null;
             pendingTransferRef.current = null;
             if (useEditorStore.getState().playState === "paused")
               postToIframe({ type: "pause" });
@@ -139,6 +143,12 @@ export default function RuntimeFrame() {
           textureData[id] = copy;
           transferList.push(copy);
         }
+        const audioData: Record<string, ArrayBuffer> = {};
+        for (const [id, b] of useEditorStore.getState().audioBuffers) {
+          const copy = b.slice(0);
+          audioData[id] = copy;
+          transferList.push(copy);
+        }
         // 启动：发 run（若 iframe 未 ready，暂存等 handshake）
         if (readyRef.current && project) {
           if (transferList.length > 0) {
@@ -149,6 +159,7 @@ export default function RuntimeFrame() {
                 project,
                 modelData,
                 textureData,
+                audioData,
               },
               transferList,
             );
@@ -156,6 +167,7 @@ export default function RuntimeFrame() {
             postToIframe({ type: "run", runId: runIdRef.current, project });
           }
         } else if (project) {
+          pendingAudioDataRef.current = audioData;
           pendingTextureDataRef.current = textureData;
           pendingProjectRef.current = project;
           pendingModelDataRef.current =
@@ -172,6 +184,7 @@ export default function RuntimeFrame() {
       pendingProjectRef.current = null;
       pendingModelDataRef.current = null;
       pendingTextureDataRef.current = null;
+      pendingAudioDataRef.current = null;
       pendingTransferRef.current = null;
       postToIframe({ type: "stop" }); // 完全重置 iframe 场景
     }
