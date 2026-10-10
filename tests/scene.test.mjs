@@ -46,3 +46,31 @@ test('late model containers are disposed after stop or replacement and URLs are 
  resolvers.shift()(container());await newer;assert.equal(added,1);assert.equal(disposed,2);
  }finally{adapter.dispose();engine.dispose();}
 });
+
+test('PBR material parameters are shared, updated live and restored to node colors on unassignment',async()=>{
+ const t=setup(),definition={id:'m',name:'PBR',baseColor:'#123456',emissiveColor:'#001100',metallic:.7,roughness:.2,alpha:.6,doubleSided:true,uvScale:{u:2,v:3}},content={materials:{m:definition},textures:[]};
+ try{
+  const defs=[node('a','mesh',{color:'#FF0000'}),node('b','mesh',{color:'#00FF00'})];await t.adapter.sync(defs);
+  await t.adapter.sync(defs.map(n=>({...n,materialId:'m'})),new Map(),content);const a=t.adapter.nodes.get('a'),b=t.adapter.nodes.get('b');
+  assert.equal(a.material,b.material);assert.equal(a.material.metallic,.7);assert.equal(a.material.alpha,.6);assert.equal(a.material.backFaceCulling,false);
+  content.materials.m={...definition,roughness:.9};await t.adapter.sync(defs.map(n=>({...n,materialId:'m'})),new Map(),content);assert.equal(a.material.roughness,.9);
+  await t.adapter.sync(defs,new Map(),content);assert.equal(a.material.diffuseColor.toHexString(),'#FF0000');assert.equal(b.material.diffuseColor.toHexString(),'#00FF00');
+  t.adapter.clear();assert.equal(t.scene.materials.length,0);
+ }finally{t.dispose();}
+});
+test('removing a mesh using a shared PBR material cannot dispose the surviving mesh material',async()=>{
+ const t=setup(),m={id:'m',name:'Shared',baseColor:'#FFFFFF',emissiveColor:'#000000',metallic:0,roughness:1,alpha:1,doubleSided:false,uvScale:{u:1,v:1}},content={materials:{m},textures:[]};
+ try{await t.adapter.sync([node('a','mesh',{materialId:'m'}),node('b','mesh',{materialId:'m'})],new Map(),content);const shared=t.adapter.nodes.get('b').material;
+ await t.adapter.sync([node('b','mesh',{materialId:'m'})],new Map(),content);assert.equal(t.adapter.nodes.get('b').material,shared);assert.ok(t.scene.materials.includes(shared));t.adapter.clear();assert.equal(t.scene.materials.length,0);
+ }finally{t.dispose();}
+});
+test('model material override applies after async loading and restores original imported materials',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let resolve;
+ const fake={...B,SceneLoader:{LoadAssetContainerAsync:()=>new Promise(r=>resolve=r)}},adapter=globalThis.ArkGlideScene.createSceneAdapter(fake,scene);
+ const m={id:'m',name:'Override',baseColor:'#FFFFFF',emissiveColor:'#000000',metallic:0,roughness:1,alpha:1,doubleSided:false,uvScale:{u:1,v:1}},content={materials:{m},textures:[]},buffer=new ArrayBuffer(3);
+ try{
+ const load=adapter.sync([node('model','model',{materialId:'m'})],new Map([['model',buffer]]),content),mesh=B.MeshBuilder.CreateBox('part',{},scene),original=new B.StandardMaterial('original',scene);mesh.material=original;
+ resolve({meshes:[mesh],transformNodes:[],addAllToScene(){},dispose(){mesh.dispose(false,true);}});await load;assert.equal(mesh.material,adapter.materials.get('m'));
+ await adapter.sync([node('model','model')],new Map([['model',buffer]]),content);assert.equal(mesh.material,original);adapter.clear();assert.equal(scene.materials.length,0);
+ }finally{adapter.dispose();engine.dispose();}
+});

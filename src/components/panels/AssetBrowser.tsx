@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
+import { importTextureFile } from "../../utils/textureImport";
+import { useState, useMemo, useRef } from "react";
 import {
   Box,
   TextField,
@@ -8,7 +9,7 @@ import {
   Typography,
   Tooltip,
   Alert,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Search,
   FolderOpen,
@@ -18,32 +19,32 @@ import {
   Code,
   InsertDriveFile,
   Add as AddIcon,
-} from '@mui/icons-material';
-import { useEditorStore, type AssetEntry } from '../../store/useEditorStore';
+} from "@mui/icons-material";
+import { useEditorStore, type AssetEntry } from "../../store/useEditorStore";
 
 // 展示用资源条目：在 AssetEntry 基础上扩展 isUserScript 标记
 type DisplayAsset = AssetEntry & { isUserScript?: boolean };
 
 // 资源类型
-type AssetType = 'model' | 'texture' | 'script' | 'other';
+type AssetType = "model" | "texture" | "script" | "other";
 
 // 根据文件扩展名推断资源类型
 function getAssetType(filename: string): AssetType {
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
-  if (['glb', 'gltf'].includes(ext)) return 'model';
-  if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) return 'texture';
-  if (['js', 'ts', 'jsx', 'tsx'].includes(ext)) return 'script';
-  return 'other';
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  if (["glb", "gltf"].includes(ext)) return "model";
+  if (["png", "jpg", "jpeg", "webp", "bmp"].includes(ext)) return "texture";
+  if (["js", "ts", "jsx", "tsx"].includes(ext)) return "script";
+  return "other";
 }
 
 // 按类型渲染图标
 function renderTypeIcon(type: AssetType) {
   switch (type) {
-    case 'model':
+    case "model":
       return <ViewInAr />;
-    case 'texture':
+    case "texture":
       return <ImageIcon />;
-    case 'script':
+    case "script":
       return <Code />;
     default:
       return <InsertDriveFile />;
@@ -72,7 +73,7 @@ async function traverseDirectory(
   while (!entry.done) {
     const [name, handle] = entry.value;
     const path = basePath ? `${basePath}/${name}` : name;
-    if (handle.kind === 'file') {
+    if (handle.kind === "file") {
       results.push({
         id: path,
         name,
@@ -82,7 +83,12 @@ async function traverseDirectory(
         fileHandle: handle as FileSystemFileHandle,
       });
     } else {
-      await traverseDirectory(handle as FileSystemDirectoryHandle, path, depth + 1, results);
+      await traverseDirectory(
+        handle as FileSystemDirectoryHandle,
+        path,
+        depth + 1,
+        results,
+      );
     }
     entry = await entries.next();
   }
@@ -93,7 +99,9 @@ function traverseFileList(files: FileList): AssetEntry[] {
   const results: AssetEntry[] = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    const path = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+    const path =
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+      file.name;
     results.push({
       id: path,
       name: file.name,
@@ -108,9 +116,9 @@ function traverseFileList(files: FileList): AssetEntry[] {
 
 // 项目资源管理器：File System Access API + 回退 input[file]
 export default function AssetBrowser() {
-  const [keyword, setKeyword] = useState('');
-  const assets = useEditorStore(s => s.assets);
-  const setAssets = useEditorStore(s => s.setAssets);
+  const [keyword, setKeyword] = useState("");
+  const assets = useEditorStore((s) => s.assets);
+  const setAssets = useEditorStore((s) => s.setAssets);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -135,22 +143,24 @@ export default function AssetBrowser() {
     setError(null);
     setLoading(true);
     try {
-      if (!('showDirectoryPicker' in window)) throw new Error('UNSUPPORTED');
+      if (!("showDirectoryPicker" in window)) throw new Error("UNSUPPORTED");
       const dirHandle = await (
-        window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
+        window as unknown as {
+          showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
+        }
       ).showDirectoryPicker();
       const results: AssetEntry[] = [];
-      await traverseDirectory(dirHandle, '', 0, results);
+      await traverseDirectory(dirHandle, "", 0, results);
       setAssets(results);
       setStoreAssets(results);
     } catch (e: unknown) {
       const err = e as { name?: string; message?: string };
-      if (err?.name === 'AbortError') {
+      if (err?.name === "AbortError") {
         // 用户取消选择，无需提示
-      } else if (err?.message === 'UNSUPPORTED') {
-        setError('当前环境不支持直接访问文件夹，请使用上传模式');
+      } else if (err?.message === "UNSUPPORTED") {
+        setError("当前环境不支持直接访问文件夹，请使用上传模式");
       } else {
-        setError('打开文件夹失败：' + String(err?.message || e));
+        setError("打开文件夹失败：" + String(err?.message || e));
       }
     } finally {
       setLoading(false);
@@ -172,7 +182,8 @@ export default function AssetBrowser() {
     const kw = keyword.trim().toLowerCase();
     if (!kw) return assets;
     return assets.filter(
-      (a) => a.name.toLowerCase().includes(kw) || a.path.toLowerCase().includes(kw),
+      (a) =>
+        a.name.toLowerCase().includes(kw) || a.path.toLowerCase().includes(kw),
     );
   }, [keyword, assets]);
 
@@ -182,10 +193,10 @@ export default function AssetBrowser() {
     return Object.keys(scripts)
       .filter((name) => !kw || name.toLowerCase().includes(kw))
       .map((name) => ({
-        id: 'script:' + name,
+        id: "script:" + name,
         name,
-        path: 'scripts/' + name,
-        type: 'script' as AssetType,
+        path: "scripts/" + name,
+        type: "script" as AssetType,
         size: scripts[name].length,
         isUserScript: true,
       }));
@@ -207,16 +218,23 @@ export default function AssetBrowser() {
   }, [allAssets]);
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       {/* 顶部工具栏：搜索框 + 打开文件夹 + 上传 */}
       <Box
         sx={{
-          display: 'flex',
-          alignItems: 'center',
+          display: "flex",
+          alignItems: "center",
           gap: 0.5,
           px: 1,
           py: 0.5,
-          borderBottom: '1px solid #333333',
+          borderBottom: "1px solid #333333",
         }}
       >
         <TextField
@@ -240,7 +258,7 @@ export default function AssetBrowser() {
           onClick={handleOpenFolder}
           disabled={loading}
         >
-          {loading ? '加载中...' : '打开文件夹'}
+          {loading ? "加载中..." : "打开文件夹"}
         </Button>
         <Tooltip title="新建脚本">
           <Button
@@ -253,7 +271,10 @@ export default function AssetBrowser() {
           </Button>
         </Tooltip>
         <Tooltip title="上传文件（回退模式）">
-          <IconButton size="small" onClick={() => fileInputRef.current?.click()}>
+          <IconButton
+            size="small"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <Upload />
           </IconButton>
         </Tooltip>
@@ -263,7 +284,7 @@ export default function AssetBrowser() {
           multiple
           // @ts-ignore - webkitdirectory 是非标准属性，TypeScript 不识别
           webkitdirectory=""
-          style={{ display: 'none' }}
+          style={{ display: "none" }}
           onChange={handleFileInput}
         />
       </Box>
@@ -277,106 +298,139 @@ export default function AssetBrowser() {
         </Alert>
       )}
       {allAssets.length > 0 && (
-        <Typography variant="caption" sx={{ px: 1, py: 0.25, color: 'text.secondary' }}>
-          共 {allAssets.length} 个文件（模型 {counts.model} / 贴图 {counts.texture} / 脚本{' '}
-          {counts.script}）
+        <Typography
+          variant="caption"
+          sx={{ px: 1, py: 0.25, color: "text.secondary" }}
+        >
+          共 {allAssets.length} 个文件（模型 {counts.model} / 贴图{" "}
+          {counts.texture} / 脚本 {counts.script}）
         </Typography>
       )}
       {/* 资源网格 */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 1 }}>
+      <Box sx={{ flex: 1, overflow: "auto", p: 1 }}>
         <Box
           sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, 72px)',
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, 72px)",
             gap: 0.5,
           }}
         >
           {allAssets.map((a) => {
             // 当前活跃脚本高亮
-            const isActiveScript = a.name === activeFileId && a.type === 'script';
+            const isActiveScript =
+              a.name === activeFileId && a.type === "script";
             return (
-            <Box
-              key={a.id}
-              title={a.path}
-              draggable={a.type === 'model'}
-              onClick={async () => {
-                if (a.isUserScript) {
-                  // 用户脚本：直接切换 activeFileId
-                  setActiveFile(a.name);
-                  setSelectedAsset(a.id);
-                } else if (a.type === 'script') {
-                  // 文件系统中的 .js 文件：若已在 scripts 中则切换 activeFileId
-                  try {
-                    if (!Object.hasOwn(scripts,a.name)) {
-                      const file = a.fileHandle ? await a.fileHandle.getFile() : a.file;
-                      if (!file) throw new Error('无法读取脚本');
-                      const code = await file.text();
-                      createScript(a.name);
-                      useEditorStore.getState().updateScript(a.name,code);
-                    }
+              <Box
+                key={a.id}
+                title={a.path}
+                draggable={a.type === "model"}
+                onClick={async () => {
+                  if (a.isUserScript) {
+                    // 用户脚本：直接切换 activeFileId
                     setActiveFile(a.name);
-                  } catch(error) { setError(String(error)); }
-                  setSelectedAsset(a.id);
-                } else {
-                  setSelectedAsset(a.id);
-                }
-              }}
-              onDragStart={(e) => {
-                if (a.type !== 'model') return;
-                e.dataTransfer.effectAllowed = 'copy';
-                // 携带文件信息（JSON 字符串，因为 dataTransfer 只能存字符串）
-                // fileHandle 不可序列化，无法通过 dataTransfer 传递，
-                // Viewport 通过 store.assets 查找对应 AssetEntry 获取 fileHandle/file
-                e.dataTransfer.setData(
-                  'application/json',
-                  JSON.stringify({
-                    assetId: a.id,
-                    name: a.name,
-                    path: a.path,
-                  }),
-                );
-              }}
-              sx={{
-                width: 72,
-                height: 72,
-                borderRadius: 4,
-                background: '#2A2A2A',
-                border: isActiveScript
-                  ? '1px solid #7C9CFF'
-                  : selectedAsset === a.id
-                    ? '1px solid #7C9CFF'
-                    : '1px solid transparent',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 0.5,
-                cursor: a.type === 'model' ? 'grab' : 'pointer',
-                '&:hover': { background: '#333333' },
-              }}
-            >
-              <Box sx={{ color: 'text.secondary', '& .MuiSvgIcon-root': { fontSize: 28 } }}>
-                {renderTypeIcon(a.type)}
-              </Box>
-              <Typography
+                    setSelectedAsset(a.id);
+                  } else if (a.type === "script") {
+                    // 文件系统中的 .js 文件：若已在 scripts 中则切换 activeFileId
+                    try {
+                      if (!Object.hasOwn(scripts, a.name)) {
+                        const file = a.fileHandle
+                          ? await a.fileHandle.getFile()
+                          : a.file;
+                        if (!file) throw new Error("无法读取脚本");
+                        const code = await file.text();
+                        createScript(a.name);
+                        useEditorStore.getState().updateScript(a.name, code);
+                      }
+                      setActiveFile(a.name);
+                    } catch (error) {
+                      setError(String(error));
+                    }
+                    setSelectedAsset(a.id);
+                  } else if (a.type === "texture") {
+                    try {
+                      const file = a.fileHandle
+                        ? await a.fileHandle.getFile()
+                        : a.file;
+                      if (!file) throw new Error("无法读取贴图");
+                      await importTextureFile(file);
+                    } catch (error) {
+                      setError(String(error));
+                    }
+                    setSelectedAsset(a.id);
+                  } else {
+                    setSelectedAsset(a.id);
+                  }
+                }}
+                onDragStart={(e) => {
+                  if (a.type !== "model") return;
+                  e.dataTransfer.effectAllowed = "copy";
+                  // 携带文件信息（JSON 字符串，因为 dataTransfer 只能存字符串）
+                  // fileHandle 不可序列化，无法通过 dataTransfer 传递，
+                  // Viewport 通过 store.assets 查找对应 AssetEntry 获取 fileHandle/file
+                  e.dataTransfer.setData(
+                    "application/json",
+                    JSON.stringify({
+                      assetId: a.id,
+                      name: a.name,
+                      path: a.path,
+                    }),
+                  );
+                }}
                 sx={{
-                  fontSize: 12,
-                  color: 'text.secondary',
-                  maxWidth: 64,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  width: 72,
+                  height: 72,
+                  borderRadius: 4,
+                  background: "#2A2A2A",
+                  border: isActiveScript
+                    ? "1px solid #7C9CFF"
+                    : selectedAsset === a.id
+                      ? "1px solid #7C9CFF"
+                      : "1px solid transparent",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.5,
+                  cursor: a.type === "model" ? "grab" : "pointer",
+                  "&:hover": { background: "#333333" },
                 }}
               >
-                {a.name}
-              </Typography>
-            </Box>
+                <Box
+                  sx={{
+                    color: "text.secondary",
+                    "& .MuiSvgIcon-root": { fontSize: 28 },
+                  }}
+                >
+                  {renderTypeIcon(a.type)}
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    color: "text.secondary",
+                    maxWidth: 64,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {a.name}
+                </Typography>
+              </Box>
             );
           })}
         </Box>
         {allAssets.length === 0 && !loading && (
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', p: 1, textAlign: 'center' }}>
-            {assets.length === 0 ? '点击"打开文件夹"挂载本地资源，或"新建脚本"' : '无匹配资源'}
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: "text.secondary",
+              p: 1,
+              textAlign: "center",
+            }}
+          >
+            {assets.length === 0
+              ? '点击"打开文件夹"挂载本地资源，或"新建脚本"'
+              : "无匹配资源"}
           </Typography>
         )}
       </Box>

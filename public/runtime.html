@@ -54,7 +54,7 @@
     var sceneAdapter = null, runGeneration = 0, desiredState = 'stopped';
     var session = ArkGlideLifecycle.createSession({onError: reportScriptError});
     var entityAPI = ArkGlideRuntime.createEntityAPI(BABYLON, function() { return scene; }, function() { return math; }, {
-      onBeforeDestroy: function(id) { session.destroyEntity(id); }
+      onBeforeDestroy: function(id) { session.destroyEntity(id);sceneAdapter?.prepareDestroy(id); }
     });
     var entityMap = entityAPI.entities;
     var sceneAPI = entityAPI.sceneAPI;
@@ -358,7 +358,7 @@
           initBabylon();
           runtimeSettings=msg.project.settings || {};
           applySettings(runtimeSettings);
-          Promise.all([mathReady,sceneAdapter.sync(msg.project.scene.nodes,msg.modelData || {})]).then(function(){
+          Promise.all([mathReady,sceneAdapter.sync(msg.project.scene.nodes,msg.modelData || {},msg.project.content || {},msg.textureData || {})]).then(function(){
             if(generation!==runGeneration || desiredState==='stopped')return;
             scene.activeCamera=sceneAdapter.activeCamera() || camera;
             if(msg.project.scripts)runEntityScripts(msg.project.scripts,msg.project.scene.nodes);
