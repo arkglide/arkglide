@@ -105,10 +105,10 @@ test('ZIP keeps a missing model missing when another model has the same filename
 test('legacy project migration adds time defaults; future versions and invalid references leave current project untouched',async()=>{
  store.getState().newProject();const before=store.getState().nodes;
  const old={version:'0.1',scene:{nodes:before},scripts:{'main.js':''}};
- const upgraded=normalize(old);assert.equal(upgraded.version,'0.2');assert.equal(upgraded.settings.fixedTimeStep,1/60);assert.equal(upgraded.settings.timeScale,1);
- assert.throws(()=>normalize({...old,version:'0.3'}),/版本/);
+ const upgraded=normalize(old);assert.equal(upgraded.version,'0.3');assert.equal(upgraded.settings.fixedTimeStep,1/60);assert.equal(upgraded.settings.timeScale,1);
+ assert.throws(()=>normalize({...old,version:'0.4'}),/版本/);
  const {zipSync,strToU8}=await import('fflate');
- const bytes=zipSync({'project.json':strToU8(JSON.stringify({...old,version:'0.3'}))});
+ const bytes=zipSync({'project.json':strToU8(JSON.stringify({...old,version:'0.4'}))});
  await assert.rejects(archive.importProject(new File([bytes],'future.arkglide')),/版本/);assert.equal(store.getState().nodes,before);
  const model={...before[0],id:'model',type:'model'};
  assert.throws(()=>normalize({...old,scene:{nodes:[model]},modelRefs:[{assetId:'model',fileName:'../outside.glb'}]}),/引用/);
@@ -121,7 +121,7 @@ test('automatic recovery atomically stores script, scene and binary data without
   const model=store.getState().addNode('model','draft');store.getState().setModelBuffer(model,new Uint8Array([3,4,5]).buffer);
   store.getState().updateScript('main.js','return {onUpdate(){}};');
   const id=store.getState().documentId;await controller.flush();
-  const draft=await storage.loadRecovery(id);assert.ok(draft);assert.equal(draft.project.version,'0.2');assert.deepEqual([...new Uint8Array(draft.buffers.get(model))],[3,4,5]);
+  const draft=await storage.loadRecovery(id);assert.ok(draft);assert.equal(draft.project.version,'0.3');assert.deepEqual([...new Uint8Array(draft.buffers.get(model))],[3,4,5]);
   assert.ok(!(await storage.loadProject(projectId)).scene.nodes.some(n=>n.id===model));
   store.getState().newProject();await recovery.restoreRecovery(id);
   assert.equal(store.getState().documentId,id);assert.equal(store.getState().currentProjectId,projectId);

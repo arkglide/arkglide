@@ -1,10 +1,11 @@
-import type { SceneNode } from '../store/useEditorStore';
+import type { ProjectContent } from "./content";
+import type { SceneNode } from "../store/useEditorStore";
 
 // 资源引用
 export interface AssetRef {
   id: string;
   name: string;
-  type: 'model' | 'texture' | 'script';
+  type: "model" | "texture" | "script";
   ref: string;
 }
 
@@ -22,6 +23,7 @@ export interface ProjectSettings {
 
 // 项目 JSON：编辑器 → iframe 沙箱的完整数据包
 export interface ProjectJSON {
+  content?: ProjectContent;
   version: string;
   scene: { nodes: SceneNode[] };
   assets: AssetRef[];
@@ -38,9 +40,9 @@ export interface ProjectJSON {
 // 默认项目设置常量
 export const DEFAULT_SETTINGS: ProjectSettings = {
   gravity: { x: 0, y: -9.8, z: 0 },
-  backgroundColor: '#0D0D0D',
+  backgroundColor: "#0D0D0D",
   ambientIntensity: 0.5,
-  ambientColor: '#FFFFFF',
+  ambientColor: "#FFFFFF",
   fpsCap: 60,
   fixedTimeStep: 1 / 60,
   maxSubSteps: 8,

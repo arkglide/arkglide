@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from "react";
 import {
   List,
   ListItem,
@@ -11,7 +11,8 @@ import {
   Tooltip,
   TextField,
   Stack,
-} from '@mui/material';
+  Alert,
+} from "@mui/material";
 import {
   Folder,
   CropSquare,
@@ -24,8 +25,12 @@ import {
   Visibility,
   VisibilityOff,
   Search,
-} from '@mui/icons-material';
-import { useEditorStore, type NodeType, type SceneNode } from '../../store/useEditorStore';
+} from "@mui/icons-material";
+import {
+  useEditorStore,
+  type NodeType,
+  type SceneNode,
+} from "../../store/useEditorStore";
 
 // 节点类型 → 图标
 const NODE_ICON: Record<NodeType, ReactNode> = {
@@ -56,27 +61,36 @@ export default function SceneTree() {
   // 资源丢失的模型节点 ID 集合：在节点图标右下角显示红色警告角标
   const missingModelIds = useEditorStore((s) => s.missingModelIds);
 
+  const [hierarchyError, setHierarchyError] = useState<string | null>(null);
+  const reparent = (id: string, parent: string | null) => {
+    try {
+      setParent(id, parent);
+      setHierarchyError(null);
+    } catch (error) {
+      setHierarchyError(String(error));
+    }
+  };
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   // 搜索框文本：实时过滤场景树节点（保持层级结构：匹配节点 + 祖先链）
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Delete 键监听：删除选中节点（重命名中或焦点在输入框时不触发）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (useEditorStore.getState().playState !== 'stopped') return;
-      if (e.key === 'Delete' && selectedNodeId && renamingId === null) {
+      if (useEditorStore.getState().playState !== "stopped") return;
+      if (e.key === "Delete" && selectedNodeId && renamingId === null) {
         const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
           const store = useEditorStore.getState();
           store.removeNodes(store.selectedNodeIds);
         }
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [selectedNodeId, renamingId, removeNode]);
 
   // Ctrl/Cmd + C/V/D 快捷键：复制 / 粘贴 / 复制副本
@@ -84,35 +98,39 @@ export default function SceneTree() {
   // 使用 useEditorStore.getState() 取最新值，handler 无需依赖项
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (useEditorStore.getState().playState !== 'stopped') return;
+      if (useEditorStore.getState().playState !== "stopped") return;
       const target = e.target as HTMLElement;
       if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
         target.isContentEditable
       ) {
         return;
       }
       // Monaco 编辑器聚焦时跳过，避免拦截代码编辑器的复制粘贴
-      if (target.closest('.monaco-editor')) return;
+      if (target.closest(".monaco-editor")) return;
 
       const isCtrl = e.ctrlKey || e.metaKey;
       if (!isCtrl) return;
 
-      if (e.key === 'c' || e.key === 'C') {
+      if (e.key === "c" || e.key === "C") {
         e.preventDefault();
         useEditorStore.getState().copyToClipboard();
-      } else if (e.key === 'v' || e.key === 'V') {
+      } else if (e.key === "v" || e.key === "V") {
         e.preventDefault();
         useEditorStore.getState().pasteFromClipboard();
-      } else if (e.key === 'd' || e.key === 'D') {
+      } else if (e.key === "d" || e.key === "D") {
         e.preventDefault();
         const selectedId = useEditorStore.getState().selectedNodeId;
-        if (selectedId) { const store = useEditorStore.getState(); store.copyToClipboard(); store.pasteFromClipboard(); }
+        if (selectedId) {
+          const store = useEditorStore.getState();
+          store.copyToClipboard();
+          store.pasteFromClipboard();
+        }
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   // 检查 nodeId 是否是 ancestorId 的子孙节点（防循环拖拽）
@@ -164,7 +182,9 @@ export default function SceneTree() {
         let current: SceneNode | undefined = n;
         while (current) {
           matchingIds.add(current.id);
-          current = current.parentId ? nodeMap.get(current.parentId) : undefined;
+          current = current.parentId
+            ? nodeMap.get(current.parentId)
+            : undefined;
         }
       }
     });
@@ -190,13 +210,17 @@ export default function SceneTree() {
             }}
             draggable
             onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.effectAllowed = "move";
               setDraggedId(node.id);
             }}
             onDragOver={(e) => {
               e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              if (draggedId && draggedId !== node.id && !isDescendant(node.id, draggedId)) {
+              e.dataTransfer.dropEffect = "move";
+              if (
+                draggedId &&
+                draggedId !== node.id &&
+                !isDescendant(node.id, draggedId)
+              ) {
                 setDragOverId(node.id);
               }
             }}
@@ -204,26 +228,32 @@ export default function SceneTree() {
             onDrop={(e) => {
               e.preventDefault();
               setDragOverId(null);
-              if (draggedId && draggedId !== node.id && !isDescendant(node.id, draggedId)) {
-                setParent(draggedId, node.id);
+              if (
+                draggedId &&
+                draggedId !== node.id &&
+                !isDescendant(node.id, draggedId)
+              ) {
+                reparent(draggedId, node.id);
               }
               setDraggedId(null);
             }}
             sx={{
               pl: 1 + depth * 2,
               py: 0.25,
-              bgcolor: isDragOver ? 'rgba(124, 156, 255, 0.15)' : undefined,
-              borderLeft: isDragOver ? '2px solid #7C9CFF' : '2px solid transparent',
+              bgcolor: isDragOver ? "rgba(124, 156, 255, 0.15)" : undefined,
+              borderLeft: isDragOver
+                ? "2px solid #7C9CFF"
+                : "2px solid transparent",
             }}
           >
-            <ListItemIcon sx={{ minWidth: 28, position: 'relative' }}>
+            <ListItemIcon sx={{ minWidth: 28, position: "relative" }}>
               {NODE_ICON[node.type]}
               {missingModelIds.has(node.id) && (
                 <Warning
                   sx={{
-                    color: '#ff6b6b',
+                    color: "#ff6b6b",
                     fontSize: 14,
-                    position: 'absolute',
+                    position: "absolute",
                     right: -2,
                     bottom: -2,
                   }}
@@ -237,20 +267,20 @@ export default function SceneTree() {
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     renameNode(node.id, renameValue);
                     setRenamingId(null);
-                  } else if (e.key === 'Escape') {
+                  } else if (e.key === "Escape") {
                     setRenamingId(null);
                   }
                 }}
                 onBlur={() => setRenamingId(null)}
-                sx={{ '& input': { fontSize: 13, py: 0 } }}
+                sx={{ "& input": { fontSize: 13, py: 0 } }}
               />
             ) : (
               <ListItemText
                 primary={node.name}
-                secondary={`P(${node.transform.x.toFixed(1)}, ${node.transform.y.toFixed(1)}, ${node.transform.z.toFixed(1)})`}
+                secondary={`${node.prefab ? "◇ 预制体 · " : ""}P(${node.transform.x.toFixed(1)}, ${node.transform.y.toFixed(1)}, ${node.transform.z.toFixed(1)})`}
                 primaryTypographyProps={{ fontSize: 13 }}
                 secondaryTypographyProps={{ fontSize: 11 }}
               />
@@ -265,9 +295,13 @@ export default function SceneTree() {
               sx={{ p: 0.5 }}
             >
               {node.visible !== false ? (
-                <Visibility sx={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
+                <Visibility
+                  sx={{ fontSize: 14, color: "rgba(255,255,255,0.6)" }}
+                />
               ) : (
-                <VisibilityOff sx={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }} />
+                <VisibilityOff
+                  sx={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}
+                />
               )}
             </IconButton>
           </ListItemButton>
@@ -280,35 +314,42 @@ export default function SceneTree() {
   const rootNodes = filteredNodes.filter((n) => !n.parentId);
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       {/* 顶部工具栏：创建按钮 + 删除按钮 */}
       <Stack
         direction="row"
         spacing={0.5}
-        sx={{ px: 1, py: 0.5, borderBottom: '1px solid #333333' }}
+        sx={{ px: 1, py: 0.5, borderBottom: "1px solid #333333" }}
       >
         <Tooltip title="创建 Cube">
-          <IconButton size="small" onClick={() => addNode('mesh', 'Cube')}>
+          <IconButton size="small" onClick={() => addNode("mesh", "Cube")}>
             <CropSquare fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="创建 Sphere">
-          <IconButton size="small" onClick={() => addNode('mesh', 'Sphere')}>
+          <IconButton size="small" onClick={() => addNode("mesh", "Sphere")}>
             <CircleOutlined fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="创建 Light">
-          <IconButton size="small" onClick={() => addNode('light')}>
+          <IconButton size="small" onClick={() => addNode("light")}>
             <Lightbulb fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="创建 Camera">
-          <IconButton size="small" onClick={() => addNode('camera')}>
+          <IconButton size="small" onClick={() => addNode("camera")}>
             <PhotoCamera fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="创建 Empty">
-          <IconButton size="small" onClick={() => addNode('empty')}>
+          <IconButton size="small" onClick={() => addNode("empty")}>
             <Folder fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -316,7 +357,9 @@ export default function SceneTree() {
         <Tooltip title="删除选中">
           <IconButton
             size="small"
-            onClick={() => useEditorStore.getState().removeNodes(selectedNodeIds)}
+            onClick={() =>
+              useEditorStore.getState().removeNodes(selectedNodeIds)
+            }
             disabled={!selectedNodeId}
           >
             <DeleteOutline fontSize="small" />
@@ -330,18 +373,28 @@ export default function SceneTree() {
         placeholder="搜索节点..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        sx={{ mt: 0.5, '& .MuiInputBase-input': { fontSize: 12 } }}
+        sx={{ mt: 0.5, "& .MuiInputBase-input": { fontSize: 12 } }}
         InputProps={{
           startAdornment: (
-            <Search sx={{ fontSize: 14, mr: 0.5, color: 'rgba(255,255,255,0.4)' }} />
+            <Search
+              sx={{ fontSize: 14, mr: 0.5, color: "rgba(255,255,255,0.4)" }}
+            />
           ),
         }}
       />
-      <Typography variant="caption" sx={{ px: 1, py: 0.5, color: 'text.secondary' }}>
+      <Typography
+        variant="caption"
+        sx={{ px: 1, py: 0.5, color: "text.secondary" }}
+      >
         场景树
       </Typography>
+      {hierarchyError && (
+        <Alert severity="warning" onClose={() => setHierarchyError(null)}>
+          {hierarchyError}
+        </Alert>
+      )}
       <List
-        sx={{ flex: 1, overflow: 'auto', py: 0 }}
+        sx={{ flex: 1, overflow: "auto", py: 0 }}
         onClick={(e) => {
           // 点击列表空白处清空选择（仅当点击目标为 List 本身时）
           if (e.target === e.currentTarget) {
@@ -354,7 +407,10 @@ export default function SceneTree() {
             <ListItemIcon sx={{ minWidth: 28 }}>
               <Folder />
             </ListItemIcon>
-            <ListItemText primary="Scene" primaryTypographyProps={{ fontSize: 13 }} />
+            <ListItemText
+              primary="Scene"
+              primaryTypographyProps={{ fontSize: 13 }}
+            />
           </ListItemButton>
         </ListItem>
         {rootNodes.map((node) => renderNode(node, 1))}

@@ -1,18 +1,39 @@
-import { create } from 'zustand';
-import type { ProjectJSON, ProjectSettings } from '../types/project';
-import { validateProject, normalizeProject, PROJECT_VERSION } from '../utils/projectValidation';
-import { DEFAULT_SETTINGS } from '../types/project';
+import { create } from "zustand";
+import {
+  emptyContent,
+  defaultMaterial,
+  type ProjectContent,
+  type MaterialAsset,
+  type TextureAsset,
+  type PrefabInstance,
+} from "../types/content";
+import {
+  capturePrefab,
+  createInstance,
+  applyPrefab,
+  cloneInstanceLinks,
+  subtree,
+} from "../engine/prefabs";
+import { collectModelRefs } from "../utils/contentResources";
+import type { ProjectJSON, ProjectSettings } from "../types/project";
+import {
+  validateProject,
+  normalizeProject,
+  PROJECT_VERSION,
+} from "../utils/projectValidation";
+import { DEFAULT_SETTINGS } from "../types/project";
 import {
   saveProjectSnapshot,
   loadProject,
   loadModelBlob,
+  loadTextureBlob,
   type StoredProject,
-} from '../utils/projectStorage';
+} from "../utils/projectStorage";
 
 // 播放状态
-export type PlayState = 'stopped' | 'playing' | 'paused';
+export type PlayState = "stopped" | "playing" | "paused";
 // 节点类型
-export type NodeType = 'mesh' | 'light' | 'camera' | 'empty' | 'model';
+export type NodeType = "mesh" | "light" | "camera" | "empty" | "model";
 
 export interface Transform {
   x: number;
@@ -23,29 +44,65 @@ export interface Transform {
 export interface SceneNode {
   id: string;
   name: string;
-  type: NodeType;            // 'mesh' | 'light' | 'camera' | 'empty' | 'model'
-  transform: Transform;      // 位置（保持不变，向后兼容 runtime.html）
-  rotation: Transform;       // 旋转（弧度，与 Babylon mesh.rotation 一致）
-  scale: Transform;          // 缩放
-  visible: boolean;          // 可见性
-  primitive?: 'box' | 'sphere' | 'plane' | 'cylinder' | 'capsule' | 'torus';
-  lightType?: 'hemispheric' | 'directional' | 'point';
+  type: NodeType; // 'mesh' | 'light' | 'camera' | 'empty' | 'model'
+  transform: Transform; // 位置（保持不变，向后兼容 runtime.html）
+  rotation: Transform; // 旋转（弧度，与 Babylon mesh.rotation 一致）
+  scale: Transform; // 缩放
+  visible: boolean; // 可见性
+  primitive?: "box" | "sphere" | "plane" | "cylinder" | "capsule" | "torus";
+  lightType?: "hemispheric" | "directional" | "point";
   activeCamera?: boolean;
-  color?: string;            // 颜色（hex 格式如 '#FF6B6B'，mesh 用）
-  intensity?: number;        // 光照强度（light 用）
-  fov?: number;              // 视场角（camera 用，角度）
-  parentId?: string | null;  // 父节点 ID（null 或 undefined = 根节点）
-  modelUrl?: string;         // 模型文件 URL（type='model' 时用）
-  scripts?: string[];        // 挂载的脚本文件名列表，如 ['player.js', 'physics.js']
+  color?: string; // 颜色（hex 格式如 '#FF6B6B'，mesh 用）
+  intensity?: number; // 光照强度（light 用）
+  fov?: number; // 视场角（camera 用，角度）
+  parentId?: string | null; // 父节点 ID（null 或 undefined = 根节点）
+  modelRevision?: string;
+  modelUrl?: string; // 模型文件 URL（type='model' 时用）
+  materialId?: string;
+  prefab?: { prefabId: string; instanceId: string; nodeId: string };
+  scripts?: string[]; // 挂载的脚本文件名列表，如 ['player.js', 'physics.js']
 }
 
 // 控制台消息（来自 iframe 沙箱转发）
-export interface DiagnosticLocation {file?:string|null;line?:number|null;column?:number|null;hook?:string;entityId?:string|null;stack?:string;}
-export interface RuntimeStats {state:string;mathBackend:string;fps:number;frameMs:number;peakFrameMs:number;renderMs:number;scriptMs:number;entities:number;scripts:number;meshes:number;materials:number;textures:number;lights:number;cameras:number;modelLoads:number;timers:number;subscriptions:number;listeners:number;heapBytes:number|null;totalTime:number;unscaledTotalTime:number;fixedSteps:number;timeScale:number;droppedTime:number;errors:number;}
+export interface DiagnosticLocation {
+  file?: string | null;
+  line?: number | null;
+  column?: number | null;
+  hook?: string;
+  entityId?: string | null;
+  stack?: string;
+}
+export interface RuntimeStats {
+  state: string;
+  mathBackend: string;
+  fps: number;
+  frameMs: number;
+  peakFrameMs: number;
+  renderMs: number;
+  scriptMs: number;
+  entities: number;
+  scripts: number;
+  meshes: number;
+  materials: number;
+  textures: number;
+  lights: number;
+  cameras: number;
+  modelLoads: number;
+  timers: number;
+  subscriptions: number;
+  listeners: number;
+  heapBytes: number | null;
+  totalTime: number;
+  unscaledTotalTime: number;
+  fixedSteps: number;
+  timeScale: number;
+  droppedTime: number;
+  errors: number;
+}
 export interface ConsoleMessage {
-  location?:DiagnosticLocation;
+  location?: DiagnosticLocation;
   id: number;
-  level: 'log' | 'warn' | 'error';
+  level: "log" | "warn" | "error";
   text: string;
   time: number;
 }
@@ -55,7 +112,7 @@ export interface AssetEntry {
   id: string;
   name: string;
   path: string;
-  type: 'model' | 'texture' | 'script' | 'other';
+  type: "model" | "texture" | "script" | "other";
   size: number;
   fileHandle?: FileSystemFileHandle;
   file?: File;
@@ -66,30 +123,43 @@ export interface AssetEntry {
 // 注意：DEFAULT_SCRIPT 不再使用 entity 参数和 scene.find('cube')，改用 this.entity 直接操作挂载的实体
 // entity 参数仍保留在 runtime.html 的 new Function 签名中（向后兼容），只是此处不再使用
 export const DEFAULT_SCRIPT = [
-  '// ArkGlide 脚本 — this.entity 指向挂载此脚本的实体',
-  '// 生命周期：onStart（启动时调用一次）/ onUpdate（每帧调用）',
-  '// 输入：input.isKeyDown(\'w\') / input.getMouseDelta()',
-  '// 场景：scene.find(\'id\') / scene.findByName(\'Cube\')',
-  '',
-  'return {',
-  '  onStart() {',
-  '    console.log(\'脚本启动:\', this.entity.name);',
-  '  },',
-  '  onUpdate() {',
-  '    // 以每秒 3 个单位移动，速度不随帧率变化',
-  '    const distance = 3 * time.deltaTime;',
-  '    this.entity.translate(',
-  '      input.getAxis(\'a\', \'d\') * distance,',
-  '      0,',
-  '      input.getAxis(\'s\', \'w\') * distance',
-  '    );',
-  '  }',
-  '};',
-  '',
-].join('\n');
+  "// ArkGlide 脚本 — this.entity 指向挂载此脚本的实体",
+  "// 生命周期：onStart（启动时调用一次）/ onUpdate（每帧调用）",
+  "// 输入：input.isKeyDown('w') / input.getMouseDelta()",
+  "// 场景：scene.find('id') / scene.findByName('Cube')",
+  "",
+  "return {",
+  "  onStart() {",
+  "    console.log('脚本启动:', this.entity.name);",
+  "  },",
+  "  onUpdate() {",
+  "    // 以每秒 3 个单位移动，速度不随帧率变化",
+  "    const distance = 3 * time.deltaTime;",
+  "    this.entity.translate(",
+  "      input.getAxis('a', 'd') * distance,",
+  "      0,",
+  "      input.getAxis('s', 'w') * distance",
+  "    );",
+  "  }",
+  "};",
+  "",
+].join("\n");
 
 // 历史栈条目：nodes + scripts 的快照
+type ClipboardScriptsSnapshot = Pick<
+  EditorState,
+  "clipboard" | "clipboardContent" | "clipboardPrefabInstances"
+>;
+interface ScriptHistoryChange {
+  oldName: string;
+  newName: string | null;
+  before: ClipboardScriptsSnapshot;
+  after: ClipboardScriptsSnapshot;
+}
 interface HistoryEntry {
+  scriptChange?: ScriptHistoryChange;
+  content: ProjectContent;
+  textureBuffers: Map<string, ArrayBuffer>;
   nodes: SceneNode[];
   scripts: Record<string, string>;
   activeFileId: string;
@@ -99,30 +169,57 @@ interface HistoryEntry {
 }
 
 export interface EditorState {
-  documentId:string;
-  documentOrigin:'new'|'loaded'|'imported'|'recovered';
-  savedSnapshot:{project:StoredProject;buffers:Map<string,ArrayBuffer>}|null;
-  recoveryStatus:'idle'|'pending'|'saving'|'saved'|'error';
-  recoveryError:string|null;
-  recoveryUpdatedAt:number|null;
-  scriptNavigation:{id:number;file:string;line:number;column:number}|null;
-  navigateToScript:(file:string,line?:number,column?:number)=>void;
-  runtimeStats:RuntimeStats|null;
-  setRuntimeStats:(stats:RuntimeStats|null)=>void;
+  content: ProjectContent;
+  textureBuffers: Map<string, ArrayBuffer>;
+  clipboardPrefabInstances: Record<string, PrefabInstance>;
+  clipboardContent: ProjectContent | null;
+  clipboardTextureBuffers: Map<string, ArrayBuffer>;
+  createMaterial: (name?: string, sourceId?: string) => string;
+  updateMaterial: (id: string, patch: Partial<MaterialAsset>) => void;
+  deleteMaterial: (id: string) => void;
+  setNodeMaterial: (nodeId: string, materialId?: string) => void;
+  importTexture: (asset: TextureAsset, bytes: ArrayBuffer) => void;
+  deleteTexture: (id: string) => void;
+  createPrefab: (rootId: string, name?: string) => string;
+  instantiatePrefab: (id: string) => string;
+  updatePrefabFromInstance: (instanceId: string) => void;
+  resetPrefabInstance: (instanceId: string) => void;
+  unpackPrefabInstance: (instanceId: string) => void;
+  deletePrefab: (id: string) => void;
+  renamePrefab: (id: string, name: string) => void;
+  documentId: string;
+  documentOrigin: "new" | "loaded" | "imported" | "recovered";
+  savedSnapshot: {
+    project: StoredProject;
+    buffers: Map<string, ArrayBuffer>;
+    textures: Map<string, ArrayBuffer>;
+  } | null;
+  recoveryStatus: "idle" | "pending" | "saving" | "saved" | "error";
+  recoveryError: string | null;
+  recoveryUpdatedAt: number | null;
+  scriptNavigation: {
+    id: number;
+    file: string;
+    line: number;
+    column: number;
+  } | null;
+  navigateToScript: (file: string, line?: number, column?: number) => void;
+  runtimeStats: RuntimeStats | null;
+  setRuntimeStats: (stats: RuntimeStats | null) => void;
   playState: PlayState;
   nodes: SceneNode[];
   selectedNodeId: string | null;
-  selectedNodeIds: string[];           // 多选节点 ID 列表（selectedNodeId 派生自 [0]）
+  selectedNodeIds: string[]; // 多选节点 ID 列表（selectedNodeId 派生自 [0]）
   clipboardModelBuffers: Map<string, ArrayBuffer>;
-  clipboard: SceneNode[] | null;       // 内部剪贴板（复制/粘贴用）
-  gizmoMode: 'move' | 'rotate' | 'scale';   // Gizmo 模式（W/E/R 切换）
-  gizmoSpace: 'global' | 'local';            // 坐标系（Global/Local 切换）
+  clipboard: SceneNode[] | null; // 内部剪贴板（复制/粘贴用）
+  gizmoMode: "move" | "rotate" | "scale"; // Gizmo 模式（W/E/R 切换）
+  gizmoSpace: "global" | "local"; // 坐标系（Global/Local 切换）
   // 撤销/重做历史栈
-  past: HistoryEntry[];        // 撤销栈（过去的状态快照）
-  future: HistoryEntry[];      // 重做栈（未来的状态快照）
-  undo: () => void;             // 撤销
-  redo: () => void;             // 重做
-  beginTransform: () => void;   // Gizmo 拖拽开始时调用（保存拖拽前快照）
+  past: HistoryEntry[]; // 撤销栈（过去的状态快照）
+  future: HistoryEntry[]; // 重做栈（未来的状态快照）
+  undo: () => void; // 撤销
+  redo: () => void; // 重做
+  beginTransform: () => void; // Gizmo 拖拽开始时调用（保存拖拽前快照）
   // 多脚本数据层：key 为文件名（如 'main.js'），value 为代码内容
   scripts: Record<string, string>;
   activeFileId: string; // 当前编辑的脚本文件名
@@ -143,34 +240,57 @@ export interface EditorState {
   stop: () => void;
   selectNode: (id: string | null) => void;
   // 多选：selectedNodeIds 为主，selectedNodeId 派生自 [0]（向后兼容）
-  selectNodes: (ids: string[]) => void;           // 设置多选
-  toggleNodeSelection: (id: string) => void;       // 加选/减选（Ctrl/Cmd+点击）
-  clearSelection: () => void;                       // 清空选择
+  selectNodes: (ids: string[]) => void; // 设置多选
+  toggleNodeSelection: (id: string) => void; // 加选/减选（Ctrl/Cmd+点击）
+  clearSelection: () => void; // 清空选择
   // 复制/粘贴/复制副本
   copyToClipboard: () => void;
   pasteFromClipboard: (parentId?: string | null) => void;
-  duplicateNode: (id: string) => void;                      // 复制副本（Ctrl+D，含子树，入栈）
+  duplicateNode: (id: string) => void; // 复制副本（Ctrl+D，含子树，入栈）
   // 可见性 toggle（入栈）
   toggleVisibility: (id: string) => void;
-  setGizmoMode: (mode: 'move' | 'rotate' | 'scale') => void;
-  setGizmoSpace: (space: 'global' | 'local') => void;
-  updateTransform: (id: string, partial: Partial<Pick<SceneNode, 'transform' | 'rotation' | 'scale' | 'visible' | 'color' | 'intensity' | 'fov' | 'modelUrl' | 'primitive' | 'lightType' | 'activeCamera'>>, recordHistory?: boolean) => void;
-  addNode: (type: NodeType, name?: string) => string;       // 创建节点，返回新节点 id
+  setGizmoMode: (mode: "move" | "rotate" | "scale") => void;
+  setGizmoSpace: (space: "global" | "local") => void;
+  updateTransform: (
+    id: string,
+    partial: Partial<
+      Pick<
+        SceneNode,
+        | "transform"
+        | "rotation"
+        | "scale"
+        | "visible"
+        | "color"
+        | "intensity"
+        | "fov"
+        | "modelUrl"
+        | "primitive"
+        | "lightType"
+        | "activeCamera"
+      >
+    >,
+    recordHistory?: boolean,
+  ) => void;
+  addNode: (type: NodeType, name?: string) => string; // 创建节点，返回新节点 id
   removeNodes: (ids: string[]) => void;
-  removeNode: (id: string) => void;                          // 级联删除子节点
-  renameNode: (id: string, name: string) => void;            // 重命名节点
-  setParent: (id: string, parentId: string | null) => void;  // 设置父节点（拖拽层级）
+  removeNode: (id: string) => void; // 级联删除子节点
+  renameNode: (id: string, name: string) => void; // 重命名节点
+  setParent: (id: string, parentId: string | null) => void; // 设置父节点（拖拽层级）
   attachScript: (nodeId: string, scriptFile: string) => void; // 给节点挂载脚本
   detachScript: (nodeId: string, scriptFile: string) => void; // 从节点卸载脚本
   // 多脚本 CRUD
-  createScript: (fileName: string) => void;                  // 新建脚本（避免重名）
-  deleteScript: (fileName: string) => void;                  // 删除脚本（不允许删除 main.js）
-  renameScript: (oldName: string, newName: string) => void;  // 重命名脚本
+  createScript: (fileName: string) => void; // 新建脚本（避免重名）
+  deleteScript: (fileName: string) => void; // 删除脚本（不允许删除 main.js）
+  renameScript: (oldName: string, newName: string) => void; // 重命名脚本
   updateScript: (fileName: string, content: string) => void; // 更新脚本内容
-  setActiveFile: (fileName: string) => void;                 // 切换当前编辑的脚本
+  setActiveFile: (fileName: string) => void; // 切换当前编辑的脚本
   // 向后兼容别名：setScript(code) === updateScript(activeFileId, code)
   setScript: (code: string) => void;
-  addConsoleLog: (level: ConsoleMessage['level'], text: string, location?:DiagnosticLocation) => void;
+  addConsoleLog: (
+    level: ConsoleMessage["level"],
+    text: string,
+    location?: DiagnosticLocation,
+  ) => void;
   clearConsoleLogs: () => void;
   setAssets: (assets: AssetEntry[]) => void;
   // 模型 ArrayBuffer 缓存：nodeId → ArrayBuffer
@@ -186,7 +306,14 @@ export interface EditorState {
   saveCurrentProject: (name?: string) => Promise<void>;
   loadProjectById: (projectId: string) => Promise<void>;
   newProject: () => void;
-  replaceProject: (data: StoredProject, buffers: Map<string, ArrayBuffer>, missing: Set<string>, imported?: boolean, recoveryId?:string) => void;
+  replaceProject: (
+    data: StoredProject,
+    buffers: Map<string, ArrayBuffer>,
+    missing: Set<string>,
+    imported?: boolean,
+    recoveryId?: string,
+    textures?: Map<string, ArrayBuffer>,
+  ) => void;
   // 项目设置：重力/背景色/环境光/帧率上限
   settings: ProjectSettings;
   updateSettings: (partial: Partial<ProjectSettings>) => void;
@@ -194,10 +321,51 @@ export interface EditorState {
 
 // 初始场景节点（Mock）
 const initialNodes: SceneNode[] = [
-  { id: 'cube', name: 'Cube', type: 'mesh', primitive: 'box', transform: { x: 0, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, visible: true, color: '#7C9CFF', scripts: ['main.js'] },
-  { id: 'sphere', name: 'Sphere', type: 'mesh', primitive: 'sphere', transform: { x: 2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, visible: true, color: '#FF6B6B' },
-  { id: 'light', name: 'DirectionalLight', type: 'light', transform: { x: 0, y: 5, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, visible: true, color: '#FFFFFF', intensity: 0.8 },
-  { id: 'camera', name: 'Camera', type: 'camera', transform: { x: 0, y: 3, z: -8 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, visible: true, fov: 60, activeCamera: true },
+  {
+    id: "cube",
+    name: "Cube",
+    type: "mesh",
+    primitive: "box",
+    transform: { x: 0, y: 0.5, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    visible: true,
+    color: "#7C9CFF",
+    scripts: ["main.js"],
+  },
+  {
+    id: "sphere",
+    name: "Sphere",
+    type: "mesh",
+    primitive: "sphere",
+    transform: { x: 2, y: 0.5, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    visible: true,
+    color: "#FF6B6B",
+  },
+  {
+    id: "light",
+    name: "DirectionalLight",
+    type: "light",
+    transform: { x: 0, y: 5, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    visible: true,
+    color: "#FFFFFF",
+    intensity: 0.8,
+  },
+  {
+    id: "camera",
+    name: "Camera",
+    type: "camera",
+    transform: { x: 0, y: 3, z: -8 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    visible: true,
+    fov: 60,
+    activeCamera: true,
+  },
 ];
 
 let logId = 0;
@@ -208,7 +376,9 @@ const HISTORY_LIMIT = 100;
 
 // Zustand set 函数的类型（接受 partial 对象或 updater 函数）
 type EditorSet = (
-  partial: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>),
+  partial:
+    | Partial<EditorState>
+    | ((state: EditorState) => Partial<EditorState>),
 ) => void;
 
 // 深拷贝 SceneNode（含嵌套 transform/rotation/scale/scripts）
@@ -223,13 +393,17 @@ function deepCloneNodes(nodes: SceneNode[]): SceneNode[] {
 }
 
 // 深拷贝 scripts（Record<string, string>，string 不可变只需浅拷贝对象）
-function deepCloneScripts(scripts: Record<string, string>): Record<string, string> {
+function deepCloneScripts(
+  scripts: Record<string, string>,
+): Record<string, string> {
   return { ...scripts };
 }
 
 // 创建历史快照：深拷贝当前 nodes + scripts
 function createSnapshot(state: EditorState): HistoryEntry {
   return {
+    content: structuredClone(state.content),
+    textureBuffers: new Map(state.textureBuffers),
     nodes: deepCloneNodes(state.nodes),
     scripts: deepCloneScripts(state.scripts),
     activeFileId: state.activeFileId,
@@ -256,27 +430,222 @@ function pushHistory(get: () => EditorState, set: EditorSet): void {
   });
 }
 
+function assertEditing(s: EditorState) {
+  if (s.playState !== "stopped") throw new Error("请先停止运行");
+}
+function pruneModels(
+  nodes: SceneNode[],
+  content: ProjectContent,
+  buffers: Map<string, ArrayBuffer>,
+) {
+  const keys = new Set(collectModelRefs(nodes, content).map((r) => r.assetId));
+  for (const id of buffers.keys()) if (!keys.has(id)) buffers.delete(id);
+}
+function missingModels(
+  nodes: SceneNode[],
+  content: ProjectContent,
+  buffers: Map<string, ArrayBuffer>,
+) {
+  return new Set(
+    collectModelRefs(nodes, content)
+      .filter((r) => !buffers.has(r.assetId))
+      .map((r) => r.assetId),
+  );
+}
+function rewriteNodeScripts(
+  n: SceneNode,
+  fn: (name: string) => string | null,
+): SceneNode {
+  return {
+    ...n,
+    scripts: n.scripts?.flatMap((name) => {
+      const next = fn(name);
+      return next ? [next] : [];
+    }),
+  };
+}
+function rewriteInstancesScripts(
+  instances: Record<string, PrefabInstance>,
+  fn: (name: string) => string | null,
+) {
+  return Object.fromEntries(
+    Object.entries(instances).map(([id, i]) => [
+      id,
+      { ...i, baseline: i.baseline.map((n) => rewriteNodeScripts(n, fn)) },
+    ]),
+  );
+}
+function rewriteContentScripts(
+  content: ProjectContent,
+  fn: (name: string) => string | null,
+): ProjectContent {
+  return {
+    ...content,
+    prefabs: Object.fromEntries(
+      Object.entries(content.prefabs).map(([id, p]) => [
+        id,
+        { ...p, nodes: p.nodes.map((n) => rewriteNodeScripts(n, fn)) },
+      ]),
+    ),
+    prefabInstances: rewriteInstancesScripts(content.prefabInstances, fn),
+  };
+}
+
+function clipboardScriptsSnapshot(
+  state: EditorState,
+): ClipboardScriptsSnapshot {
+  return {
+    clipboard: state.clipboard,
+    clipboardContent: state.clipboardContent,
+    clipboardPrefabInstances: state.clipboardPrefabInstances,
+  };
+}
+function rewriteClipboardScripts(
+  state: EditorState,
+  fn: (name: string) => string | null,
+): ClipboardScriptsSnapshot {
+  return {
+    clipboard: state.clipboard?.map((n) => rewriteNodeScripts(n, fn)) || null,
+    clipboardContent: state.clipboardContent
+      ? rewriteContentScripts(state.clipboardContent, fn)
+      : null,
+    clipboardPrefabInstances: rewriteInstancesScripts(
+      state.clipboardPrefabInstances,
+      fn,
+    ),
+  };
+}
+function restoreClipboardScripts(
+  state: EditorState,
+  change: ScriptHistoryChange | undefined,
+  undo: boolean,
+): Partial<EditorState> {
+  if (!change) return {};
+  const expected = undo ? change.after : change.before,
+    target = undo ? change.before : change.after;
+  if (
+    state.clipboard === expected.clipboard &&
+    state.clipboardContent === expected.clipboardContent &&
+    state.clipboardPrefabInstances === expected.clipboardPrefabInstances
+  )
+    return target;
+  // A later copy remains on the clipboard; only update renamed/deleted file references.
+  if (undo && !change.newName) return {};
+  return rewriteClipboardScripts(state, (name) =>
+    undo
+      ? name === change.newName
+        ? change.oldName
+        : name
+      : name === change.oldName
+        ? change.newName
+        : name,
+  );
+}
+function recordScriptHistory(
+  get: () => EditorState,
+  set: EditorSet,
+  oldName: string,
+  newName: string | null,
+  before: ClipboardScriptsSnapshot,
+) {
+  const state = get(),
+    after = clipboardScriptsSnapshot(state);
+  set({
+    past: state.past.map((entry, index) =>
+      index === state.past.length - 1
+        ? { ...entry, scriptChange: { oldName, newName, before, after } }
+        : entry,
+    ),
+  });
+}
+
+function restoreClipboardResources(
+  state: EditorState,
+  nodes: SceneNode[],
+  instances: Record<string, PrefabInstance>,
+) {
+  const snapshot = state.clipboardContent,
+    content = structuredClone(state.content),
+    buffers = new Map(state.modelBuffers),
+    textures = new Map(state.textureBuffers);
+  content.prefabInstances = { ...content.prefabInstances, ...instances };
+  const materialIds = new Set(
+    nodes.flatMap((n) => (n.materialId ? [n.materialId] : [])),
+  );
+  for (const instance of Object.values(instances)) {
+    const id = instance.prefabId;
+    if (!content.prefabs[id] && snapshot?.prefabs[id]) {
+      content.prefabs[id] = structuredClone(snapshot.prefabs[id]);
+      for (const key of Object.values(content.prefabs[id].modelKeys)) {
+        const b = state.clipboardModelBuffers.get(key);
+        if (b) buffers.set(key, b.slice(0));
+      }
+    }
+    for (const n of [
+      ...(content.prefabs[id]?.nodes || []),
+      ...instance.baseline,
+    ])
+      if (n.materialId) materialIds.add(n.materialId);
+  }
+  for (const id of materialIds)
+    if (!content.materials[id] && snapshot?.materials[id])
+      content.materials[id] = structuredClone(snapshot.materials[id]);
+  for (const id of materialIds) {
+    const m = content.materials[id];
+    if (!m) continue;
+    for (const textureId of [
+      m.albedoTextureId,
+      m.normalTextureId,
+      m.metallicRoughnessTextureId,
+    ])
+      if (textureId && !content.textures.some((t) => t.id === textureId)) {
+        const t = snapshot?.textures.find((t) => t.id === textureId);
+        if (t) content.textures.push({ ...t });
+        const b = state.clipboardTextureBuffers.get(textureId);
+        if (b) textures.set(textureId, b.slice(0));
+      }
+  }
+  return { content, buffers, textures };
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
-  documentId:crypto.randomUUID(),documentOrigin:'new',savedSnapshot:null,
-  recoveryStatus:'idle',recoveryError:null,recoveryUpdatedAt:null,
-  scriptNavigation:null,runtimeStats:null,
-  navigateToScript:(file,line=1,column=1)=>{
-    if(!Object.hasOwn(get().scripts,file))return;
+  content: emptyContent(),
+  textureBuffers: new Map(),
+  clipboardPrefabInstances: {},
+  clipboardContent: null,
+  clipboardTextureBuffers: new Map(),
+  documentId: crypto.randomUUID(),
+  documentOrigin: "new",
+  savedSnapshot: null,
+  recoveryStatus: "idle",
+  recoveryError: null,
+  recoveryUpdatedAt: null,
+  scriptNavigation: null,
+  runtimeStats: null,
+  navigateToScript: (file, line = 1, column = 1) => {
+    if (!Object.hasOwn(get().scripts, file)) return;
     get().setActiveFile(file);
-    set({scriptNavigation:{id:Date.now()+Math.random(),file,line:Math.max(1,line),column:Math.max(1,column)}});
+    set({
+      scriptNavigation: {
+        id: Date.now() + Math.random(),
+        file,
+        line: Math.max(1, line),
+        column: Math.max(1, column),
+      },
+    });
   },
-  setRuntimeStats:runtimeStats=>set({runtimeStats}),
-  playState: 'stopped',
+  setRuntimeStats: (runtimeStats) => set({ runtimeStats }),
+  playState: "stopped",
   nodes: initialNodes,
-  selectedNodeId: 'cube',
-  selectedNodeIds: ['cube'],
+  selectedNodeId: "cube",
+  selectedNodeIds: ["cube"],
   clipboard: null,
   clipboardModelBuffers: new Map(),
-  gizmoMode: 'move',
-  gizmoSpace: 'global',
+  gizmoMode: "move",
+  gizmoSpace: "global",
   // 多脚本数据层：默认包含 main.js，内容为 DEFAULT_SCRIPT
-  scripts: { 'main.js': DEFAULT_SCRIPT },
-  activeFileId: 'main.js',
+  scripts: { "main.js": DEFAULT_SCRIPT },
+  activeFileId: "main.js",
   // 派生字段：script === scripts[activeFileId]，向后兼容 CodeEditor
   script: DEFAULT_SCRIPT,
   consoleLogs: [],
@@ -285,7 +654,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   assets: [],
   // 持久化字段初始值：未保存的新项目
   currentProjectId: null,
-  currentProjectName: '未命名项目',
+  currentProjectName: "未命名项目",
   settings: { ...DEFAULT_SETTINGS },
   // 撤销/重做历史栈初始为空
   past: [],
@@ -297,42 +666,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // structured clone via postMessage 已隔离 iframe 侧，但 store.project 也用深拷贝防止引用泄漏
   play: () =>
     set((state) => {
-      if (state.playState === 'playing') return {};
-      if (state.playState === 'paused') return { playState: 'playing' };
+      if (state.playState === "playing") return {};
+      if (state.playState === "paused") return { playState: "playing" };
       return {
-      playState: 'playing',
-      // 保存播放前场景快照（深拷贝每个节点含嵌套 transform/rotation/scale）
-      prePlaySnapshot: state.nodes.map((n) => ({
-        ...n,
-        transform: { ...n.transform },
-        rotation: { ...n.rotation },
-        scale: { ...n.scale },
-        scripts: n.scripts ? [...n.scripts] : undefined,
-      })),
-      project: {
-        version: PROJECT_VERSION,
-        scene: {
-          nodes: state.nodes.map((n) => ({
-            ...n,
-            transform: { ...n.transform },
-            rotation: { ...n.rotation },
-            scale: { ...n.scale },
-            scripts: n.scripts ? [...n.scripts] : undefined,
-          })),
-        }, // 深拷贝
-        assets: [],
-        script: state.script,
-        scripts: state.scripts,
-        activeFileId: state.activeFileId,
-        settings: state.settings,
-      },
+        playState: "playing",
+        // 保存播放前场景快照（深拷贝每个节点含嵌套 transform/rotation/scale）
+        prePlaySnapshot: state.nodes.map((n) => ({
+          ...n,
+          transform: { ...n.transform },
+          rotation: { ...n.rotation },
+          scale: { ...n.scale },
+          scripts: n.scripts ? [...n.scripts] : undefined,
+        })),
+        project: {
+          content: structuredClone(state.content),
+          version: PROJECT_VERSION,
+          scene: {
+            nodes: state.nodes.map((n) => ({
+              ...n,
+              transform: { ...n.transform },
+              rotation: { ...n.rotation },
+              scale: { ...n.scale },
+              scripts: n.scripts ? [...n.scripts] : undefined,
+            })),
+          }, // 深拷贝
+          assets: [],
+          script: state.script,
+          scripts: state.scripts,
+          activeFileId: state.activeFileId,
+          settings: state.settings,
+        },
       };
     }),
-  pause: () => set(state => state.playState === 'playing' ? { playState: 'paused' } : {}),
+  pause: () =>
+    set((state) =>
+      state.playState === "playing" ? { playState: "paused" } : {},
+    ),
   // 停止：恢复播放前的场景快照（如果有），清除 project 引用，实现编辑态/运行态隔离
   stop: () =>
     set((state) => ({
-      playState: 'stopped',
+      playState: "stopped",
       // 恢复播放前的场景快照（如果有的话）
       nodes: state.prePlaySnapshot ?? state.nodes,
       prePlaySnapshot: null,
@@ -375,11 +748,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let changed = true;
     while (changed) {
       changed = false;
-      state.nodes.forEach(node => { if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) { ids.add(node.id); changed = true; } });
+      state.nodes.forEach((node) => {
+        if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
+          ids.add(node.id);
+          changed = true;
+        }
+      });
     }
     set({
-      clipboard: deepCloneNodes(state.nodes.filter(node => ids.has(node.id))),
-      clipboardModelBuffers: new Map([...state.modelBuffers].filter(([id]) => ids.has(id))),
+      clipboardContent: structuredClone(state.content),
+      clipboardTextureBuffers: new Map(state.textureBuffers),
+      clipboardPrefabInstances: structuredClone(state.content.prefabInstances),
+      clipboard: deepCloneNodes(state.nodes.filter((node) => ids.has(node.id))),
+      clipboardModelBuffers: new Map(state.modelBuffers),
     });
   },
   // 粘贴剪贴板节点：生成新 ID，保持剪贴板内父子关系，可选指定 parentId（入栈）
@@ -395,9 +776,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     state.clipboard.forEach((node) => {
       const newId =
         node.id +
-        '_copy_' +
+        "_copy_" +
         Date.now().toString(36) +
-        '_' +
+        "_" +
         Math.random().toString(36).slice(2, 6);
       idMap.set(node.id, newId);
     });
@@ -405,13 +786,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     state.clipboard.forEach((node) => {
       const newId = idMap.get(node.id)!;
       // parentId 显式传入时用之；否则映射剪贴板内父子关系，找不到则保留原 parentId
-      const newParentId = node.parentId && idMap.has(node.parentId)
-        ? idMap.get(node.parentId)
-        : parentId !== undefined ? parentId : state.nodes.some(n => n.id === node.parentId) ? node.parentId : null;
+      const newParentId =
+        node.parentId && idMap.has(node.parentId)
+          ? idMap.get(node.parentId)
+          : parentId !== undefined
+            ? parentId
+            : state.nodes.some((n) => n.id === node.parentId)
+              ? node.parentId
+              : null;
       newNodes.push({
         ...node,
         id: newId,
-        name: node.name + '_copy',
+        name: node.name + "_copy",
         parentId: newParentId,
         transform: { ...node.transform },
         rotation: { ...node.rotation },
@@ -420,15 +806,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     });
 
-    set((s) => ({
-      nodes: [...s.nodes, ...newNodes],
-      modelBuffers: new Map([...s.modelBuffers, ...[...idMap].flatMap(([oldId, newId]) => {
-        const buffer = state.clipboardModelBuffers.get(oldId);
-        return buffer ? [[newId, buffer.slice(0)] as [string, ArrayBuffer]] : [];
-      })]),
-      selectedNodeIds: newNodes.map((n) => n.id),
-      selectedNodeId: newNodes[0]?.id || null,
-    }));
+    const links = cloneInstanceLinks(
+      newNodes,
+      state.clipboardPrefabInstances,
+      idMap,
+    );
+    const restored = restoreClipboardResources(
+      state,
+      links.nodes,
+      links.instances,
+    );
+    const buffers = new Map([
+      ...restored.buffers,
+      ...[...idMap].flatMap(([oldId, newId]) => {
+        const b = state.clipboardModelBuffers.get(oldId);
+        return b ? [[newId, b.slice(0)] as [string, ArrayBuffer]] : [];
+      }),
+    ]);
+    const nodes = [...state.nodes, ...links.nodes];
+    validateProject({ ...state, scene: { nodes }, content: restored.content });
+    set({
+      content: restored.content,
+      nodes,
+      textureBuffers: restored.textures,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(nodes, restored.content, buffers),
+      selectedNodeIds: links.nodes.map((n) => n.id),
+      selectedNodeId: links.nodes[0]?.id || null,
+    });
   },
   // 复制副本（Ctrl+D）：深拷贝节点及其整棵子树，根节点保持同级（入栈）
   duplicateNode: (id) => {
@@ -447,9 +852,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!n) return [];
       const newId =
         n.id +
-        '_copy_' +
+        "_copy_" +
         timestamp +
-        '_' +
+        "_" +
         Math.random().toString(36).slice(2, 6);
       idMap.set(n.id, newId);
       const children = state.nodes.filter((x) => x.parentId === nodeId);
@@ -465,7 +870,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         ...n,
         id: newId,
-        name: n.name + '_copy',
+        name: n.name + "_copy",
         // 根节点保持同级（沿用原 parentId），子节点映射到新父 ID
         parentId: n.id === id ? n.parentId : newParentId,
         transform: { ...n.transform },
@@ -475,12 +880,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     });
 
+    const links = cloneInstanceLinks(
+      newNodes,
+      state.content.prefabInstances,
+      idMap,
+    );
     set((s) => ({
-      nodes: [...s.nodes, ...newNodes],
-      modelBuffers: new Map([...s.modelBuffers, ...[...idMap].flatMap(([oldId, newId]) => {
-        const buffer = state.modelBuffers.get(oldId);
-        return buffer ? [[newId, buffer.slice(0)] as [string, ArrayBuffer]] : [];
-      })]),
+      content: {
+        ...s.content,
+        prefabInstances: { ...s.content.prefabInstances, ...links.instances },
+      },
+      nodes: [...s.nodes, ...links.nodes],
+      modelBuffers: new Map([
+        ...s.modelBuffers,
+        ...[...idMap].flatMap(([oldId, newId]) => {
+          const buffer = state.modelBuffers.get(oldId);
+          return buffer
+            ? [[newId, buffer.slice(0)] as [string, ArrayBuffer]]
+            : [];
+        }),
+      ]),
       selectedNodeIds: [newNodes[0].id],
       selectedNodeId: newNodes[0].id,
     }));
@@ -490,7 +909,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
-        n.id === id ? { ...n, visible: !n.visible } : n
+        n.id === id ? { ...n, visible: !n.visible } : n,
       ),
     }));
   },
@@ -499,12 +918,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 撤销：从 past 弹出最近快照恢复，当前状态压入 future
   undo: () =>
     set((state) => {
-      if (state.playState !== 'stopped' || state.past.length === 0) return {};
+      if (state.playState !== "stopped" || state.past.length === 0) return {};
       const previous = state.past[state.past.length - 1];
       const currentSnapshot = createSnapshot(state);
+      currentSnapshot.scriptChange = previous.scriptChange;
       // 同步 selectedNodeIds：快照不追踪选择状态，用 [selectedNodeId] 兜底
-      const restoredSelectedId = previous.nodes.some(n => n.id === state.selectedNodeId) ? state.selectedNodeId : null;
+      const restoredSelectedId = previous.nodes.some(
+        (n) => n.id === state.selectedNodeId,
+      )
+        ? state.selectedNodeId
+        : null;
       return {
+        ...restoreClipboardScripts(state, previous.scriptChange, true),
+        content: previous.content,
+        textureBuffers: previous.textureBuffers,
         nodes: previous.nodes,
         scripts: previous.scripts,
         activeFileId: previous.activeFileId,
@@ -512,37 +939,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         missingModelIds: new Set(previous.missingModelIds),
         settings: previous.settings,
         // 同步派生字段：恢复 activeFileId 对应的脚本内容
-        script: previous.scripts[previous.activeFileId] || '',
+        script: previous.scripts[previous.activeFileId] || "",
         past: state.past.slice(0, -1),
         future: [currentSnapshot, ...state.future],
         selectedNodeId: restoredSelectedId,
-        selectedNodeIds: restoredSelectedId
-          ? [restoredSelectedId]
-          : [],
+        selectedNodeIds: restoredSelectedId ? [restoredSelectedId] : [],
       };
     }),
   // 重做：从 future 弹出最近快照恢复，当前状态压入 past
   redo: () =>
     set((state) => {
-      if (state.playState !== 'stopped' || state.future.length === 0) return {};
+      if (state.playState !== "stopped" || state.future.length === 0) return {};
       const next = state.future[0];
       const currentSnapshot = createSnapshot(state);
+      currentSnapshot.scriptChange = next.scriptChange;
       // 同步 selectedNodeIds：快照不追踪选择状态，用 [selectedNodeId] 兜底
-      const restoredSelectedId = next.nodes.some(n => n.id === state.selectedNodeId) ? state.selectedNodeId : null;
+      const restoredSelectedId = next.nodes.some(
+        (n) => n.id === state.selectedNodeId,
+      )
+        ? state.selectedNodeId
+        : null;
       return {
+        ...restoreClipboardScripts(state,next.scriptChange,false),
+        content: next.content,
+        textureBuffers: next.textureBuffers,
         nodes: next.nodes,
         scripts: next.scripts,
         activeFileId: next.activeFileId,
         modelBuffers: new Map(next.modelBuffers),
         missingModelIds: new Set(next.missingModelIds),
         settings: next.settings,
-        script: next.scripts[next.activeFileId] || '',
+        script: next.scripts[next.activeFileId] || "",
         past: [...state.past, currentSnapshot],
         future: state.future.slice(1),
         selectedNodeId: restoredSelectedId,
-        selectedNodeIds: restoredSelectedId
-          ? [restoredSelectedId]
-          : [],
+        selectedNodeIds: restoredSelectedId ? [restoredSelectedId] : [],
       };
     }),
   // Gizmo 拖拽开始时调用：保存拖拽前快照到 past
@@ -554,15 +985,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (recordHistory) pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
-        n.id === id ? { ...n, ...partial } : partial.activeCamera === true && n.type === 'camera' ? { ...n, activeCamera: false } : n
+        n.id === id
+          ? { ...n, ...partial }
+          : partial.activeCamera === true && n.type === "camera"
+            ? { ...n, activeCamera: false }
+            : n,
       ),
     }));
   },
   // 创建节点：生成 id、默认属性，并选中该节点
   addNode: (type, name) => {
     pushHistory(get, set);
-    const id = type + '_' + crypto.randomUUID();
-    const defaultName = name || (type.charAt(0).toUpperCase() + type.slice(1));
+    const id = type + "_" + crypto.randomUUID();
+    const defaultName = name || type.charAt(0).toUpperCase() + type.slice(1);
     const newNode: SceneNode = {
       id,
       name: defaultName,
@@ -572,11 +1007,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       scale: { x: 1, y: 1, z: 1 },
       visible: true,
       parentId: null,
-      ...(type === 'mesh' ? { primitive: /sphere/i.test(defaultName) ? 'sphere' as const : 'box' as const } : {}),
-      ...(type === 'light' ? { lightType: 'directional' as const } : {}),
-      ...(type === 'mesh' ? { color: '#7C9CFF' } : {}),
-      ...(type === 'light' ? { color: '#FFFFFF', intensity: 0.8 } : {}),
-      ...(type === 'camera' ? { fov: 60, activeCamera: !get().nodes.some(n => n.type === 'camera' && n.activeCamera) } : {}),
+      ...(type === "mesh"
+        ? {
+            primitive: /sphere/i.test(defaultName)
+              ? ("sphere" as const)
+              : ("box" as const),
+          }
+        : {}),
+      ...(type === "light" ? { lightType: "directional" as const } : {}),
+      ...(type === "mesh" ? { color: "#7C9CFF" } : {}),
+      ...(type === "light" ? { color: "#FFFFFF", intensity: 0.8 } : {}),
+      ...(type === "camera"
+        ? {
+            fov: 60,
+            activeCamera: !get().nodes.some(
+              (n) => n.type === "camera" && n.activeCamera,
+            ),
+          }
+        : {}),
     };
     set((state) => ({
       nodes: [...state.nodes, newNode],
@@ -600,12 +1048,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ids.forEach(collect);
       // 同步多选：从 selectedNodeIds 中移除所有被删节点
       const newSelectedIds = state.selectedNodeIds.filter(
-        (sid) => !toDelete.has(sid)
+        (sid) => !toDelete.has(sid),
       );
       return {
+        content: {
+          ...state.content,
+          prefabInstances: Object.fromEntries(
+            Object.entries(state.content.prefabInstances).filter(
+              ([, i]) => !toDelete.has(i.rootId),
+            ),
+          ),
+        },
         nodes: state.nodes.filter((n) => !toDelete.has(n.id)),
-        modelBuffers: new Map([...state.modelBuffers].filter(([id]) => !toDelete.has(id))),
-        missingModelIds: new Set([...state.missingModelIds].filter(id => !toDelete.has(id))),
+        modelBuffers: new Map(
+          [...state.modelBuffers].filter(([id]) => !toDelete.has(id)),
+        ),
+        missingModelIds: new Set(
+          [...state.missingModelIds].filter((id) => !toDelete.has(id)),
+        ),
         selectedNodeId: newSelectedIds[0] || null,
         selectedNodeIds: newSelectedIds,
       };
@@ -615,17 +1075,62 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   renameNode: (id, name) => {
     pushHistory(get, set);
     set((state) => ({
-      nodes: state.nodes.map((n) => (n.id === id ? { ...n, primitive: n.type === 'mesh' ? n.primitive ?? (/sphere/i.test(n.name) ? 'sphere' : 'box') : undefined, name } : n)),
+      nodes: state.nodes.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              primitive:
+                n.type === "mesh"
+                  ? (n.primitive ?? (/sphere/i.test(n.name) ? "sphere" : "box"))
+                  : undefined,
+              name,
+            }
+          : n,
+      ),
     }));
   },
   // 设置父节点（拖拽层级）
   setParent: (id, parentId) => {
+    const state = get(),
+      movingRoots = subtree(state.nodes, id).filter(
+        (n) =>
+          n.prefab &&
+          state.content.prefabInstances[n.prefab.instanceId]?.rootId === n.id,
+      );
+    if (movingRoots.length) {
+      let ancestor = parentId;
+      while (ancestor) {
+        const n = state.nodes.find((n) => n.id === ancestor);
+        if (
+          n?.prefab &&
+          !movingRoots.some(
+            (r) => r.prefab?.instanceId === n.prefab?.instanceId,
+          )
+        )
+          throw new Error("暂不支持嵌套预制体，请先解除关联");
+        ancestor = n?.parentId || null;
+      }
+    }
+    const linked = get().nodes.find((n) => n.id === id)?.prefab;
+    if (linked) {
+      const instance = get().content.prefabInstances[linked.instanceId];
+      if (
+        instance &&
+        instance.rootId !== id &&
+        !subtree(get().nodes, instance.rootId).some((n) => n.id === parentId)
+      )
+        throw new Error("请先解除预制体关联，再将子节点移出实例");
+    }
     let ancestor = parentId;
     while (ancestor) {
       if (ancestor === id) return;
-      ancestor = get().nodes.find(n => n.id === ancestor)?.parentId ?? null;
+      ancestor = get().nodes.find((n) => n.id === ancestor)?.parentId ?? null;
     }
-    if (!get().nodes.some(n => n.id === id) || (parentId && !get().nodes.some(n => n.id === parentId))) return;
+    if (
+      !get().nodes.some((n) => n.id === id) ||
+      (parentId && !get().nodes.some((n) => n.id === parentId))
+    )
+      return;
     pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)),
@@ -633,13 +1138,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 给节点挂载脚本（进入历史栈，可撤销）
   attachScript: (nodeId, scriptFile) => {
-    if (!Object.hasOwn(get().scripts, scriptFile) || get().nodes.find(n => n.id === nodeId)?.scripts?.includes(scriptFile)) return;
+    if (
+      !Object.hasOwn(get().scripts, scriptFile) ||
+      get()
+        .nodes.find((n) => n.id === nodeId)
+        ?.scripts?.includes(scriptFile)
+    )
+      return;
     pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
         n.id === nodeId
           ? { ...n, scripts: [...(n.scripts || []), scriptFile] }
-          : n
+          : n,
       ),
     }));
   },
@@ -650,7 +1161,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nodes: state.nodes.map((n) =>
         n.id === nodeId
           ? { ...n, scripts: (n.scripts || []).filter((s) => s !== scriptFile) }
-          : n
+          : n,
       ),
     }));
   },
@@ -665,45 +1176,101 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!fileName.trim() || Object.hasOwn(get().scripts, fileName)) return;
     pushHistory(get, set);
     set((state) => {
-      if (Object.prototype.hasOwnProperty.call(state.scripts, fileName)) return {}; // 重名则不操作
-      const newScripts = { ...state.scripts, [fileName]: '' };
-      return { scripts: newScripts, activeFileId: fileName, script: '' };
+      if (Object.prototype.hasOwnProperty.call(state.scripts, fileName))
+        return {}; // 重名则不操作
+      const newScripts = { ...state.scripts, [fileName]: "" };
+      return { scripts: newScripts, activeFileId: fileName, script: "" };
     });
   },
   // 删除脚本：不允许删除 main.js；若删除的是活跃文件则切回 main.js
   deleteScript: (fileName) => {
-    if (fileName === 'main.js' || !Object.hasOwn(get().scripts, fileName)) return;
+    if (fileName === "main.js" || !Object.hasOwn(get().scripts, fileName))
+      return;
+    const clipboardBefore = clipboardScriptsSnapshot(get());
     pushHistory(get, set);
     set((state) => {
-      if (fileName === 'main.js') return {}; // 不允许删除 main.js
+      if (fileName === "main.js") return {}; // 不允许删除 main.js
       const newScripts = { ...state.scripts };
       delete newScripts[fileName];
-      const newActive = state.activeFileId === fileName ? 'main.js' : state.activeFileId;
+      const newActive =
+        state.activeFileId === fileName ? "main.js" : state.activeFileId;
       return {
         scripts: newScripts,
-        nodes: state.nodes.map(n => ({ ...n, scripts: n.scripts?.filter(name => name !== fileName) })),
+        clipboardContent: state.clipboardContent
+          ? rewriteContentScripts(state.clipboardContent, (name) =>
+              name === fileName ? null : name,
+            )
+          : null,
+        content: rewriteContentScripts(state.content, (name) =>
+          name === fileName ? null : name,
+        ),
+        clipboard:
+          state.clipboard?.map((n) =>
+            rewriteNodeScripts(n, (name) => (name === fileName ? null : name)),
+          ) || null,
+        clipboardPrefabInstances: rewriteInstancesScripts(
+          state.clipboardPrefabInstances,
+          (name) => (name === fileName ? null : name),
+        ),
+        nodes: state.nodes.map((n) =>
+          rewriteNodeScripts(n, (name) => (name === fileName ? null : name)),
+        ),
         activeFileId: newActive,
-        script: newScripts[newActive] || '',
+        script: newScripts[newActive] || "",
       };
     });
+    recordScriptHistory(get, set, fileName, null, clipboardBefore);
   },
   // 重命名脚本：目标名已存在或源名不存在则不操作
   renameScript: (oldName, newName) => {
-    if (oldName === 'main.js' || !newName.trim() || Object.hasOwn(get().scripts, newName) || !Object.hasOwn(get().scripts, oldName)) return;
+    if (
+      oldName === "main.js" ||
+      !newName.trim() ||
+      Object.hasOwn(get().scripts, newName) ||
+      !Object.hasOwn(get().scripts, oldName)
+    )
+      return;
+    const clipboardBefore = clipboardScriptsSnapshot(get());
     pushHistory(get, set);
     set((state) => {
-      if (Object.prototype.hasOwnProperty.call(state.scripts, newName) || !Object.prototype.hasOwnProperty.call(state.scripts, oldName)) return {};
+      if (
+        Object.prototype.hasOwnProperty.call(state.scripts, newName) ||
+        !Object.prototype.hasOwnProperty.call(state.scripts, oldName)
+      )
+        return {};
       const newScripts = { ...state.scripts };
       newScripts[newName] = newScripts[oldName];
       delete newScripts[oldName];
-      const newActive = state.activeFileId === oldName ? newName : state.activeFileId;
+      const newActive =
+        state.activeFileId === oldName ? newName : state.activeFileId;
       return {
         scripts: newScripts,
-        nodes: state.nodes.map(n => ({ ...n, scripts: n.scripts?.map(name => name === oldName ? newName : name) })),
+        clipboardContent: state.clipboardContent
+          ? rewriteContentScripts(state.clipboardContent, (name) =>
+              name === oldName ? newName : name,
+            )
+          : null,
+        content: rewriteContentScripts(state.content, (name) =>
+          name === oldName ? newName : name,
+        ),
+        clipboard:
+          state.clipboard?.map((n) =>
+            rewriteNodeScripts(n, (name) =>
+              name === oldName ? newName : name,
+            ),
+          ) || null,
+        clipboardPrefabInstances: rewriteInstancesScripts(
+          state.clipboardPrefabInstances,
+          (name) => (name === oldName ? newName : name),
+        ),
+        nodes: state.nodes.map((n) =>
+          rewriteNodeScripts(n, (name) => (name === oldName ? newName : name)),
+        ),
         activeFileId: newActive,
-        script: newScripts[newActive] || '',
+        script: newScripts[newActive] || "",
       };
     });
+    recordScriptHistory(get, set, oldName, newName, clipboardBefore);
   },
   // 更新脚本内容：仅当更新的是活跃文件时同步派生 script 字段
   updateScript: (fileName, content) => {
@@ -717,11 +1284,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setActiveFile: (fileName) =>
     set((state) => ({
       activeFileId: fileName,
-      script: state.scripts[fileName] || '',
+      script: state.scripts[fileName] || "",
     })),
   addConsoleLog: (level, text, location) =>
     set((state) => ({
-      consoleLogs: [...state.consoleLogs.slice(-999), { id: ++logId, level, text, time: Date.now(),location }],
+      consoleLogs: [
+        ...state.consoleLogs.slice(-999),
+        { id: ++logId, level, text, time: Date.now(), location },
+      ],
     })),
   clearConsoleLogs: () => set({ consoleLogs: [] }),
   setAssets: (assets) => set({ assets }),
@@ -730,7 +1300,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const newMap = new Map(state.modelBuffers);
       newMap.set(id, buffer);
-      return { modelBuffers: newMap };
+      return {
+        modelBuffers: newMap,
+        missingModelIds: new Set(
+          [...state.missingModelIds].filter((missingId) => missingId !== id),
+        ),
+      };
     }),
   // 资源丢失标记初始为空集
   missingModelIds: new Set(),
@@ -742,7 +1317,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       newMap.set(nodeId, buffer);
       const newMissing = new Set(state.missingModelIds);
       newMissing.delete(nodeId);
-      return { modelBuffers: newMap, missingModelIds: newMissing };
+      return {
+        nodes: state.nodes.map((n) =>
+          n.id === nodeId ? { ...n, modelRevision: crypto.randomUUID() } : n,
+        ),
+        modelBuffers: newMap,
+        missingModelIds: newMissing,
+      };
     });
   },
   // 保存当前项目到 IndexedDB
@@ -757,12 +1338,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // 确定项目名称：若提供 name 参数则更新，否则沿用现有名称
     const projectName = name ?? state.currentProjectName;
     // 从 nodes 中提取模型引用：遍历 type='model' 的节点
-    const modelRefs = state.nodes
-      .filter((n) => n.type === 'model')
-      .map((n) => ({ assetId: n.id, fileName: n.modelUrl || n.id+'.glb' }));
+    const modelRefs = collectModelRefs(state.nodes, state.content);
     // 构造 StoredProject 元数据
     const data: StoredProject = {
       projectId,
+      content: state.content,
       name: projectName,
       version: PROJECT_VERSION,
       updatedAt: Date.now(),
@@ -773,9 +1353,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       settings: state.settings,
     };
     // 保存项目元数据
-    await saveProjectSnapshot(data, state.modelBuffers);
+    await saveProjectSnapshot(data, state.modelBuffers, state.textureBuffers);
     // 更新 currentProjectId / currentProjectName 状态
-    if (epoch === projectEpoch) set({ currentProjectId: projectId, currentProjectName: projectName, savedSnapshot:{project:data,buffers:state.modelBuffers} });
+    if (epoch === projectEpoch)
+      set({
+        currentProjectId: projectId,
+        currentProjectName: projectName,
+        savedSnapshot: {
+          project: data,
+          buffers: state.modelBuffers,
+          textures: state.textureBuffers,
+        },
+      });
   },
   // 从 IndexedDB 加载项目并恢复全部状态
   // 读取 StoredProject → 恢复 nodes/scripts/activeFileId/currentProjectId/currentProjectName
@@ -785,32 +1374,88 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const epoch = ++projectEpoch;
     const stored = await loadProject(projectId);
     const data = stored ? normalizeProject(stored) : undefined;
-    if (!data) throw new Error('项目不存在: ' + projectId);
+    if (!data) throw new Error("项目不存在: " + projectId);
     validateProject(data);
-    const buffers = new Map<string, ArrayBuffer>(), missing = new Set<string>();
+    const buffers = new Map<string, ArrayBuffer>(),
+      missing = new Set<string>();
     for (const ref of data.modelRefs) {
       const blob = await loadModelBlob(ref.assetId, projectId);
-      if (blob) buffers.set(ref.assetId, blob); else missing.add(ref.assetId);
+      if (blob) buffers.set(ref.assetId, blob);
+      else missing.add(ref.assetId);
     }
     if (epoch !== projectEpoch) return;
-    get().replaceProject(data, buffers, missing);
+    const textures = new Map<string, ArrayBuffer>();
+    for (const texture of data.content?.textures || []) {
+      const b = await loadTextureBlob(texture.id, projectId);
+      if (b) textures.set(texture.id, b);
+    }
+    if (epoch !== projectEpoch) return;
+    get().replaceProject(data, buffers, missing, false, undefined, textures);
   },
-  replaceProject: (data, buffers, missing, imported = false, recoveryId) => {
-    const normalized=normalizeProject(data);
+  replaceProject: (
+    data,
+    buffers,
+    missing,
+    imported = false,
+    recoveryId,
+    textures = new Map(),
+  ) => {
+    const normalized = normalizeProject(data);
     const valid = validateProject(normalized);
     ++projectEpoch;
     set({
-      documentId:recoveryId || crypto.randomUUID(),documentOrigin:recoveryId?'recovered':imported?'imported':'loaded',savedSnapshot:null,
-      recoveryStatus:'idle',recoveryError:null,recoveryUpdatedAt:null,scriptNavigation:null,runtimeStats:null,
-      nodes: valid.nodes, scripts: valid.scripts, activeFileId: valid.activeFileId,
-      script: valid.scripts[valid.activeFileId], settings: valid.settings,
+      content: valid.content,
+      textureBuffers: textures,
+      clipboardPrefabInstances: {},
+      clipboardContent: null,
+      clipboardTextureBuffers: new Map(),
+      documentId: recoveryId || crypto.randomUUID(),
+      documentOrigin: recoveryId
+        ? "recovered"
+        : imported
+          ? "imported"
+          : "loaded",
+      savedSnapshot: null,
+      recoveryStatus: "idle",
+      recoveryError: null,
+      recoveryUpdatedAt: null,
+      scriptNavigation: null,
+      runtimeStats: null,
+      nodes: valid.nodes,
+      scripts: valid.scripts,
+      activeFileId: valid.activeFileId,
+      script: valid.scripts[valid.activeFileId],
+      settings: valid.settings,
       currentProjectId: imported ? null : data.projectId,
       currentProjectName: data.name,
-      modelBuffers: buffers, missingModelIds: missing,
-      playState: 'stopped', project: null, prePlaySnapshot: null,
-      selectedNodeId: null, selectedNodeIds: [], clipboard: null, clipboardModelBuffers: new Map(),
-      assets: [], past: [], future: [],
-      consoleLogs: [...missing].map(id => ({id:++logId,level:'warn' as const,text:'资源丢失: '+id,time:Date.now()})),
+      modelBuffers: buffers,
+      missingModelIds: missing,
+      playState: "stopped",
+      project: null,
+      prePlaySnapshot: null,
+      selectedNodeId: null,
+      selectedNodeIds: [],
+      clipboard: null,
+      clipboardModelBuffers: new Map(),
+      assets: [],
+      past: [],
+      future: [],
+      consoleLogs: [
+        ...[...missing].map((id) => ({
+          id: ++logId,
+          level: "warn" as const,
+          text: "资源丢失: " + id,
+          time: Date.now(),
+        })),
+        ...valid.content.textures
+          .filter((t) => !textures.has(t.id))
+          .map((t) => ({
+            id: ++logId,
+            level: "warn" as const,
+            text: "贴图丢失: " + t.name,
+            time: Date.now(),
+          })),
+      ],
     });
   },
   // 项目设置和场景编辑共用撤销历史。
@@ -824,26 +1469,339 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newProject: () => {
     ++projectEpoch;
     set({
-      documentId:crypto.randomUUID(),documentOrigin:'new',savedSnapshot:null,
-      recoveryStatus:'idle',recoveryError:null,recoveryUpdatedAt:null,scriptNavigation:null,runtimeStats:null,
-      past: [], future: [], project: null, assets: [],
+      content: emptyContent(),
+      textureBuffers: new Map(),
+      clipboardPrefabInstances: {},
+      clipboardContent: null,
+      clipboardTextureBuffers: new Map(),
+      documentId: crypto.randomUUID(),
+      documentOrigin: "new",
+      savedSnapshot: null,
+      recoveryStatus: "idle",
+      recoveryError: null,
+      recoveryUpdatedAt: null,
+      scriptNavigation: null,
+      runtimeStats: null,
+      past: [],
+      future: [],
+      project: null,
+      assets: [],
       nodes: deepCloneNodes(initialNodes),
-      scripts: { 'main.js': DEFAULT_SCRIPT },
-      activeFileId: 'main.js',
+      scripts: { "main.js": DEFAULT_SCRIPT },
+      activeFileId: "main.js",
       script: DEFAULT_SCRIPT,
       currentProjectId: null,
-      currentProjectName: '未命名项目',
+      currentProjectName: "未命名项目",
       consoleLogs: [],
       modelBuffers: new Map(),
       missingModelIds: new Set(),
-      playState: 'stopped',
-      selectedNodeId: 'cube',
-      selectedNodeIds: ['cube'],
+      playState: "stopped",
+      selectedNodeId: "cube",
+      selectedNodeIds: ["cube"],
       settings: { ...DEFAULT_SETTINGS },
       clipboard: null,
       clipboardModelBuffers: new Map(),
       // 重置播放快照：新建项目后无播放前状态
       prePlaySnapshot: null,
+    });
+  },
+  createMaterial: (name = "新材质", sourceId) => {
+    if (get().playState !== "stopped") throw new Error("请先停止运行");
+    const id = crypto.randomUUID(),
+      source = sourceId ? get().content.materials[sourceId] : undefined;
+    pushHistory(get, set);
+    set((s) => ({
+      content: {
+        ...s.content,
+        materials: {
+          ...s.content.materials,
+          [id]: source
+            ? { ...structuredClone(source), id, name }
+            : defaultMaterial(id, name),
+        },
+      },
+    }));
+    return id;
+  },
+  updateMaterial: (id, patch) => {
+    const s = get();
+    if (s.playState !== "stopped" || !s.content.materials[id]) return;
+    const content = {
+      ...s.content,
+      materials: {
+        ...s.content.materials,
+        [id]: { ...s.content.materials[id], ...patch, id },
+      },
+    };
+    validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    pushHistory(get, set);
+    set({ content });
+  },
+  deleteMaterial: (id) => {
+    const s = get();
+    assertEditing(s);
+    if (
+      [
+        ...s.nodes,
+        ...Object.values(s.content.prefabs).flatMap((p) => p.nodes),
+        ...Object.values(s.content.prefabInstances).flatMap((i) => i.baseline),
+      ].some((n) => n.materialId === id)
+    )
+      throw new Error("材质仍被节点或预制体引用，请先解除引用");
+    const materials = { ...s.content.materials };
+    delete materials[id];
+    pushHistory(get, set);
+    set({ content: { ...s.content, materials } });
+  },
+  setNodeMaterial: (nodeId, materialId) => {
+    const s = get();
+    assertEditing(s);
+    if (materialId && !s.content.materials[materialId])
+      throw new Error("材质不存在");
+    pushHistory(get, set);
+    set({
+      nodes: s.nodes.map((n) => (n.id === nodeId ? { ...n, materialId } : n)),
+    });
+  },
+  importTexture: (asset, bytes) => {
+    const s = get();
+    assertEditing(s);
+    if (asset.byteLength !== bytes.byteLength)
+      throw new Error("贴图大小不一致");
+    const content = {
+      ...s.content,
+      textures: [...s.content.textures.filter((t) => t.id !== asset.id), asset],
+    };
+    validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    pushHistory(get, set);
+    set({
+      content,
+      textureBuffers: new Map([...s.textureBuffers, [asset.id, bytes]]),
+    });
+  },
+  deleteTexture: (id) => {
+    const s = get();
+    assertEditing(s);
+    if (
+      Object.values(s.content.materials).some((m) =>
+        [
+          m.albedoTextureId,
+          m.normalTextureId,
+          m.metallicRoughnessTextureId,
+        ].includes(id),
+      )
+    )
+      throw new Error("贴图仍被材质引用，请先解除引用");
+    const buffers = new Map(s.textureBuffers);
+    buffers.delete(id);
+    pushHistory(get, set);
+    set({
+      content: {
+        ...s.content,
+        textures: s.content.textures.filter((t) => t.id !== id),
+      },
+      textureBuffers: buffers,
+    });
+  },
+  createPrefab: (rootId, name) => {
+    const s = get();
+    assertEditing(s);
+    const selected = subtree(s.nodes, rootId);
+    if (!selected.length || !s.nodes.some((n) => n.id === rootId))
+      throw new Error("请选择节点");
+    if (selected.some((n) => n.prefab))
+      throw new Error("请先解除原有预制体关联，再创建新模板");
+    const id = crypto.randomUUID(),
+      prefab = capturePrefab(
+        s.nodes,
+        rootId,
+        id,
+        name || selected.find((n) => n.id === rootId)!.name,
+      ),
+      created = createInstance(prefab, s.nodes, undefined, selected);
+    const buffers = new Map(s.modelBuffers);
+    prefab.nodes.forEach((n, index) => {
+      const b = s.modelBuffers.get(selected[index].id);
+      if (n.type === "model" && b)
+        buffers.set(prefab.modelKeys[n.id], b.slice(0));
+    });
+    pushHistory(get, set);
+    set({
+      content: {
+        ...s.content,
+        prefabs: { ...s.content.prefabs, [id]: prefab },
+        prefabInstances: {
+          ...s.content.prefabInstances,
+          [created.instance.id]: created.instance,
+        },
+      },
+      nodes: s.nodes.map((n) => created.nodes.find((c) => c.id === n.id) || n),
+      modelBuffers: buffers,
+    });
+    return id;
+  },
+  instantiatePrefab: (id) => {
+    const s = get();
+    assertEditing(s);
+    const prefab = s.content.prefabs[id];
+    if (!prefab) throw new Error("预制体不存在");
+    const created = createInstance(prefab, s.nodes, { x: 0, y: 0.5, z: 0 }),
+      buffers = new Map(s.modelBuffers);
+    for (const n of prefab.nodes)
+      if (n.type === "model") {
+        const b = buffers.get(prefab.modelKeys[n.id]);
+        if (b) buffers.set(created.instance.nodeMap[n.id], b.slice(0));
+      }
+    const nodes = [...s.nodes, ...created.nodes],
+      content = {
+        ...s.content,
+        prefabInstances: {
+          ...s.content.prefabInstances,
+          [created.instance.id]: created.instance,
+        },
+      };
+    validateProject({ ...s, scene: { nodes }, content });
+    pushHistory(get, set);
+    set({
+      content,
+      nodes,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(nodes, content, buffers),
+      selectedNodeId: created.instance.rootId,
+      selectedNodeIds: [created.instance.rootId],
+    });
+    return created.instance.rootId;
+  },
+  updatePrefabFromInstance: (instanceId) => {
+    const s = get();
+    assertEditing(s);
+    const source = s.content.prefabInstances[instanceId];
+    if (!source) throw new Error("实例不存在");
+    const previous = s.content.prefabs[source.prefabId],
+      selected = subtree(s.nodes, source.rootId),
+      prefab = capturePrefab(
+        s.nodes,
+        source.rootId,
+        previous.id,
+        previous.name,
+        source,
+      );
+    prefab.revision = previous.revision + 1;
+    const buffers = new Map(s.modelBuffers);
+    prefab.nodes.forEach((n, index) => {
+      if (n.type === "model") {
+        const b = s.modelBuffers.get(selected[index].id);
+        if (b) buffers.set(prefab.modelKeys[n.id], b.slice(0));
+        else buffers.delete(prefab.modelKeys[n.id]);
+      }
+    });
+    // New children in the source instance become inherited without changing scene IDs.
+    const sourceMap = { ...source.nodeMap };
+    prefab.nodes.forEach((n, index) => (sourceMap[n.id] = selected[index].id));
+    let nodes = s.nodes;
+    const instances = { ...s.content.prefabInstances };
+    instances[instanceId] = { ...source, nodeMap: sourceMap };
+    for (const i of Object.values(instances))
+      if (i.prefabId === prefab.id) {
+        const next = applyPrefab(prefab, i, nodes, i.id === instanceId);
+        nodes = next.nodes;
+        instances[i.id] = next.instance;
+        for (const [scene, key] of next.modelCopies) {
+          const b = buffers.get(key);
+          if (b) buffers.set(scene, b.slice(0));
+          else buffers.delete(scene);
+        }
+      }
+    const content = {
+      ...s.content,
+      prefabs: { ...s.content.prefabs, [prefab.id]: prefab },
+      prefabInstances: instances,
+    };
+    validateProject({ ...s, scene: { nodes }, content });
+    pruneModels(nodes, content, buffers);
+    pushHistory(get, set);
+    set({
+      content,
+      nodes,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(nodes, content, buffers),
+    });
+  },
+  resetPrefabInstance: (instanceId) => {
+    const s = get();
+    assertEditing(s);
+    const i = s.content.prefabInstances[instanceId];
+    if (!i) throw new Error("实例不存在");
+    const next = applyPrefab(s.content.prefabs[i.prefabId], i, s.nodes, true),
+      content = {
+        ...s.content,
+        prefabInstances: {
+          ...s.content.prefabInstances,
+          [i.id]: next.instance,
+        },
+      },
+      buffers = new Map(s.modelBuffers);
+    for (const [scene, key] of next.modelCopies) {
+      const b = buffers.get(key);
+      if (b) buffers.set(scene, b.slice(0));
+      else buffers.delete(scene);
+    }
+    validateProject({ ...s, scene: { nodes: next.nodes }, content });
+    pruneModels(next.nodes, content, buffers);
+    pushHistory(get, set);
+    set({
+      content,
+      nodes: next.nodes,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(next.nodes, content, buffers),
+    });
+  },
+  unpackPrefabInstance: (instanceId) => {
+    const s = get();
+    assertEditing(s);
+    const instances = { ...s.content.prefabInstances };
+    delete instances[instanceId];
+    pushHistory(get, set);
+    set({
+      content: { ...s.content, prefabInstances: instances },
+      nodes: s.nodes.map((n) => {
+        if (n.prefab?.instanceId !== instanceId) return n;
+        const copy = { ...n };
+        delete copy.prefab;
+        return copy;
+      }),
+    });
+  },
+  deletePrefab: (id) => {
+    const s = get();
+    assertEditing(s);
+    if (Object.values(s.content.prefabInstances).some((i) => i.prefabId === id))
+      throw new Error("预制体仍有实例，请先删除实例或解除关联");
+    const prefabs = { ...s.content.prefabs };
+    delete prefabs[id];
+    const content = { ...s.content, prefabs },
+      buffers = new Map(s.modelBuffers);
+    pruneModels(s.nodes, content, buffers);
+    pushHistory(get, set);
+    set({
+      content,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(s.nodes, content, buffers),
+    });
+  },
+  renamePrefab: (id, name) => {
+    const s = get();
+    assertEditing(s);
+    if (!s.content.prefabs[id] || !name.trim()) return;
+    pushHistory(get, set);
+    set({
+      content: {
+        ...s.content,
+        prefabs: {
+          ...s.content.prefabs,
+          [id]: { ...s.content.prefabs[id], name: name.trim() },
+        },
+      },
     });
   },
 }));

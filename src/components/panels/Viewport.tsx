@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { useEffect, useRef, useState } from "react";
+import { Box, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import {
   Engine,
   Scene,
@@ -17,15 +17,21 @@ import {
   Matrix,
   Quaternion,
   GizmoCoordinatesMode,
-} from '@babylonjs/core';
-import * as Babylon from '@babylonjs/core';
-import '@babylonjs/loaders/glTF';
-import { createSceneAdapter, type SceneAdapter } from '../../engine/sceneAdapter';
-import { readModelAsset } from '../../engine/modelImport';
-import { applySelectionDelta, selectionRoots } from '../../engine/selectionTransform';
-import { GridMaterial } from '@babylonjs/materials';
-import { useEditorStore } from '../../store/useEditorStore';
-import RuntimeFrame from './RuntimeFrame';
+} from "@babylonjs/core";
+import * as Babylon from "@babylonjs/core";
+import "@babylonjs/loaders/glTF";
+import {
+  createSceneAdapter,
+  type SceneAdapter,
+} from "../../engine/sceneAdapter";
+import { readModelAsset } from "../../engine/modelImport";
+import {
+  applySelectionDelta,
+  selectionRoots,
+} from "../../engine/selectionTransform";
+import { GridMaterial } from "@babylonjs/materials";
+import { useEditorStore } from "../../store/useEditorStore";
+import RuntimeFrame from "./RuntimeFrame";
 
 // 中央 3D 视口：编辑 canvas（常驻）+ 运行时 iframe（常驻，display 切换）
 export default function Viewport() {
@@ -38,6 +44,8 @@ export default function Viewport() {
   const adapterRef = useRef<SceneAdapter | null>(null);
   const loadingCountRef = useRef(0);
   const modelBuffers = useEditorStore((s) => s.modelBuffers);
+  const content = useEditorStore((s) => s.content);
+  const textureBuffers = useEditorStore((s) => s.textureBuffers);
   const settings = useEditorStore((s) => s.settings);
   const [sceneRevision, setSceneRevision] = useState(0);
   const pivotRef = useRef<TransformNode | null>(null);
@@ -48,7 +56,14 @@ export default function Viewport() {
   const cameraRef = useRef<ArcRotateCamera | null>(null);
   // 飞行模式状态：右键按下时进入飞行模式，WASD/QE 移动相机 target
   const flyModeRef = useRef(false);
-  const flyStateRef = useRef({ w: false, a: false, s: false, d: false, q: false, e: false });
+  const flyStateRef = useRef({
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    q: false,
+    e: false,
+  });
   // flyModeDisplay：触发浮层重渲染（ref 变化不触发 React 重渲染）
   const [flyModeDisplay, setFlyModeDisplay] = useState(false);
 
@@ -78,17 +93,19 @@ export default function Viewport() {
   const isDraggingRef = useRef(false);
   const draggedIdRef = useRef<string | null>(null);
 
-
   // 初始化编辑引擎 / 场景 / 环境光 / 网格地面
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    const engine = new Engine(canvas, true, {
+      preserveDrawingBuffer: true,
+      stencil: true,
+    });
     const scene = new Scene(engine);
     scene.clearColor = new Color4(0.05, 0.05, 0.05, 1);
     sceneRef.current = scene;
 
     const camera = new ArcRotateCamera(
-      '__editor_camera',
+      "__editor_camera",
       -Math.PI / 2,
       Math.PI / 3,
       8,
@@ -99,11 +116,15 @@ export default function Viewport() {
     camera.wheelDeltaPercentage = 0.01;
     cameraRef.current = camera;
 
-    const hemi = new HemisphericLight('__ambient', new Vector3(0, 1, 0), scene);
+    const hemi = new HemisphericLight("__ambient", new Vector3(0, 1, 0), scene);
     hemi.intensity = 0.8;
 
-    const ground = MeshBuilder.CreateGround('ground', { width: 12, height: 12 }, scene);
-    const gridMat = new GridMaterial('gridMat', scene);
+    const ground = MeshBuilder.CreateGround(
+      "ground",
+      { width: 12, height: 12 },
+      scene,
+    );
+    const gridMat = new GridMaterial("gridMat", scene);
     gridMat.mainColor = new Color3(0.12, 0.12, 0.12);
     gridMat.lineColor = new Color3(0.35, 0.35, 0.35);
     gridMat.gridRatio = 1;
@@ -111,14 +132,23 @@ export default function Viewport() {
     ground.isPickable = false;
     adapterRef.current = createSceneAdapter(Babylon, scene, {
       editor: true,
-      onLoading: (delta) => { loadingCountRef.current += delta; setModelLoading(loadingCountRef.current > 0); },
-      onLoaded: () => setSceneRevision(v => v + 1),
-      onError: (node, error) => useEditorStore.getState().addConsoleLog('error', `模型加载失败: ${node.name} - ${String(error)}`),
+      onLoading: (delta) => {
+        loadingCountRef.current += delta;
+        setModelLoading(loadingCountRef.current > 0);
+      },
+      onLoaded: () => setSceneRevision((v) => v + 1),
+      onError: (node, error) =>
+        useEditorStore
+          .getState()
+          .addConsoleLog(
+            "error",
+            `资源加载失败: ${node.name} - ${String(error)}`,
+          ),
     });
     meshMapRef.current = adapterRef.current.nodes;
-    pivotRef.current = new TransformNode('__selection_pivot', scene);
+    pivotRef.current = new TransformNode("__selection_pivot", scene);
 
-    const hl = new HighlightLayer('hl', scene);
+    const hl = new HighlightLayer("hl", scene);
     highlightRef.current = hl;
 
     // Gizmo 管理器（初始只启用 positionGizmo，由 gizmoMode/selectedNodeId useEffect 控制切换）
@@ -129,17 +159,27 @@ export default function Viewport() {
     gizmoManagerRef.current = gizmoManager;
 
     scene.onPointerObservable.add((pi) => {
-      if (pi.type !== PointerEventTypes.POINTERDOWN || gizmoManager.isHovered) return;
+      if (pi.type !== PointerEventTypes.POINTERDOWN || gizmoManager.isHovered)
+        return;
       const event = pi.event as PointerEvent;
-      if (event.button !== 0 || useEditorStore.getState().playState !== 'stopped') return;
+      if (
+        event.button !== 0 ||
+        useEditorStore.getState().playState !== "stopped"
+      )
+        return;
       let picked = pi.pickInfo?.pickedMesh;
       let id: string | undefined;
-      while (picked && !id) { id = picked.metadata?.arkglideId; picked = picked.parent as Mesh; }
+      while (picked && !id) {
+        id = picked.metadata?.arkglideId;
+        picked = picked.parent as Mesh;
+      }
       const store = useEditorStore.getState();
       if (id) {
-        if (event.ctrlKey || event.metaKey || event.shiftKey) store.toggleNodeSelection(id);
+        if (event.ctrlKey || event.metaKey || event.shiftKey)
+          store.toggleNodeSelection(id);
         else store.selectNode(id);
-      } else if (!event.ctrlKey && !event.metaKey && !event.shiftKey) store.clearSelection();
+      } else if (!event.ctrlKey && !event.metaKey && !event.shiftKey)
+        store.clearSelection();
     });
 
     // 飞行模式移动逻辑：每帧渲染前根据 WASD/QE 按键状态移动相机 target
@@ -186,65 +226,110 @@ export default function Viewport() {
   }, []);
 
   useEffect(() => {
-    void adapterRef.current?.sync(nodes, modelBuffers);
-  }, [nodes, modelBuffers]);
+    void adapterRef.current?.sync(nodes, modelBuffers, content, textureBuffers);
+  }, [nodes, modelBuffers, content, textureBuffers]);
 
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-    scene.clearColor = Color4.FromColor3(Color3.FromHexString(settings.backgroundColor));
-    const ambient = scene.getLightByName('__ambient') as HemisphericLight;
+    scene.clearColor = Color4.FromColor3(
+      Color3.FromHexString(settings.backgroundColor),
+    );
+    const ambient = scene.getLightByName("__ambient") as HemisphericLight;
     ambient.intensity = settings.ambientIntensity;
     ambient.diffuse = Color3.FromHexString(settings.ambientColor);
   }, [settings]);
 
   useEffect(() => {
-    const manager = gizmoManagerRef.current, scene = sceneRef.current, pivot = pivotRef.current;
+    const manager = gizmoManagerRef.current,
+      scene = sceneRef.current,
+      pivot = pivotRef.current;
     if (!manager || !scene || !pivot) return;
-    manager.positionGizmoEnabled = gizmoMode === 'move';
-    manager.rotationGizmoEnabled = gizmoMode === 'rotate';
-    manager.scaleGizmoEnabled = gizmoMode === 'scale';
-    manager.coordinatesMode = gizmoSpace === 'local' ? GizmoCoordinatesMode.Local : GizmoCoordinatesMode.World;
-    const selected = selectedNodeIds.map(id => meshMapRef.current.get(id)).filter((n): n is TransformNode => !!n);
+    manager.positionGizmoEnabled = gizmoMode === "move";
+    manager.rotationGizmoEnabled = gizmoMode === "rotate";
+    manager.scaleGizmoEnabled = gizmoMode === "scale";
+    manager.coordinatesMode =
+      gizmoSpace === "local"
+        ? GizmoCoordinatesMode.Local
+        : GizmoCoordinatesMode.World;
+    const selected = selectedNodeIds
+      .map((id) => meshMapRef.current.get(id))
+      .filter((n): n is TransformNode => !!n);
     const roots = selectionRoots(selected);
     const multiple = roots.length > 1;
     if (multiple) {
       const center = Vector3.Zero();
-      roots.forEach(node => { node.computeWorldMatrix(true); center.addInPlace(node.getAbsolutePosition()); });
+      roots.forEach((node) => {
+        node.computeWorldMatrix(true);
+        center.addInPlace(node.getAbsolutePosition());
+      });
       pivot.position.copyFrom(center.scale(1 / roots.length));
       pivot.scaling.setAll(1);
-      pivot.rotationQuaternion = gizmoSpace === 'local' ? roots[0].absoluteRotationQuaternion.clone() : Quaternion.Identity();
+      pivot.rotationQuaternion =
+        gizmoSpace === "local"
+          ? roots[0].absoluteRotationQuaternion.clone()
+          : Quaternion.Identity();
     }
-    manager.attachToNode(playState === 'stopped' ? (multiple ? pivot : roots[0] || null) : null);
+    manager.attachToNode(
+      playState === "stopped" ? (multiple ? pivot : roots[0] || null) : null,
+    );
     const onStart = () => {
       if (isDraggingRef.current) return;
       beginTransformRef.current();
       isDraggingRef.current = true;
-      initialWorldRef.current = new Map(roots.map(node => [node, node.computeWorldMatrix(true).clone()]));
+      initialWorldRef.current = new Map(
+        roots.map((node) => [node, node.computeWorldMatrix(true).clone()]),
+      );
       initialPivotRef.current = pivot.computeWorldMatrix(true).clone();
     };
     const applyGroup = () => {
-      if (multiple && isDraggingRef.current) applySelectionDelta(initialWorldRef.current, initialPivotRef.current, pivot.computeWorldMatrix(true));
+      if (multiple && isDraggingRef.current)
+        applySelectionDelta(
+          initialWorldRef.current,
+          initialPivotRef.current,
+          pivot.computeWorldMatrix(true),
+        );
     };
     const onEnd = () => {
       if (!isDraggingRef.current) return;
       applyGroup();
       isDraggingRef.current = false;
-      selected.forEach(node => {
-        const rotation = node.rotationQuaternion?.toEulerAngles() || node.rotation;
-        node.rotation.copyFrom(rotation); node.rotationQuaternion = null;
-        updateTransformRef.current(node.name, {
-          transform: { x: node.position.x, y: node.position.y, z: node.position.z },
-          rotation: { x: rotation.x, y: rotation.y, z: rotation.z },
-          scale: { x: node.scaling.x, y: node.scaling.y, z: node.scaling.z },
-        }, false);
+      selected.forEach((node) => {
+        const rotation =
+          node.rotationQuaternion?.toEulerAngles() || node.rotation;
+        node.rotation.copyFrom(rotation);
+        node.rotationQuaternion = null;
+        updateTransformRef.current(
+          node.name,
+          {
+            transform: {
+              x: node.position.x,
+              y: node.position.y,
+              z: node.position.z,
+            },
+            rotation: { x: rotation.x, y: rotation.y, z: rotation.z },
+            scale: { x: node.scaling.x, y: node.scaling.y, z: node.scaling.z },
+          },
+          false,
+        );
       });
     };
-    const gizmos = [manager.gizmos.positionGizmo, manager.gizmos.rotationGizmo, manager.gizmos.scaleGizmo].filter(g => !!g);
-    const observers = gizmos.map(g => ({ g: g!, start: g!.onDragStartObservable.add(onStart), end: g!.onDragEndObservable.add(onEnd) }));
+    const gizmos = [
+      manager.gizmos.positionGizmo,
+      manager.gizmos.rotationGizmo,
+      manager.gizmos.scaleGizmo,
+    ].filter((g) => !!g);
+    const observers = gizmos.map((g) => ({
+      g: g!,
+      start: g!.onDragStartObservable.add(onStart),
+      end: g!.onDragEndObservable.add(onEnd),
+    }));
     const frame = scene.onBeforeRenderObservable.add(applyGroup);
     return () => {
-      observers.forEach(({g, start, end}) => { g.onDragStartObservable.remove(start); g.onDragEndObservable.remove(end); });
+      observers.forEach(({ g, start, end }) => {
+        g.onDragStartObservable.remove(start);
+        g.onDragEndObservable.remove(end);
+      });
       scene.onBeforeRenderObservable.remove(frame);
     };
   }, [selectedNodeIds, gizmoMode, gizmoSpace, playState, nodes]);
@@ -253,23 +338,29 @@ export default function Viewport() {
     const hl = highlightRef.current;
     if (!hl) return;
     hl.removeAllMeshes();
-    const color = Color3.FromHexString('#7C9CFF');
-    selectedNodeIds.forEach(id => {
+    const color = Color3.FromHexString("#7C9CFF");
+    selectedNodeIds.forEach((id) => {
       const node = meshMapRef.current.get(id);
       if (!node) return;
-      const meshes = [...(node instanceof Mesh ? [node] : []), ...node.getChildMeshes()];
-      meshes.forEach(mesh => { if (mesh instanceof Mesh && mesh.getTotalVertices() > 0) hl.addMesh(mesh, color); });
+      const meshes = [
+        ...(node instanceof Mesh ? [node] : []),
+        ...node.getChildMeshes(),
+      ];
+      meshes.forEach((mesh) => {
+        if (mesh instanceof Mesh && mesh.getTotalVertices() > 0)
+          hl.addMesh(mesh, color);
+      });
     });
   }, [selectedNodeIds, nodes, sceneRevision]);
 
   // 停止时编辑 canvas 恢复显示，触发 resize
   useEffect(() => {
-    if (playState === 'stopped') {
+    if (playState === "stopped") {
       sceneRef.current?.getEngine().resize();
     }
   }, [playState]);
 
-  const editing = playState === 'stopped';
+  const editing = playState === "stopped";
   const [focusHintDismissed, setFocusHintDismissed] = useState(false);
 
   // 编辑模式：键盘快捷键（F聚焦/W/E/R切换Gizmo）+ 右键WASD飞行模式
@@ -281,7 +372,7 @@ export default function Viewport() {
 
     // 禁止 canvas 右键菜单（飞行模式用右键）
     const onContextMenu = (e: Event) => e.preventDefault();
-    canvas.addEventListener('contextmenu', onContextMenu);
+    canvas.addEventListener("contextmenu", onContextMenu);
 
     // 右键按下 → 进入飞行模式，脱离轨道控制
     const onMouseDown = (e: MouseEvent) => {
@@ -292,20 +383,37 @@ export default function Viewport() {
         camera.detachControl();
       }
     };
-    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener("mousedown", onMouseDown);
 
     // 右键抬起 → 退出飞行模式，恢复轨道控制
     const onMouseUp = (e: MouseEvent) => {
       if (e.button === 2) {
         flyModeRef.current = false;
         setFlyModeDisplay(false);
-        flyStateRef.current = { w: false, a: false, s: false, d: false, q: false, e: false };
+        flyStateRef.current = {
+          w: false,
+          a: false,
+          s: false,
+          d: false,
+          q: false,
+          e: false,
+        };
         camera.attachControl(canvas, true);
       }
     };
-    window.addEventListener('mouseup', onMouseUp);
-    const onBlur = () => { flyStateRef.current = { w:false,a:false,s:false,d:false,q:false,e:false }; onMouseUp({ button:2 } as MouseEvent); };
-    window.addEventListener('blur', onBlur);
+    window.addEventListener("mouseup", onMouseUp);
+    const onBlur = () => {
+      flyStateRef.current = {
+        w: false,
+        a: false,
+        s: false,
+        d: false,
+        q: false,
+        e: false,
+      };
+      onMouseUp({ button: 2 } as MouseEvent);
+    };
+    window.addEventListener("blur", onBlur);
 
     // 飞行模式下鼠标移动控制视角（旋转 alpha/beta）
     const onMouseMove = (e: MouseEvent) => {
@@ -316,15 +424,15 @@ export default function Viewport() {
         camera.beta = Math.max(0.1, Math.min(Math.PI - 0.1, camera.beta));
       }
     };
-    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener("mousemove", onMouseMove);
 
     // 键盘按下：监听 window（过滤输入元素，避免在 Inspector/CodeEditor 中触发）
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
         target.isContentEditable
       ) {
         return;
@@ -333,14 +441,21 @@ export default function Viewport() {
 
       // 飞行模式下：WASD/QE 控制移动，不触发 Gizmo 切换
       if (flyModeRef.current) {
-        if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'q' || key === 'e') {
-          flyStateRef.current[key as 'w' | 'a' | 's' | 'd' | 'q' | 'e'] = true;
+        if (
+          key === "w" ||
+          key === "a" ||
+          key === "s" ||
+          key === "d" ||
+          key === "q" ||
+          key === "e"
+        ) {
+          flyStateRef.current[key as "w" | "a" | "s" | "d" | "q" | "e"] = true;
         }
         return;
       }
 
       // 非飞行模式快捷键
-      if (key === 'f') {
+      if (key === "f") {
         // F键聚焦选中节点
         const selectedId = useEditorStore.getState().selectedNodeId;
         if (selectedId) {
@@ -348,41 +463,55 @@ export default function Viewport() {
           if (mesh) {
             mesh.computeWorldMatrix(true);
             const bounds = mesh.getHierarchyBoundingVectors(true);
-            const validBounds = Number.isFinite(bounds.min.x) && Number.isFinite(bounds.max.x);
-            camera.setTarget(validBounds ? bounds.min.add(bounds.max).scale(0.5) : mesh.getAbsolutePosition());
+            const validBounds =
+              Number.isFinite(bounds.min.x) && Number.isFinite(bounds.max.x);
+            camera.setTarget(
+              validBounds
+                ? bounds.min.add(bounds.max).scale(0.5)
+                : mesh.getAbsolutePosition(),
+            );
             // 调整 radius 使物体在视口中合适大小
-            const radius = validBounds ? bounds.max.subtract(bounds.min).length() * 2 : 3;
+            const radius = validBounds
+              ? bounds.max.subtract(bounds.min).length() * 2
+              : 3;
             camera.radius = Math.max(radius, 3);
           }
         }
-      } else if (key === 'w') {
-        useEditorStore.getState().setGizmoMode('move');
-      } else if (key === 'e') {
-        useEditorStore.getState().setGizmoMode('rotate');
-      } else if (key === 'r') {
-        useEditorStore.getState().setGizmoMode('scale');
+      } else if (key === "w") {
+        useEditorStore.getState().setGizmoMode("move");
+      } else if (key === "e") {
+        useEditorStore.getState().setGizmoMode("rotate");
+      } else if (key === "r") {
+        useEditorStore.getState().setGizmoMode("scale");
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
 
     // 键盘抬起：更新飞行按键状态
     const onKeyUp = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'q' || key === 'e') {
-        flyStateRef.current[key as 'w' | 'a' | 's' | 'd' | 'q' | 'e'] = false;
+      if (
+        key === "w" ||
+        key === "a" ||
+        key === "s" ||
+        key === "d" ||
+        key === "q" ||
+        key === "e"
+      ) {
+        flyStateRef.current[key as "w" | "a" | "s" | "d" | "q" | "e"] = false;
       }
     };
-    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener("keyup", onKeyUp);
 
     return () => {
-      canvas.removeEventListener('contextmenu', onContextMenu);
-      canvas.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mouseup', onMouseUp);
-      window.removeEventListener('blur', onBlur);
-      canvas.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      camera.attachControl(canvas,true);
+      canvas.removeEventListener("contextmenu", onContextMenu);
+      canvas.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("blur", onBlur);
+      canvas.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      camera.attachControl(canvas, true);
     };
   }, [editing]);
 
@@ -391,12 +520,26 @@ export default function Viewport() {
     if (!editing) {
       flyModeRef.current = false;
       setFlyModeDisplay(false);
-      flyStateRef.current = { w: false, a: false, s: false, d: false, q: false, e: false };
+      flyStateRef.current = {
+        w: false,
+        a: false,
+        s: false,
+        d: false,
+        q: false,
+        e: false,
+      };
     }
   }, [editing]);
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
       {/* 编辑 canvas（常驻，stopped 时显示） */}
       <canvas
         id="viewport"
@@ -404,11 +547,11 @@ export default function Viewport() {
         ref={canvasRef}
         onDragOver={(e) => {
           e.preventDefault();
-          e.dataTransfer.dropEffect = 'copy';
+          e.dataTransfer.dropEffect = "copy";
         }}
         onDrop={async (e) => {
           e.preventDefault();
-          const data = e.dataTransfer.getData('application/json');
+          const data = e.dataTransfer.getData("application/json");
           if (!data) return;
           let info: { assetId: string; name: string; path: string };
           try {
@@ -421,57 +564,72 @@ export default function Viewport() {
           const assets = useEditorStore.getState().assets;
           const asset = assets.find((a) => a.id === info.assetId);
           if (!asset) {
-            useEditorStore.getState().addConsoleLog('error', `未找到资源: ${info.name}`);
+            useEditorStore
+              .getState()
+              .addConsoleLog("error", `未找到资源: ${info.name}`);
             return;
           }
 
           try {
             const buffer = await readModelAsset(asset, assets);
             const store = useEditorStore.getState();
-            const nodeId = store.addNode('model', info.name.replace(/\.(glb|gltf)$/i, ''));
+            const nodeId = store.addNode(
+              "model",
+              info.name.replace(/\.(glb|gltf)$/i, ""),
+            );
             store.updateTransform(nodeId, { modelUrl: info.name }, false);
             store.setModelBuffer(nodeId, buffer);
           } catch (error) {
-            useEditorStore.getState().addConsoleLog('error', `模型导入失败: ${info.name} - ${String(error)}`);
+            useEditorStore
+              .getState()
+              .addConsoleLog(
+                "error",
+                `模型导入失败: ${info.name} - ${String(error)}`,
+              );
           }
         }}
         style={{
-          width: '100%',
-          height: '100%',
-          display: editing ? 'block' : 'none',
-          outline: 'none',
+          width: "100%",
+          height: "100%",
+          display: editing ? "block" : "none",
+          outline: "none",
         }}
       />
       {/* 状态浮层：显示当前 Gizmo 模式/坐标系/飞行状态 */}
       {editing && (
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             top: 8,
             left: 8,
-            bgcolor: 'rgba(0,0,0,0.6)',
+            bgcolor: "rgba(0,0,0,0.6)",
             borderRadius: 1,
             px: 1,
             py: 0.5,
             fontSize: 11,
-            color: 'rgba(255,255,255,0.8)',
-            pointerEvents: 'none',
-            userSelect: 'none',
-            display: 'flex',
+            color: "rgba(255,255,255,0.8)",
+            pointerEvents: "none",
+            userSelect: "none",
+            display: "flex",
             gap: 1,
             zIndex: 10,
           }}
         >
           <span>
-            模式: {gizmoMode === 'move' ? '移动(W)' : gizmoMode === 'rotate' ? '旋转(E)' : '缩放(R)'}
+            模式:{" "}
+            {gizmoMode === "move"
+              ? "移动(W)"
+              : gizmoMode === "rotate"
+                ? "旋转(E)"
+                : "缩放(R)"}
           </span>
-          <span>坐标: {gizmoSpace === 'global' ? '全局' : '局部'}</span>
-          {flyModeDisplay && <span style={{ color: '#7C9CFF' }}>飞行中</span>}
+          <span>坐标: {gizmoSpace === "global" ? "全局" : "局部"}</span>
+          {flyModeDisplay && <span style={{ color: "#7C9CFF" }}>飞行中</span>}
         </Box>
       )}
       {/* Babylon GizmoManager.coordinatesMode controls world/local axes. */}
       {editing && (
-        <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+        <Box sx={{ position: "absolute", top: 8, right: 8, zIndex: 10 }}>
           <ToggleButtonGroup
             size="small"
             value={gizmoSpace}
@@ -489,16 +647,16 @@ export default function Viewport() {
       {editing && modelLoading && (
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             top: 36,
             left: 8,
-            bgcolor: 'rgba(0,0,0,0.7)',
-            color: 'white',
+            bgcolor: "rgba(0,0,0,0.7)",
+            color: "white",
             fontSize: 12,
             px: 1.5,
             py: 0.5,
             borderRadius: 1,
-            pointerEvents: 'none',
+            pointerEvents: "none",
             zIndex: 10,
           }}
         >
@@ -508,9 +666,9 @@ export default function Viewport() {
       {/* 运行时 iframe（常驻，playing/paused 时显示覆盖） */}
       <Box
         sx={{
-          position: 'absolute',
+          position: "absolute",
           inset: 0,
-          display: editing ? 'none' : 'block',
+          display: editing ? "none" : "block",
         }}
         onClick={() => setFocusHintDismissed(true)}
       >
@@ -519,17 +677,17 @@ export default function Viewport() {
         {!focusHintDismissed && (
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               bottom: 8,
               right: 8,
-              bgcolor: 'rgba(0,0,0,0.6)',
-              color: 'rgba(255,255,255,0.7)',
+              bgcolor: "rgba(0,0,0,0.6)",
+              color: "rgba(255,255,255,0.7)",
               fontSize: 11,
               px: 1,
               py: 0.5,
               borderRadius: 1,
-              pointerEvents: 'none',
-              userSelect: 'none',
+              pointerEvents: "none",
+              userSelect: "none",
             }}
           >
             点击此处激活运行窗口 (Click to focus)
