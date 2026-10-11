@@ -414,6 +414,29 @@ test("audio buffers decode once, voices track owner/position, pause and timeScal
   assert.equal(api.state, "closed");
   assert.throws(() => api.play("sound"));
 });
+test("invalid spatial audio parameters allocate no Web Audio nodes", async () => {
+  let allocations = 0;
+  class CountingContext extends Context {
+    createGain() { allocations++; return super.createGain(); }
+    createBufferSource() { allocations++; return super.createBufferSource(); }
+    createPanner() { allocations++; return super.createPanner(); }
+  }
+  const entity = { id: "e", getWorldPosition: () => ({ x: 0, y: 0, z: 0 }) },
+    a = ArkGlideAudio.createAudio({ AudioContext: CountingContext, find: () => entity });
+  try {
+    await a.load([{ id: "sound" }], { sound: new ArrayBuffer(8) });
+    const api = a.forOwner(), baseline = allocations;
+    assert.throws(() => api.play("sound", { spatial: true }), /entity/);
+    for (const refDistance of [0, -1, NaN, Infinity])
+      assert.throws(() => api.play("sound", { spatial: true, entity, refDistance }), /refDistance/);
+    assert.equal(allocations, baseline);
+    assert.equal(a.stats().audioVoices, 0);
+    const voice = api.play("sound", { spatial: true, entity, refDistance: 2 });
+    assert.equal(a.stats().audioVoices, 1);
+    voice.stop();
+    assert.equal(a.stats().audioVoices, 0);
+  } finally { a.dispose(); }
+});
 test("a late audio decode cannot revive a stopped run", async () => {
   let release;
   class Slow extends Context {

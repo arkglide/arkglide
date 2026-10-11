@@ -79,6 +79,12 @@
       const entity = params.entity;
       if (entity && (entity.destroyed || options.find(entity.id) !== entity))
         throw new Error("空间音频实体不存在");
+      const ref = params.refDistance ?? 1;
+      if (params.spatial) {
+        if (!entity) throw new Error("空间音频需要entity");
+        if (!Number.isFinite(ref) || ref <= 0)
+          throw new Error("refDistance无效");
+      }
       const source = context.createBufferSource(),
         gain = context.createGain();
       source.buffer = buffers.get(id);
@@ -88,10 +94,6 @@
       source.connect(gain);
       const panner = params.spatial ? context.createPanner() : null;
       if (panner) {
-        if (!entity) throw new Error("空间音频需要entity");
-        const ref = params.refDistance ?? 1;
-        if (!Number.isFinite(ref) || ref <= 0)
-          throw new Error("refDistance无效");
         panner.panningModel = "HRTF";
         panner.distanceModel = "inverse";
         panner.refDistance = ref;
