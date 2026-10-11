@@ -265,6 +265,56 @@ test("action mappings combine opposing keyboard and multiple touch sources and c
     t.ui.dispose();
   }
 });
+test("hiding a held HUD button releases only its own touches and does not resume stale input", () => {
+  const t = uiFixture();
+  try {
+    const api = t.ui.forOwner(t.owner),
+      hidden = api.createButton({ id: "hidden", action: "move" });
+    api.createButton({ id: "other", action: "move" });
+    const [el, other] = t.layer.children;
+    el.emit("pointerdown", { pointerId: 1 });
+    el.emit("pointerdown", { pointerId: 2 });
+    other.emit("pointerdown", { pointerId: 3 });
+    hidden.setVisible(false);
+    assert.equal(t.ui.stats().inputHeld, 1);
+    assert.equal(t.ui.input.getAction("move"), 1);
+    other.emit("pointerup", { pointerId: 3 });
+    assert.equal(t.ui.input.getAction("move"), 0);
+    assert.equal(t.ui.input.wasActionReleased("move"), true);
+    el.emit("pointerdown", { pointerId: 5 });
+    assert.equal(t.ui.input.getAction("move"), 0);
+    hidden.setVisible(true);
+    assert.equal(t.ui.input.getAction("move"), 0);
+    el.emit("pointerup", { pointerId: 1 });
+    t.window.emit("keydown", { key: "d", code: "KeyD" });
+    el.emit("pointerdown", { pointerId: 4 });
+    hidden.setVisible(false);
+    assert.equal(t.ui.input.getAction("move"), 1);
+    t.window.emit("keyup", { key: "d", code: "KeyD" });
+    assert.equal(t.ui.input.getAction("move"), 0);
+  } finally {
+    t.s.stop();
+    t.ui.dispose();
+  }
+});
+test("HUD buttons created during pause stay disabled until the session resumes", () => {
+  const t = uiFixture();
+  try {
+    t.ui.setActive(false);
+    t.ui.forOwner(t.owner).createButton({ id: "paused", action: "move" });
+    const el = t.layer.children[0];
+    assert.equal(el.disabled, true);
+    el.emit("pointerdown", { pointerId: 1 });
+    assert.equal(t.ui.input.getAction("move"), 0);
+    t.ui.setActive(true);
+    assert.equal(el.disabled, false);
+    el.emit("pointerdown", { pointerId: 2 });
+    assert.equal(t.ui.input.getAction("move"), 1);
+  } finally {
+    t.s.stop();
+    t.ui.dispose();
+  }
+});
 test("HUD text is literal and script destruction clears buttons, callbacks and virtual input", () => {
   const t = uiFixture();
   const api = t.ui.forOwner(t.owner),

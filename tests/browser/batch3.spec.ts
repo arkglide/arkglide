@@ -131,7 +131,15 @@ test("third batch playable project: real WASM collision, animation, sound, HUD/i
       () => (window as any).audioRuntime.stats().audioState,
     ),
   ).toBe("suspended");
+  await runtime.evaluate(() => {
+    (window as any).pausedButton = (window as any).inputRuntime
+      .forOwner()
+      .createButton({ id: "paused-regression", text: "Paused" });
+  });
+  await expect(runtime.locator('[data-hud-id="paused-regression"]')).toBeDisabled();
   await page.evaluate(() => (window as any).s.getState().play());
+  await expect(runtime.locator('[data-hud-id="paused-regression"]')).toBeEnabled();
+  await runtime.evaluate(() => (window as any).pausedButton.destroy());
   await expect
     .poll(() =>
       runtime.evaluate(() => (window as any).audioRuntime.stats().audioState),
@@ -146,6 +154,18 @@ test("third batch playable project: real WASM collision, animation, sound, HUD/i
   expect(
     await runtime.evaluate(() => (window as any).input.getAction("moveX")),
   ).toBe(-1);
+  await runtime.evaluate(() =>
+    (window as any).inputRuntime.forOwner().get("left").setVisible(false),
+  );
+  expect(
+    await runtime.evaluate(() => (window as any).input.getAction("moveX")),
+  ).toBe(0);
+  await runtime.evaluate(() =>
+    (window as any).inputRuntime.forOwner().get("left").setVisible(true),
+  );
+  expect(
+    await runtime.evaluate(() => (window as any).input.getAction("moveX")),
+  ).toBe(0);
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchCancel",
     touchPoints: [],

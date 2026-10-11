@@ -193,9 +193,16 @@
         el.addEventListener(name, fn);
         localReleases.push(() => el.removeEventListener(name, fn));
       }
+      function releaseTouches() {
+        mutate(() => {
+          for (const token of tokens) virtual.delete(token);
+        });
+        tokens.clear();
+      }
       if (def.kind === "button") {
+        el.disabled = !active;
         on("pointerdown", (e) => {
-          if (!active) return;
+          if (!active || el.hidden) return;
           e.stopPropagation();
           e.preventDefault();
           el.setPointerCapture?.(e.pointerId);
@@ -244,13 +251,13 @@
         setVisible(value) {
           if (!live) throw new Error("HUD destroyed");
           el.hidden = !value;
+          if (el.hidden) releaseTouches();
         },
         destroy() {
           if (!live) return;
           live = false;
           for (const fn of localReleases) fn();
-          for (const token of tokens) mutate(() => virtual.delete(token));
-          tokens.clear();
+          releaseTouches();
           elements.delete(def.id);
           el.remove();
           untrack?.();
