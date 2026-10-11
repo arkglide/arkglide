@@ -30,7 +30,7 @@ export default function RecoveryPanel() {
         <Typography variant="body2" sx={{mb:2}}>恢复副本包含场景、脚本、模型、材质、贴图和预制体。恢复会替换当前编辑内容；手动保存的项目版本会保留。</Typography>
         {(error || recoveryError)&&<Alert severity="error">{error || recoveryError}</Alert>}
         {!records.length&&<Typography color="text.secondary">暂无恢复记录。编辑内容会在约 1.2 秒后自动保存，持续编辑时最长约 10 秒。</Typography>}
-        {records.map(record=><Box key={record.recoveryId} sx={{py:1,borderBottom:'1px solid',borderColor:'divider',display:'flex',alignItems:'center',gap:1}}>
+        {records.map(record=><Box key={record.recoveryId} data-recovery-id={record.recoveryId} sx={{py:1,borderBottom:'1px solid',borderColor:'divider',display:'flex',alignItems:'center',gap:1}}>
           <Box sx={{flex:1,minWidth:0}}><Typography noWrap>{record.project?.name || '损坏的恢复记录'}</Typography>
             <Typography variant="caption" color="text.secondary">{new Date(record.updatedAt).toLocaleString()} · {record.project?.scene?.nodes?.length ?? '?'} 个节点</Typography></Box>
           <Button disabled={busy||playState!=='stopped'} onClick={()=>void restore(record.recoveryId)}>恢复</Button>

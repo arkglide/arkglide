@@ -1,6 +1,8 @@
 export interface PhysicsComponent {
   motion: "static" | "dynamic" | "kinematic";
-  shape: "box" | "sphere" | "capsule";
+  shape: "box" | "sphere" | "capsule" | "convex" | "mesh";
+  group?: string;
+  parts?: string[];
   size: { x: number; y: number; z: number };
   mass: number;
   friction: number;
@@ -9,12 +11,20 @@ export interface PhysicsComponent {
   lockRotation: boolean;
 }
 export interface AnimationComponent {
+  controllerId?: string;
+  rootMotion?: { target: string; translation: boolean; rotation: boolean };
+  retarget?: { sourceId: string; profileId: string };
   clip: string;
   autoplay: boolean;
   loop: boolean;
   speed: number;
 }
 export interface AudioSourceComponent {
+  rate?: number;
+  bus?: string;
+  stream?: boolean;
+  preservePitch?: boolean;
+  priority?: number;
   assetId: string;
   autoplay: boolean;
   loop: boolean;
@@ -27,15 +37,52 @@ export interface AudioAsset {
   name: string;
   mime: string;
   byteLength: number;
+  stream?: boolean;
 }
 export interface InputAction {
+  gamepad?: {
+    kind: "button" | "axis";
+    index: number;
+    direction: 1 | -1;
+    deadzone: number;
+  }[];
   name: string;
   positive: string[];
   negative: string[];
 }
 export interface HUDItem {
   id: string;
-  kind: "text" | "button";
+  kind:
+    | "text"
+    | "button"
+    | "container"
+    | "image"
+    | "richtext"
+    | "input"
+    | "joystick";
+  parentId?: string | null;
+  width?: number;
+  height?: number;
+  unit?: "px" | "percent";
+  anchorX?: number;
+  anchorY?: number;
+  margin?: number;
+  gap?: number;
+  columns?: number;
+  layout?: "absolute" | "row" | "column" | "grid";
+  zIndex?: number;
+  disabled?: boolean;
+  visible?: boolean;
+  textureId?: string;
+  blockInput?: boolean;
+  tabIndex?: number;
+  joystick?: {
+    mode: "fixed" | "floating";
+    radius: number;
+    deadzone: number;
+    actionX: string;
+    actionY: string;
+  };
   text: string;
   x: number;
   y: number;
@@ -46,6 +93,7 @@ export interface HUDItem {
   action?: string;
 }
 export interface GameplayConfig {
+  defaults?: InputAction[];
   actions: InputAction[];
   hud: HUDItem[];
   captureInput: boolean;

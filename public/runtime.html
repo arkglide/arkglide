@@ -31,9 +31,12 @@
     <script src="/arkglide-scene.js"></script>
     <script src="/arkglide-prefabs.js"></script>
     <script src="/lib/jolt-physics.js"></script>
+    <script src="/arkglide-physics-tools.js"></script>
     <script src="/arkglide-physics.js"></script>
     <script src="/arkglide-input-ui.js"></script>
+    <script src="/arkglide-audio-stretch.js"></script>
     <script src="/arkglide-audio.js"></script>
+    <script src="/arkglide-animation-tools.js"></script>
     <script src="/arkglide-animation.js"></script>
     <script src="/lib/acorn.js"></script>
     <script src="/arkglide-modules.js"></script>
@@ -61,7 +64,9 @@
       // sandbox="allow-scripts" 无 allow-same-origin → iframe 为 opaque origin
       // targetOrigin 用 '*'（opaque origin 无法指定），安全靠编辑器端 source 验证
       var PARENT = window.parent;
+      var bootToken = new URLSearchParams(location.search).get("boot") || "";
       function sendToEditor(msg) {
+        msg.bootToken = bootToken;
         msg.runId = currentRunId;
         PARENT.postMessage(msg, "*");
       }
@@ -171,6 +176,7 @@
         return ArkGlideLifecycle.createSession({
           onError: reportScriptError,
           onFixedStep: function (dt) {
+            animationRuntime?.fixedUpdate(dt);
             physicsRuntime?.step(dt);
           },
         });
@@ -179,6 +185,7 @@
         nodes.forEach(function (n) {
           physicsRuntime?.add(n);
         });
+        physicsRuntime?.attachJoints(nodes);
         audioRuntime?.attach(nodes);
         animationRuntime?.attach(nodes);
       }
@@ -191,11 +198,14 @@
             hud: [],
             captureInput: true,
           },
+          textures: content.textures,
+          textureData: runtimeTextureData,
           onError: reportScriptError,
         });
         input = inputRuntime.input;
         physicsRuntime = ArkGlidePhysics.createPhysics(joltModule, BABYLON, {
           gravity: runtimeSettings.gravity,
+          config: content.physics,
           getObject: function (id) {
             return sceneAdapter.nodes.get(id);
           },
@@ -203,6 +213,7 @@
           onError: reportScriptError,
         });
         audioRuntime = ArkGlideAudio.createAudio({
+          config: content.mixer,
           find: sceneAPI.find,
           camera: function () {
             return scene.activeCamera;
@@ -210,6 +221,14 @@
           onError: reportScriptError,
         });
         animationRuntime = ArkGlideAnimation.createAnimation({
+          BABYLON,
+          controllers: content.animationControllers,
+          profiles: content.retargetProfiles,
+          getTargets: (id) =>
+            sceneAdapter.nodes.get(id)?.getDescendants(false) || [],
+          applyRootMotion: (entity, delta, rotation, dt) =>
+            physicsRuntime?.applyRootMotion(entity, delta, rotation, dt),
+          clearRootMotion: (entity) => physicsRuntime?.clearRootMotion(entity),
           find: sceneAPI.find,
           getGroups: function (id) {
             return sceneAdapter.resources.get(id)?.animationGroups;
@@ -312,6 +331,7 @@
             modelLoads: modelLoads,
             lights: scene ? scene.lights.length : 0,
             cameras: scene ? scene.cameras.length : 0,
+            wasmHeapBytes: joltModule?.HEAPU8?.byteLength || 0,
             heapBytes: performance.memory
               ? performance.memory.usedJSHeapSize
               : null,
@@ -426,12 +446,17 @@
           }
 
           var frameStart = performance.now();
+          inputRuntime?.setSimulationActive?.(time.timeScale > 0);
+          inputRuntime?.beginFrame?.();
           if (running) {
             try {
               session.tick(frameStart);
               animationRuntime?.update(time.deltaTime);
               audioRuntime?.setScale(time.timeScale);
-              audioRuntime?.update();
+              audioRuntime?.update(
+                time.deltaTime,
+                Math.min(0.1, engine.getDeltaTime() / 1000),
+              );
               inputRuntime?.setSimulationActive?.(time.timeScale > 0);
             } catch (error) {
               desiredState = "stopped";
@@ -439,6 +464,11 @@
               sendToEditor({ type: "fatal", message: String(error) });
             }
           }
+          if (!running)
+            audioRuntime?.update(
+              0,
+              Math.min(0.1, engine.getDeltaTime() / 1000),
+            );
           inputRuntime?.endFrame();
           if (!scene.activeCamera || scene.activeCamera.isDisposed())
             scene.activeCamera = camera;
@@ -539,7 +569,7 @@
               var globals = owner.globals;
               var args = [
                 entity,
-                input,
+                inputRuntime.inputForOwner(owner),
                 sceneAPI,
                 time,
                 console,

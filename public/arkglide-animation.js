@@ -2,6 +2,13 @@
   "use strict";
   function createAnimation(options) {
     const live = new Map();
+    const advanced = root.ArkGlideAnimationTools?.create(
+      options.BABYLON || root.BABYLON,
+      {
+        ...options,
+        stopLegacy: (e) => live.get(e.id)?.release(),
+      },
+    );
     let disposed = false;
     function groups(entity) {
       if (
@@ -11,9 +18,12 @@
         options.find(entity.id) !== entity
       )
         throw new Error("动画实体不存在");
-      return options.getGroups(entity.id) || [];
+      return advanced
+        ? advanced.groups(entity)
+        : options.getGroups(entity.id) || [];
     }
     function play(entity, name, params = {}, owner) {
+      advanced?.remove(entity.id);
       const group = groups(entity).find((g) => g.name === name);
       if (!group) throw new Error("动画不存在: " + name);
       const speed = params.speed ?? 1,
@@ -91,16 +101,19 @@
     return {
       forOwner: (owner) =>
         Object.freeze({
+          ...advanced?.api(owner),
           list: (e) => groups(e).map((g) => g.name),
           play: (e, n, p) => play(e, n, p, owner),
           stop: (e) => {
             groups(e);
             live.get(e.id)?.release();
+            advanced?.remove(e.id);
           },
         }),
       attach(nodes) {
+        advanced?.attach(nodes);
         for (const n of nodes) {
-          if (n.animation?.autoplay) {
+          if (n.animation?.autoplay && !n.animation.controllerId) {
             const e = options.find(n.id);
             if (e)
               try {
@@ -112,10 +125,15 @@
         }
       },
       update,
-      remove: (id) => live.get(id)?.release(),
-      stats: () => ({ animationPlayers: live.size }),
+      fixedUpdate: (dt) => advanced?.update(dt),
+      remove: (id) => {
+        live.get(id)?.release();
+        advanced?.removeEntity(id);
+      },
+      stats: () => ({ animationPlayers: live.size, ...advanced?.stats() }),
       dispose() {
         for (const s of [...live.values()]) s.release();
+        advanced?.dispose();
         disposed = true;
       },
     };

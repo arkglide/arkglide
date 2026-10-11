@@ -1,0 +1,32 @@
+{
+  "unit": {
+    "tests": 137,
+    "passed": 137,
+    "failed": 0
+  },
+  "browser": {
+    "tests": 7,
+    "passed": 7,
+    "failed": 0
+  },
+  "build": {
+    "passed": true,
+    "warning": "Large editor bundle remains; not standalone game export"
+  },
+  "audioMaxRelativePitchError": 0.001126319282594905,
+  "warmupCycles": 5,
+  "memoryGrowthBytes": {
+    "usedSize": 408648,
+    "backingStorageSize": 0,
+    "embedderHeapUsedSize": 204688
+  },
+  "wasmCapacityBytes": [
+    134217728
+  ],
+  "manualGamepad": "pending: no real hardware available",
+  "finalExampleRegression": {
+    "passed": true,
+    "tests": 1,
+    "durationSeconds": 53.5
+  }
+}

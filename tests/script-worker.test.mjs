@@ -334,3 +334,9 @@ test("physics, audio, UI, animation and action APIs are typed in both JS and TS 
     );
   }
 });
+
+test('advanced third-batch APIs complete in JavaScript with original source diagnostics',async()=>{
+ const code=`export default function({entity,physics,animation,audio,ui,input}) {\nconst char=physics.character(entity); char.move({x:1,y:0,z:0});char.jump();\nconst hit=physics.raycast({x:0,y:3,z:0},{x:0,y:-5,z:0});if(hit)console.log(hit.entity.id,hit.normal.y);\nphysics.overlap({kind:'sphere',radius:1},{x:0,y:0,z:0});\nconst controller=animation.createController(entity,'player');controller.setParameter('speed',1);animation.onEvent(entity,e=>console.log(e.name));\nconst voice=audio.play('music',{stream:true,bus:'Music',preservePitch:true});voice.fadeTo(.5,.2);voice.seek(30);audio.applySnapshot('pause',.2);\nconst panel=ui.create({id:'menu',kind:'container',layout:'row',width:80,height:20});panel.on('click',e=>console.log(e.id));input.rebind('jump',{positive:['KeyJ']});\nreturn {};}`;
+ const {worker,file}=setup({'advanced.js':code});assert.deepEqual(await diagnostics(worker,file('advanced.js')),[]);
+ for(const [word,entries] of [['physics.',['raycast','shapeCast','overlap','character','createJoint']],['animation.',['createController','onEvent','retarget']],['audio.',['applySnapshot','setBusVolume']],['ui.',['create']],['input.',['captureBinding','gamepads','rebind']]]){const f=setup({'complete.js':word});const result=await f.worker.getCompletionsAtPosition(f.file('complete.js'),word.length);for(const name of entries)assert.ok(result.entries.some(e=>e.name===name),name);}
+});

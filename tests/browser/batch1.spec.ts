@@ -6,7 +6,7 @@ test('batch one: clock, cleanup, diagnostics and crash recovery',async({page})=>
   async function connect(){
     await page.waitForSelector('#viewport');
     await page.evaluate(async()=>{const {useEditorStore}=await import('/src/store/useEditorStore.ts');(window as any).batchStore=useEditorStore;});
-    const frame=page.frames().find(f=>f.url().endsWith('/runtime.html'))!;
+    const frame=page.frames().find(f=>f.url().split('?')[0].endsWith('/runtime.html'))!;
     await frame.waitForFunction(()=>(window as any).math?.backend==='wasm',undefined,{polling:50});
     return frame;
   }

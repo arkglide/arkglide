@@ -122,12 +122,16 @@ test('editor roadmap: model authoring, persistence, runtime, isolation and WASM'
   });
 
   await test.step('stop cancels delayed model load and pending scripts', async () => {
-    await runtime.evaluate(() => {
-      const w=window as any,original=w.BABYLON.SceneLoader.LoadAssetContainerAsync;
-      w.BABYLON.SceneLoader.LoadAssetContainerAsync=async function(...args:any[]){const c=await original.apply(this,args);await new Promise(r=>setTimeout(r,300));return c;};
+    await page.addInitScript(() => {
+      window.addEventListener('DOMContentLoaded', () => {
+        const w=window as any;
+        if (!w.BABYLON) return;
+        const original=w.BABYLON.SceneLoader.LoadAssetContainerAsync;
+        w.BABYLON.SceneLoader.LoadAssetContainerAsync=async function(...args:any[]){w.__modelLoadingStarted=true;const c=await original.apply(this,args);await new Promise(r=>setTimeout(r,300));return c;};
+      });
     });
     await page.evaluate(()=>(window as any).auditStore.getState().play());
-    await page.waitForTimeout(80);
+    await runtime.waitForFunction(() => (window as any).__modelLoadingStarted === true, undefined, {polling:10});
     await page.evaluate(()=>(window as any).auditStore.getState().stop());
     await page.waitForTimeout(450);
     expect(await runtime.evaluate(()=>({entities:(window as any).entityMap.size,meshes:(window as any).scene.meshes.length,running:(window as any).running}))).toEqual({entities:0,meshes:0,running:false});

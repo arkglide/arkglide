@@ -16,9 +16,12 @@ copyFileSync(
 
 for (const [source, target] of [
   ["physics-runtime", "physics"],
+  ["physics-advanced", "physics-tools"],
   ["input-ui-runtime", "input-ui"],
   ["audio-runtime", "audio"],
+  ["audio-stretch", "audio-stretch"],
   ["animation-runtime", "animation"],
+  ["animation-advanced", "animation-tools"],
 ])
   copyFileSync(
     new URL("../src/engine/" + source + ".js", import.meta.url),

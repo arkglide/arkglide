@@ -64,6 +64,8 @@
       const nodes = prefab.nodes.map((n) => {
         const copy = structuredClone(n);
         delete copy.prefab;
+        if(copy.joints)copy.joints=copy.joints.map(j=>({...j,targetId:nodeMap[j.targetId]||j.targetId}));
+        if(copy.animation?.retarget)copy.animation.retarget.sourceId=nodeMap[copy.animation.retarget.sourceId]||copy.animation.retarget.sourceId;
         copy.id = nodeMap[n.id];
         copy.parentId = nodeMap[n.parentId] || null;
         if (n.id === prefab.rootId) {

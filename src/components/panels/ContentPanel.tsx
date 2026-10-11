@@ -1,3 +1,7 @@
+import { UIEditorPanel } from "./UIEditorPanel";
+import { AudioMixerPanel } from "./AudioMixerPanel";
+import { AnimationControllerPanel } from "./AnimationControllerPanel";
+import { PhysicsProjectEditor } from "./AdvancedGameplayPanel";
 import {
   AudioPanel,
   GameplayPanel,
@@ -426,12 +430,22 @@ export default function ContentPanel() {
       data-testid="content-panel"
       sx={{ height: "100%", display: "flex", flexDirection: "column" }}
     >
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ minHeight: 32 }}>
+      <Tabs
+        variant="scrollable"
+        scrollButtons="auto"
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{ minHeight: 32 }}
+      >
         <Tab label={"材质 (" + materials.length + ")"} />
         <Tab label={"贴图 (" + content.textures.length + ")"} />
         <Tab label={"预制体 (" + Object.keys(content.prefabs).length + ")"} />
         <Tab label={"音频 (" + (content.audio?.length || 0) + ")"} />
         <Tab label="输入与 HUD" />
+        <Tab label="物理分组" />
+        <Tab label="动画控制器" />
+        <Tab label="音频混音" />
+        <Tab label="UI 画布" />
       </Tabs>
       <Box
         component="fieldset"
@@ -453,6 +467,10 @@ export default function ContentPanel() {
         )}
         {tab === 3 && <AudioPanel />}
         {tab === 4 && <GameplayPanel />}
+        {tab === 5 && <PhysicsProjectEditor />}
+        {tab === 6 && <AnimationControllerPanel />}
+        {tab === 7 && <AudioMixerPanel />}
+        {tab === 8 && <UIEditorPanel />}
         {tab === 0 && (
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
             <Stack spacing={1} sx={{ width: 200 }}>

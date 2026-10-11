@@ -11,8 +11,15 @@ test("JavaScript project modules: real sandbox imports, live bindings, prefab in
       await import("/src/store/useEditorStore.ts")
     ).useEditorStore;
   });
-  const runtime = page.frames().find((f) => f.url().endsWith("/runtime.html"))!;
-  await runtime.waitForFunction(() => (window as any).math?.backend === "wasm");
+  const runtime = page
+    .frames()
+    .find((f) => f.url().split("?")[0].endsWith("/runtime.html"))!;
+  // The runtime iframe is hidden while editing; RAF polling may never run in CI.
+  await runtime.waitForFunction(
+    () => (window as any).math?.backend === "wasm",
+    undefined,
+    { polling: 50 },
+  );
   await test.step("legacy imports and module factories retain instance ownership and share module state once per play", async () => {
     await page.evaluate(() => {
       const s = (window as any).s;
@@ -48,7 +55,11 @@ test("JavaScript project modules: real sandbox imports, live bindings, prefab in
       s.getState().play();
     });
     await runtime.waitForFunction(
-      () => (window as any).lifecycleInstances.length === 2,
+      () =>
+        (window as any).running &&
+        (window as any).lifecycleInstances?.length === 2,
+      undefined,
+      { polling: 50 },
     );
     expect(
       await runtime.evaluate(
@@ -109,6 +120,8 @@ test("JavaScript project modules: real sandbox imports, live bindings, prefab in
       () =>
         (window as any).moduleLoader === null &&
         (window as any).session.stats().scripts === 0,
+      undefined,
+      { polling: 50 },
     );
     await page.evaluate(() => {
       const s = (window as any).s;
@@ -116,7 +129,11 @@ test("JavaScript project modules: real sandbox imports, live bindings, prefab in
       s.getState().play();
     });
     await runtime.waitForFunction(
-      () => (window as any).lifecycleInstances.length === 2,
+      () =>
+        (window as any).running &&
+        (window as any).lifecycleInstances?.length === 2,
+      undefined,
+      { polling: 50 },
     );
     await expect
       .poll(() =>
@@ -196,23 +213,33 @@ test("JavaScript project modules: real sandbox imports, live bindings, prefab in
     await page.evaluate(() => (window as any).s.getState().stop());
   });
   await test.step("stopping pending module imports cannot start a stale lifecycle", async () => {
-    await runtime.evaluate(() => {
-      const w = window as any,
-        create = w.ArkGlideModules.createLoader;
-      w.ArkGlideModules.createLoader = function (...args: any[]) {
-        const l = create(...args),
-          prepare = l.prepare;
-        l.prepare = async () => {
-          await prepare();
-          await new Promise((r) => setTimeout(r, 150));
+    // A fresh sandbox is created on replay; install the delay in that document.
+    await page.addInitScript(() => {
+      window.addEventListener("DOMContentLoaded", () => {
+        const w = window as any;
+        if (!w.ArkGlideModules) return;
+        const create = w.ArkGlideModules.createLoader;
+        w.ArkGlideModules.createLoader = function (...args: any[]) {
+          const loader = create(...args),
+            prepare = loader.prepare;
+          loader.prepare = async () => {
+            w.__modulePrepareStarted = true;
+            await prepare();
+            await new Promise((r) => setTimeout(r, 150));
+          };
+          return loader;
         };
-        return l;
-      };
+      });
     });
     await page.evaluate(() => {
       const s = (window as any).s;
       s.getState().play();
     });
+    await runtime.waitForFunction(
+      () => (window as any).__modulePrepareStarted === true,
+      undefined,
+      { polling: 10 },
+    );
     await page.waitForTimeout(30);
     await page.evaluate(() => (window as any).s.getState().stop());
     await page.waitForTimeout(250);

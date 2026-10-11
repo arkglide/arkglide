@@ -1,3 +1,7 @@
+import {
+  validateAdvancedComponents,
+  validateAdvancedContent,
+} from "./advancedGameplayValidation";
 import type { SceneNode } from "../store/useEditorStore";
 import type { ProjectContent } from "../types/content";
 import { defaultGameplay } from "../types/gameplay";
@@ -9,12 +13,13 @@ const key = (s: any) =>
   s.length <= 100 &&
   !["__proto__", "constructor", "prototype"].includes(s);
 export function validateComponents(n: SceneNode) {
+  validateAdvancedComponents(n);
   const p = n.physics;
   if (
     p &&
     (!["mesh", "model", "empty"].includes(n.type) ||
       !["static", "dynamic", "kinematic"].includes(p.motion) ||
-      !["box", "sphere", "capsule"].includes(p.shape) ||
+      !["box", "sphere", "capsule", "convex", "mesh"].includes(p.shape) ||
       !p.size ||
       ![p.size.x, p.size.y, p.size.z].every((v) => finite(v, 0.001, 10000)) ||
       !finite(p.mass, 0.001) ||
@@ -101,10 +106,18 @@ export function validateGameplayContent(content: ProjectContent) {
       !h ||
       !key(h.id) ||
       hud.has(h.id) ||
-      !["text", "button"].includes(h.kind) ||
+      ![
+        "text",
+        "button",
+        "container",
+        "image",
+        "richtext",
+        "input",
+        "joystick",
+      ].includes(h.kind) ||
       typeof h.text !== "string" ||
       h.text.length > 10000 ||
-      ![h.x, h.y].every((v) => finite(v, 0, 100)) ||
+      ![h.x, h.y].every((v) => finite(v, 0, h.unit === "px" ? 10000 : 100)) ||
       !finite(h.fontSize, 8, 128) ||
       !/^#[0-9a-f]{6}$/i.test(h.color) ||
       !/^#[0-9a-f]{6}$/i.test(h.background) ||
@@ -114,4 +127,5 @@ export function validateGameplayContent(content: ProjectContent) {
       throw new Error("无效HUD元素");
     hud.add(h.id);
   }
+  validateAdvancedContent(content);
 }

@@ -2,11 +2,13 @@ import { useEffect, useRef } from "react";
 import { useEditorStore } from "../../store/useEditorStore";
 import type { ProjectJSON } from "../../types/project";
 
-// iframe 运行时沙箱容器：常驻不卸载，postMessage 收发桥梁
+// Keep the browsing context, but recycle its realm between plays to release native ES module maps.
 export default function RuntimeFrame() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const runIdRef = useRef(0);
   const readyRef = useRef(false);
+  const hasRunRef = useRef(false);
+  const bootTokenRef = useRef("");
   const pendingProjectRef = useRef<ProjectJSON | null>(null);
   // 暂存待发送的模型数据（iframe 未 ready 时）
   const pendingModelDataRef = useRef<Record<string, ArrayBuffer> | null>(null);
@@ -46,6 +48,7 @@ export default function RuntimeFrame() {
       if (!iframe || ev.source !== iframe.contentWindow) return; // 只接受本 iframe 消息
       const msg = ev.data;
       if (!msg || typeof msg !== "object") return;
+      if (msg.bootToken !== bootTokenRef.current) return;
 
       if (msg.runId != null && msg.runId !== runIdRef.current) return;
       switch (msg.type) {
@@ -84,7 +87,6 @@ export default function RuntimeFrame() {
             pendingProjectRef.current = null;
             pendingModelDataRef.current = null;
             pendingTextureDataRef.current = null;
-            pendingAudioDataRef.current = null;
             pendingAudioDataRef.current = null;
             pendingTransferRef.current = null;
             if (useEditorStore.getState().playState === "paused")
@@ -126,6 +128,13 @@ export default function RuntimeFrame() {
     if (playState === "playing") {
       if (prev === "stopped") {
         runIdRef.current++;
+        if (hasRunRef.current && iframeRef.current) {
+          readyRef.current = false;
+          bootTokenRef.current = crypto.randomUUID();
+          iframeRef.current.src =
+            "/runtime.html?boot=" + encodeURIComponent(bootTokenRef.current);
+        }
+        hasRunRef.current = true;
         useEditorStore.getState().setRuntimeStats(null);
         // 收集所有 model 节点的 ArrayBuffer，通过 Transferable 零拷贝传递给 iframe
         const modelData: Record<string, ArrayBuffer> = {};
@@ -205,6 +214,7 @@ export default function RuntimeFrame() {
         ref={iframeRef}
         src="/runtime.html"
         sandbox="allow-scripts"
+        allow="gamepad *"
         title="ArkGlide Runtime"
         onLoad={handleFocus}
         style={{

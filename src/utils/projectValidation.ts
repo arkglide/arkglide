@@ -1,3 +1,4 @@
+import { validateAdvancedReferences } from "./advancedGameplayValidation";
 import {
   validateComponents,
   validateGameplayContent,
@@ -7,7 +8,7 @@ import type { StoredProject } from "./projectStorage";
 import { emptyContent, type ProjectContent } from "../types/content";
 import { assertPrefabGraph, inferInstanceParents } from "../engine/prefabs";
 import { collectModelRefs } from "./contentResources";
-export const PROJECT_VERSION = "0.5";
+export const PROJECT_VERSION = "0.6";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 
 export function validateProject(data: any): {
@@ -20,7 +21,7 @@ export function validateProject(data: any): {
   if (
     data &&
     data.version !== undefined &&
-    !["0.1", "0.2", "0.3", "0.4", PROJECT_VERSION].includes(data.version)
+    !["0.1", "0.2", "0.3", "0.4", "0.5", PROJECT_VERSION].includes(data.version)
   )
     throw new Error(
       "项目格式版本 " + data.version + " 暂不支持，请使用对应版本编辑器打开",
@@ -143,6 +144,7 @@ export function validateProject(data: any): {
   )
     throw new Error("无效时间设置");
   const content = validateContent(data.content, nodes, scripts, settings);
+  validateAdvancedReferences(content, nodes);
   return { nodes, scripts, activeFileId, settings, content };
 }
 
@@ -470,6 +472,16 @@ function validateNodeSubtree(
     const copy = { ...n };
     validateComponents(copy);
     delete copy.audioSource;
+    if (copy.physics) copy.physics = { ...copy.physics, group: undefined };
+    if (copy.character)
+      copy.character = { ...copy.character, group: undefined };
+    if (copy.animation)
+      copy.animation = {
+        ...copy.animation,
+        controllerId: undefined,
+        retarget: undefined,
+        rootMotion: undefined,
+      };
     delete copy.materialId;
     delete copy.materialSlots;
     delete copy.prefab;
@@ -481,6 +493,15 @@ function validateNodeSubtree(
     settings,
   }).nodes.map((n, index) => ({
     ...n,
+    ...(nodes[index].physics
+      ? { physics: structuredClone(nodes[index].physics) }
+      : {}),
+    ...(nodes[index].character
+      ? { character: structuredClone(nodes[index].character) }
+      : {}),
+    ...(nodes[index].animation
+      ? { animation: structuredClone(nodes[index].animation) }
+      : {}),
     ...(nodes[index].audioSource
       ? { audioSource: structuredClone(nodes[index].audioSource) }
       : {}),

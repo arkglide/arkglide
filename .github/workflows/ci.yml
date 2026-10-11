@@ -21,3 +21,23 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run build
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload third batch measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: third-batch-measurements
+          path: |
+            test-results/**/audio-pitch.json
+            test-results/**/memory-20-sessions.json
+          if-no-files-found: ignore
+          retention-days: 7

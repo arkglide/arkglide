@@ -64,7 +64,7 @@ test("batch two: material editing, texture rendering, prefabs, runtime and porta
       (window as any).s = useEditorStore;
       (window as any).B = await import(url!);
     }, coreUrl);
-    const frame = page.frames().find((f) => f.url().endsWith("/runtime.html"))!;
+    const frame = page.frames().find((f) => f.url().split("?")[0].endsWith("/runtime.html"))!;
     await frame.waitForFunction(
       () => (window as any).math?.backend === "wasm",
       undefined,

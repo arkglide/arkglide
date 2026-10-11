@@ -1,0 +1,5 @@
+npm run build: exit 0
+TypeScript: passed
+Vite: 16214 modules transformed; built in 2m 43s
+Main editor chunk: 13806.52 kB; gzip 3308.66 kB
+Warning: large chunks (existing architecture; optimization remains future work).

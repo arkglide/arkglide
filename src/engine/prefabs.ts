@@ -1,3 +1,4 @@
+import {remapGameplayReferences} from "../types/advancedGameplay";
 import type { SceneNode } from "../store/useEditorStore";
 import type { PrefabAsset, PrefabInstance } from "../types/content";
 const clone = <T>(value: T): T => structuredClone(value);
@@ -35,7 +36,7 @@ export function capturePrefab(
     selected.map((n) => [n.id, reverse.get(n.id) || crypto.randomUUID()]),
   );
   const normalized = selected.map((node) => {
-    const n = clone(node);
+    const n = remapGameplayReferences(node,ids);
     delete n.prefab;
     n.id = ids.get(node.id)!;
     n.parentId = ids.get(node.parentId || "") || null;
@@ -66,7 +67,7 @@ export function createInstance(
       prefab.nodes.map((n, i) => [n.id, reuse?.[i]?.id || crypto.randomUUID()]),
     );
   const copies = prefab.nodes.map((n, i) => ({
-    ...clone(n),
+    ...remapGameplayReferences(n,nodeMap),
     id: nodeMap[n.id],
     parentId: nodeMap[n.parentId || ""] || reuse?.[i]?.parentId || null,
     transform:
@@ -91,7 +92,7 @@ function localNode(node: SceneNode, instance: PrefabInstance): SceneNode {
   const reverse = new Map(
     Object.entries(instance.nodeMap).map(([local, scene]) => [scene, local]),
   );
-  const n = clone(node);
+  const n = remapGameplayReferences(node,reverse);
   delete n.prefab;
   n.id = reverse.get(node.id)!;
   n.parentId =
@@ -190,6 +191,8 @@ export function applyPrefab(
     if (n.materialSlots)
       for (const key of Object.keys(n.materialSlots))
         if (n.materialSlots[key] === undefined) delete n.materialSlots[key];
+    const remapped=remapGameplayReferences(n,map);
+    n.joints=remapped.joints;n.animation=remapped.animation;
     n.id = map[definition.id];
     n.parentId = n.parentId?.startsWith("external:")
       ? n.parentId.slice(9)

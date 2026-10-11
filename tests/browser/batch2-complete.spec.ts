@@ -81,7 +81,7 @@ test("second batch completion: real model slots, nested template updates, script
       ).useEditorStore;
       (window as any).B = await import(url!);
     }, coreUrl);
-    const frame = page.frames().find((f) => f.url().endsWith("/runtime.html"))!;
+    const frame = page.frames().find((f) => f.url().split("?")[0].endsWith("/runtime.html"))!;
     await frame.waitForFunction(
       () => (window as any).math?.backend === "wasm",
       undefined,
@@ -250,6 +250,8 @@ test("second batch completion: real model slots, nested template updates, script
     await page.getByRole("button", { name: "播放", exact: true }).click();
     await runtime.waitForFunction(
       () => (window as any).generated?.root && (window as any).running,
+      undefined,
+      { polling: 50 },
     );
     expect(
       await runtime.evaluate(() => {
@@ -298,6 +300,8 @@ test("second batch completion: real model slots, nested template updates, script
     await page.getByRole("button", { name: "暂停", exact: true }).click();
     await runtime.waitForFunction(
       () => (window as any).desiredState === "paused",
+      undefined,
+      { polling: 50 },
     );
     const clock = await runtime.evaluate(() => (window as any).time.totalTime);
     await page.waitForTimeout(150);
@@ -305,7 +309,11 @@ test("second batch completion: real model slots, nested template updates, script
       clock,
     );
     await page.getByRole("button", { name: "停止", exact: true }).click();
-    await runtime.waitForFunction(() => (window as any).entityMap.size === 0);
+    await runtime.waitForFunction(
+      () => (window as any).entityMap.size === 0,
+      undefined,
+      { polling: 50 },
+    );
     expect(
       await runtime.evaluate(() => {
         const w = window as any;
@@ -352,34 +360,53 @@ test("second batch completion: real model slots, nested template updates, script
         };
       }, ids),
     ).toEqual({ slot: null, nested: 1 });
-    await page.evaluate(async () => {
-      await (window as any).s.getState().saveCurrentProject("第二批补齐验收");
-      const { startProjectRecovery } = await import(
-        "/src/utils/projectRecovery.ts"
-      );
-      const c = startProjectRecovery({ delay: 100000, maxWait: 100000 });
-      try {
-        (window as any).s.getState().updateSettings({ ambientIntensity: 0.3 });
-        await c.flush();
-      } finally {
-        c.dispose();
-      }
+    const recoveryId = await page.evaluate(async () => {
+      const store = (window as any).s;
+      await store.getState().saveCurrentProject("第二批补齐验收");
+      store.getState().updateSettings({ ambientIntensity: 0.3 });
+      return store.getState().documentId as string;
+    });
+    // Exercise the application's autosave controller. A second controller has an
+    // independent write queue and can race the manual-save cleanup on reload.
+    await expect
+      .poll(
+        () => page.evaluate(() => (window as any).s.getState().recoveryStatus),
+        {
+          timeout: 10000,
+          message: "application autosave must finish before reload",
+        },
+      )
+      .toBe("saved");
+    expect(
+      await page.evaluate(async (id) => {
+        const { loadRecovery } = await import("/src/utils/projectStorage.ts");
+        const record = await loadRecovery(id);
+        return {
+          id: record?.recoveryId,
+          name: record?.project.name,
+          ambientIntensity: record?.project.settings?.ambientIntensity,
+        };
+      }, recoveryId),
+    ).toEqual({
+      id: recoveryId,
+      name: "第二批补齐验收",
+      ambientIntensity: 0.3,
     });
     await page.reload();
     runtime = await connect();
     const dialog = page.getByRole("dialog", { name: "项目恢复" });
     await expect(dialog).toBeVisible();
-    await dialog
-      .getByText("第二批补齐验收", { exact: true })
-      .locator("..")
-      .locator("..")
-      .getByRole("button", { name: "恢复", exact: true })
-      .click();
+    const record = dialog.locator(`[data-recovery-id="${recoveryId}"]`);
+    await expect(
+      record.getByText("第二批补齐验收", { exact: true }),
+    ).toBeVisible();
+    await record.getByRole("button", { name: "恢复", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     expect(
       await page.evaluate((ids) => {
         const s = (window as any).s.getState();
         return {
+          ambientIntensity: s.settings.ambientIntensity,
           slot: s.nodes.find((n: any) => n.id === ids.model).materialSlots[
             ids.left
           ],
@@ -387,7 +414,7 @@ test("second batch completion: real model slots, nested template updates, script
             .length,
         };
       }, ids),
-    ).toEqual({ slot: ids.gold, nested: 1 });
+    ).toEqual({ ambientIntensity: 0.3, slot: ids.gold, nested: 1 });
   });
   await page.screenshot({ path: "test-results/batch2-complete-editor.png" });
   expect(errors).toEqual([]);

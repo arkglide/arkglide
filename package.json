@@ -16,7 +16,9 @@
     "predev": "npm run sync:runtime",
     "analyze:build": "node scripts/analyze-build.mjs",
     "example:playable": "node scripts/create-playable-example.mjs",
-    "example:modules": "node scripts/create-modules-example.mjs"
+    "example:modules": "node scripts/create-modules-example.mjs",
+    "example:third": "node scripts/create-third-full-example.mjs",
+    "pretest": "npm run sync:runtime"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",

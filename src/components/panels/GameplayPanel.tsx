@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { AnimationAdvancedInspector } from "./AnimationControllerPanel";
+import { AdvancedNodeInspector } from "./AdvancedGameplayPanel";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -79,7 +81,13 @@ export function NodeGameplayInspector({ node }: { node: SceneNode }) {
           <Typography variant="caption">刚体与碰撞体 · Jolt WASM</Typography>
           <Button
             size="small"
-            onClick={() => patch({ physics: p ? undefined : defaultPhysics() })}
+            onClick={() =>
+              patch({
+                physics: p ? undefined : defaultPhysics(),
+                character: undefined,
+                joints: undefined,
+              })
+            }
           >
             {p ? "移除刚体" : "添加刚体"}
           </Button>
@@ -118,6 +126,8 @@ export function NodeGameplayInspector({ node }: { node: SceneNode }) {
                     ["box", "盒体"],
                     ["sphere", "球体"],
                     ["capsule", "胶囊"],
+                    ["convex", "模型凸包"],
+                    ["mesh", "静态模型三角网格"],
                   ].map(([v, l]) => (
                     <MenuItem key={v} value={v}>
                       {l}
@@ -257,6 +267,8 @@ export function NodeGameplayInspector({ node }: { node: SceneNode }) {
           )}
         </>
       )}
+      <AnimationAdvancedInspector node={node} />
+      <AdvancedNodeInspector node={node} />
       <Divider />
       <Typography variant="caption">音源</Typography>
       <TextField
@@ -306,6 +318,55 @@ export function NodeGameplayInspector({ node }: { node: SceneNode }) {
               control={
                 <Checkbox
                   checked={s[k]}
+                  onChange={(e) =>
+                    patch({ audioSource: { ...s, [k]: e.target.checked } })
+                  }
+                />
+              }
+            />
+          ))}
+          <TextField
+            label="音源总线"
+            select
+            size="small"
+            value={s.bus || "SFX"}
+            onChange={(e) =>
+              patch({ audioSource: { ...s, bus: e.target.value } })
+            }
+          >
+            {content.mixer?.buses.map((b) => (
+              <MenuItem key={b.id} value={b.id}>
+                {b.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <NumberField
+            label="音源倍率"
+            value={s.rate ?? 1}
+            min={0.001}
+            max={16}
+            onChange={(v) => patch({ audioSource: { ...s, rate: v } })}
+          />
+          <NumberField
+            label="音源优先级"
+            value={s.priority || 0}
+            min={-1000}
+            max={1000}
+            step={1}
+            onChange={(v) => patch({ audioSource: { ...s, priority: v } })}
+          />
+          {(["stream", "preservePitch"] as const).map((k) => (
+            <FormControlLabel
+              key={k}
+              label={k === "stream" ? "流式音乐（不完整解码）" : "变速不变调"}
+              control={
+                <Checkbox
+                  checked={
+                    s[k] ??
+                    s.stream ??
+                    content.audio?.find((a) => a.id === s.assetId)?.stream ??
+                    false
+                  }
                   onChange={(e) =>
                     patch({ audioSource: { ...s, [k]: e.target.checked } })
                   }
@@ -373,6 +434,23 @@ export function AudioPanel() {
           <Typography variant="caption" sx={{ overflowWrap: "anywhere" }}>
             资源 ID：{a.id}
           </Typography>
+          <FormControlLabel
+            label="作为流式音乐加载"
+            control={
+              <Checkbox
+                checked={!!a.stream}
+                onChange={(e) =>
+                  void run(() => {
+                    const bytes = buffers.get(a.id);
+                    if (!bytes) throw Error("请先重新链接音频");
+                    useEditorStore
+                      .getState()
+                      .importAudio({ ...a, stream: e.target.checked }, bytes);
+                  })
+                }
+              />
+            }
+          />
           {!buffers.has(a.id) && (
             <Alert severity="warning">音频丢失，请重新链接</Alert>
           )}
@@ -406,10 +484,53 @@ export function AudioPanel() {
 }
 export function GameplayPanel() {
   const config = useEditorStore((s) => s.content.gameplay) || defaultGameplay(),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [capture, setCapture] = useState<{
+      name: string;
+      side: "positive" | "negative";
+    } | null>(null);
+  useEffect(() => {
+    if (!capture) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setCapture(null);
+      if (e.code === "Escape") return;
+      const conflicts = config.actions.filter(
+        (a) =>
+          a.name !== capture.name &&
+          [...a.positive, ...a.negative].includes(e.code),
+      );
+      if (conflicts.length) {
+        setError(
+          "按键 " +
+            e.code +
+            " 已绑定 " +
+            conflicts.map((a) => a.name).join("、") +
+            "；请先删除冲突绑定，或在正反按键框中显式共享",
+        );
+        return;
+      }
+      save({
+        ...config,
+        defaults: config.defaults || structuredClone(config.actions),
+        actions: config.actions.map((a) =>
+          a.name === capture.name ? { ...a, [capture.side]: [e.code] } : a,
+        ),
+      });
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capture, config]);
   function save(next: GameplayConfig) {
     try {
-      useEditorStore.getState().updateGameplay(next);
+      useEditorStore
+        .getState()
+        .updateGameplay({
+          ...next,
+          defaults:
+            next.defaults || config.defaults || structuredClone(config.actions),
+        });
       setError("");
     } catch (e) {
       setError(String(e));
@@ -425,6 +546,38 @@ export function GameplayPanel() {
     <Stack spacing={1} data-testid="input-hud-panel">
       {error && <Alert severity="warning">{error}</Alert>}
       <Typography>动作映射</Typography>
+      {capture && (
+        <Alert severity="info">
+          按下要绑定的按键，Esc 取消：{capture.name}
+        </Alert>
+      )}
+      <Button
+        onClick={() =>
+          save({
+            ...config,
+            actions: config.actions.map((a) => {
+              const d = (config.defaults || defaultGameplay().actions).find(
+                (v) => v.name === a.name,
+              );
+              return {
+                ...a,
+                positive: d?.positive || [],
+                negative: d?.negative || [],
+                gamepad: d?.gamepad || [],
+              };
+            }),
+          })
+        }
+      >
+        恢复默认映射
+      </Button>
+      <Button
+        onClick={() =>
+          save({ ...config, defaults: structuredClone(config.actions) })
+        }
+      >
+        将当前映射设为默认
+      </Button>
       <Typography variant="caption">
         使用 KeyboardEvent.code，如
         KeyW、Space、ArrowLeft。逗号分隔多个按键；触屏按钮可绑定同一动作。
@@ -441,54 +594,213 @@ export function GameplayPanel() {
         }
       />
       {config.actions.map((a, i) => (
-        <Stack key={i} direction="row" spacing={1}>
-          <TextField
-            key={a.name}
-            size="small"
-            label="动作名"
-            defaultValue={a.name}
-            onBlur={(e) =>
-              save({
-                ...config,
-                actions: config.actions.map((v, j) =>
-                  j === i ? { ...v, name: e.target.value.trim() } : v,
-                ),
-              })
-            }
-          />
-          {(["positive", "negative"] as const).map((k) => (
+        <Stack key={i} spacing={1} sx={{ border: "1px solid #555", p: 1 }}>
+          <Stack direction="row" spacing={1}>
             <TextField
-              key={a[k].join(",")}
+              key={a.name}
               size="small"
-              label={k === "positive" ? "正向按键" : "反向按键"}
-              defaultValue={a[k].join(",")}
+              label="动作名"
+              defaultValue={a.name}
               onBlur={(e) =>
                 save({
                   ...config,
                   actions: config.actions.map((v, j) =>
-                    j === i
-                      ? {
-                          ...v,
-                          [k]: e.target.value
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                        }
-                      : v,
+                    j === i ? { ...v, name: e.target.value.trim() } : v,
                   ),
                 })
               }
             />
+            {(["positive", "negative"] as const).map((k) => (
+              <TextField
+                key={a[k].join(",")}
+                size="small"
+                label={k === "positive" ? "正向按键" : "反向按键"}
+                defaultValue={a[k].join(",")}
+                onBlur={(e) =>
+                  save({
+                    ...config,
+                    actions: config.actions.map((v, j) =>
+                      j === i
+                        ? {
+                            ...v,
+                            [k]: e.target.value
+                              .split(",")
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          }
+                        : v,
+                    ),
+                  })
+                }
+              />
+            ))}
+            <Button
+              onClick={() =>
+                save({
+                  ...config,
+                  actions: config.actions.filter((_, j) => j !== i),
+                })
+              }
+            >
+              删除动作
+            </Button>
+          </Stack>
+          <Stack direction="row">
+            <Button
+              onClick={() => setCapture({ name: a.name, side: "positive" })}
+            >
+              捕获正向按键
+            </Button>
+            <Button
+              onClick={() => setCapture({ name: a.name, side: "negative" })}
+            >
+              捕获反向按键
+            </Button>
+          </Stack>
+          {(a.gamepad || []).map((b, j) => (
+            <Stack key={j} direction="row" spacing={1}>
+              <TextField
+                select
+                label="手柄来源"
+                size="small"
+                value={b.kind}
+                onChange={(e) =>
+                  save({
+                    ...config,
+                    actions: config.actions.map((a, k) =>
+                      k === i
+                        ? {
+                            ...a,
+                            gamepad: a.gamepad!.map((b, l) =>
+                              l === j
+                                ? {
+                                    ...b,
+                                    kind: e.target.value as "button" | "axis",
+                                  }
+                                : b,
+                            ),
+                          }
+                        : a,
+                    ),
+                  })
+                }
+              >
+                <MenuItem value="button">按钮</MenuItem>
+                <MenuItem value="axis">摇杆轴</MenuItem>
+              </TextField>
+              <NumberField
+                label="手柄索引"
+                value={b.index}
+                max={63}
+                step={1}
+                onChange={(v) =>
+                  save({
+                    ...config,
+                    actions: config.actions.map((a, k) =>
+                      k === i
+                        ? {
+                            ...a,
+                            gamepad: a.gamepad!.map((b, l) =>
+                              l === j ? { ...b, index: v } : b,
+                            ),
+                          }
+                        : a,
+                    ),
+                  })
+                }
+              />
+              <NumberField
+                label="死区"
+                value={b.deadzone}
+                max={0.95}
+                onChange={(v) =>
+                  save({
+                    ...config,
+                    actions: config.actions.map((a, k) =>
+                      k === i
+                        ? {
+                            ...a,
+                            gamepad: a.gamepad!.map((b, l) =>
+                              l === j ? { ...b, deadzone: v } : b,
+                            ),
+                          }
+                        : a,
+                    ),
+                  })
+                }
+              />
+              <TextField
+                select
+                label="手柄方向"
+                size="small"
+                value={b.direction}
+                onChange={(e) =>
+                  save({
+                    ...config,
+                    actions: config.actions.map((a, k) =>
+                      k === i
+                        ? {
+                            ...a,
+                            gamepad: a.gamepad!.map((b, l) =>
+                              l === j
+                                ? {
+                                    ...b,
+                                    direction: Number(e.target.value) as 1 | -1,
+                                  }
+                                : b,
+                            ),
+                          }
+                        : a,
+                    ),
+                  })
+                }
+              >
+                <MenuItem value={1}>正向</MenuItem>
+                <MenuItem value={-1}>反向</MenuItem>
+              </TextField>
+              <Button
+                onClick={() =>
+                  save({
+                    ...config,
+                    actions: config.actions.map((a, k) =>
+                      k === i
+                        ? {
+                            ...a,
+                            gamepad: a.gamepad!.filter((_, l) => l !== j),
+                          }
+                        : a,
+                    ),
+                  })
+                }
+              >
+                删除手柄绑定
+              </Button>
+            </Stack>
           ))}
           <Button
             onClick={() =>
               save({
                 ...config,
-                actions: config.actions.filter((_, j) => j !== i),
+                actions: config.actions.map((a, k) =>
+                  k === i
+                    ? {
+                        ...a,
+                        gamepad: [
+                          ...(a.gamepad || []),
+                          {
+                            kind: "axis",
+                            index: 0,
+                            direction: 1,
+                            deadzone: 0.15,
+                          },
+                        ],
+                      }
+                    : a,
+                ),
               })
             }
           >
-            删除动作
+            添加手柄绑定
           </Button>
         </Stack>
       ))}

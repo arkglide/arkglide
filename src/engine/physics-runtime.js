@@ -5,20 +5,32 @@
     settings.mMaxBodies = 4096;
     settings.mMaxBodyPairs = 8192;
     settings.mMaxContactConstraints = 8192;
-    const pairs = new J.ObjectLayerPairFilterTable(2);
-    pairs.EnableCollision(0, 1);
-    pairs.EnableCollision(1, 1);
-    const broad = new J.BroadPhaseLayerInterfaceTable(2, 2),
+    const collisionGroups = options.config?.groups || [
+      { name: "Default", mask: 1 },
+    ];
+    if (!collisionGroups.length || collisionGroups.length > 16)
+      throw Error("碰撞分组数量必须在 1–16 之间");
+    const layerCount = collisionGroups.length * 2;
+    const pairs = new J.ObjectLayerPairFilterTable(layerCount);
+    for (let a = 0; a < layerCount; a++)
+      for (let b = a; b < layerCount; b++)
+        if (
+          (a % 2 || b % 2) &&
+          collisionGroups[a >> 1].mask & (1 << (b >> 1)) &&
+          collisionGroups[b >> 1].mask & (1 << (a >> 1))
+        )
+          pairs.EnableCollision(a, b);
+    const broad = new J.BroadPhaseLayerInterfaceTable(layerCount, 2),
       l0 = new J.BroadPhaseLayer(0),
       l1 = new J.BroadPhaseLayer(1);
-    broad.MapObjectToBroadPhaseLayer(0, l0);
-    broad.MapObjectToBroadPhaseLayer(1, l1);
+    for (let i = 0; i < layerCount; i++)
+      broad.MapObjectToBroadPhaseLayer(i, i % 2 ? l1 : l0);
     J.destroy(l0);
     J.destroy(l1);
     settings.mObjectLayerPairFilter = pairs;
     settings.mBroadPhaseLayerInterface = broad;
     settings.mObjectVsBroadPhaseLayerFilter =
-      new J.ObjectVsBroadPhaseLayerFilterTable(broad, 2, pairs, 2);
+      new J.ObjectVsBroadPhaseLayerFilterTable(broad, 2, pairs, layerCount);
     const world = new J.JoltInterface(settings);
     J.destroy(settings);
     const system = world.GetPhysicsSystem(),
@@ -75,13 +87,24 @@
     const listener = new J.ContactListenerJS();
     listener.OnContactValidate = () =>
       J.ValidateResult_AcceptAllContactsForThisBodyPair;
-    listener.OnContactAdded = (a, b) =>
+    listener.OnContactAdded = (a, b, manifold) => (
+      debugContact(manifold),
       contact(
         "enter",
         bodyNumber(J.wrapPointer(a, J.Body)),
         bodyNumber(J.wrapPointer(b, J.Body)),
-      );
-    listener.OnContactPersisted = () => {};
+      )
+    );
+    function debugContact(manifold) {
+      if (!tools) return;
+      const m = J.wrapPointer(manifold, J.ContactManifold);
+      for (let i = 0; i < m.mRelativeContactPointsOn1.size(); i++)
+        tools.contactPoint(
+          value(m.GetWorldSpaceContactPointOn1(i)),
+          value(m.mWorldSpaceNormal),
+        );
+    }
+    listener.OnContactPersisted = (a, b, m) => debugContact(m);
     listener.OnContactRemoved = (p) => {
       const pair = J.wrapPointer(p, J.SubShapeIDPair);
       contact(
@@ -91,7 +114,23 @@
       );
     };
     system.SetContactListener(listener);
+    const tools = root.ArkGlidePhysicsTools?.create(J, B, {
+      ...options,
+      world,
+      system,
+      bi,
+      bodies,
+      numbers,
+      worldPose,
+      signature,
+      remove,
+    });
     function add(node) {
+      if (node.character) {
+        if (!tools) throw Error("角色运行库未加载");
+        tools.character(node);
+        return;
+      }
       if (!node.physics || bodies.has(node.id)) return;
       if (disposed) throw new Error("Physics session stopped");
       const object = options.getObject(node.id);
@@ -99,7 +138,7 @@
       const c = node.physics;
       if (
         !["static", "dynamic", "kinematic"].includes(c.motion) ||
-        !["box", "sphere", "capsule"].includes(c.shape) ||
+        !["box", "sphere", "capsule", "convex", "mesh"].includes(c.shape) ||
         !c.size ||
         ![c.size.x, c.size.y, c.size.z].every(
           (v) => Number.isFinite(v) && v >= 0.001 && v <= 10000,
@@ -123,7 +162,10 @@
       if (actual.some((v, i) => Math.abs(v - recomposed[i]) > 1e-4))
         throw new Error("刚体父层级包含剪切变换: " + node.name);
       let shape;
-      if (c.shape === "box") {
+      if (c.shape === "convex" || c.shape === "mesh") {
+        if (!tools) throw Error("模型碰撞运行库未加载");
+        shape = tools.modelShape(object, c, s);
+      } else if (c.shape === "box") {
         const ext = new J.Vec3(
           (c.size.x * s.x) / 2,
           (c.size.y * s.y) / 2,
@@ -160,7 +202,7 @@
           pos,
           rot,
           motion,
-          c.motion === "static" ? 0 : 1,
+          tools ? tools.layer(c) : c.motion === "static" ? 0 : 1,
         );
       cs.mFriction = c.friction;
       cs.mRestitution = c.restitution;
@@ -198,6 +240,9 @@
       numbers.set(bodyNumber(body), node.id);
     }
     function remove(id) {
+      tools?.remove(id);
+      for (const [key, c] of contacts)
+        if (c.a === id || c.b === id) contacts.delete(key);
       const r = bodies.get(id);
       if (!r) return;
       const number = bodyNumber(r.body);
@@ -250,7 +295,7 @@
         )
           throw new Error("运行时改变刚体缩放需移除后重新添加碰撞体");
         const sig = signature(p);
-        if (sig !== r.last) {
+        if (sig !== r.last || r.config.motion === "kinematic") {
           const pos = new J.RVec3(p.pos.x, p.pos.y, p.pos.z),
             rot = new J.Quat(p.rot.x, p.rot.y, p.rot.z, p.rot.w);
           if (r.config.motion === "kinematic")
@@ -267,6 +312,7 @@
           r.last = sig;
         }
       }
+      tools?.beforeStep(dt);
       world.Step(dt, 1);
       for (const r of bodies.values()) {
         if (r.config.motion === "static") continue;
@@ -289,6 +335,7 @@
         r.last = signature(worldPose(r.object));
       }
       flush();
+      tools?.updateDebug();
     }
     function requireBody(entity) {
       if (
@@ -303,13 +350,15 @@
     }
     function forOwner(owner) {
       return Object.freeze({
+        ...tools?.ownerAPI(owner),
         backend: "jolt-wasm",
         has: (entity) => !!entity && !entity.destroyed && bodies.has(entity.id),
         add(entity, config) {
           if (!owner.record.active) throw new Error("脚本已销毁");
           if (!entity || entity.destroyed || options.find(entity.id) !== entity)
             throw new Error("实体不存在");
-          if (bodies.has(entity.id)) throw new Error("实体已有刚体");
+          if (bodies.has(entity.id) || tools?.hasCharacter(entity.id))
+            throw new Error("实体已有运动组件");
           add({ id: entity.id, name: entity.name, physics: config });
         },
         remove: (entity) => {
@@ -376,6 +425,44 @@
     J.destroy(g);
     return {
       add,
+      attachJoints: (nodes) => tools?.attachJoints(nodes),
+      clearRootMotion: (e) => tools?.clearRootMotion(e),
+      applyRootMotion(e, delta, rotation, dt) {
+        const r = bodies.get(e.id),
+          object = options.getObject(e.id);
+        if (!object) return;
+        const pose = worldPose(object),
+          d = B.Vector3.TransformNormal(
+            delta,
+            B.Matrix.Compose(pose.scale, pose.rot, B.Vector3.Zero()),
+          ),
+          q = pose.rot.multiply(rotation);
+        if (tools?.applyRootMotion(e, d, q, dt)) return;
+        if (r?.config.motion === "dynamic") {
+          const old = value(r.body.GetLinearVelocity()),
+            velocity = new J.Vec3(d.x / dt, old.y + d.y / dt, d.z / dt),
+            rot = new J.Quat(q.x, q.y, q.z, q.w);
+          try {
+            bi.SetLinearVelocity(r.body.GetID(), velocity);
+            bi.SetRotation(r.body.GetID(), rot, J.EActivation_Activate);
+          } finally {
+            J.destroy(rot);
+            J.destroy(velocity);
+          }
+          return;
+        }
+        let p = pose.pos.add(d),
+          localQ = q;
+        if (object.parent) {
+          p = B.Vector3.TransformCoordinates(
+            p,
+            B.Matrix.Invert(object.parent.computeWorldMatrix(true)),
+          );
+          localQ = worldPose(object.parent).rot.conjugate().multiply(q);
+        }
+        object.position.copyFrom(p);
+        object.rotationQuaternion = localQ;
+      },
       remove,
       step,
       forOwner,
@@ -384,10 +471,12 @@
         physicsContacts: contacts.size,
         physicsSubscriptions: subscribers.size,
         physicsBackend: "jolt-wasm",
+        ...tools?.stats(),
       }),
       dispose() {
         if (disposed) return;
         for (const id of [...bodies.keys()]) remove(id);
+        tools?.dispose();
         disposed = true;
         subscribers.clear();
         contacts.clear();

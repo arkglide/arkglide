@@ -1,4 +1,12 @@
 import {
+  defaultPhysicsConfig,
+  defaultMixer,
+  type PhysicsConfig,
+  type AudioMixerConfig,
+  type AnimationControllerAsset,
+  type RetargetProfile,
+} from "./advancedGameplay";
+import {
   defaultGameplay,
   type AudioAsset,
   type GameplayConfig,
@@ -47,6 +55,10 @@ export interface PrefabInstance {
   revision: number;
 }
 export interface ProjectContent {
+  physics?: PhysicsConfig;
+  mixer?: AudioMixerConfig;
+  animationControllers?: Record<string, AnimationControllerAsset>;
+  retargetProfiles?: Record<string, RetargetProfile>;
   audio?: AudioAsset[];
   gameplay?: GameplayConfig;
   materials: Record<string, MaterialAsset>;
@@ -55,6 +67,10 @@ export interface ProjectContent {
   prefabInstances: Record<string, PrefabInstance>;
 }
 export const emptyContent = (): ProjectContent => ({
+  physics: defaultPhysicsConfig(),
+  mixer: defaultMixer(),
+  animationControllers: {},
+  retargetProfiles: {},
   audio: [],
   gameplay: defaultGameplay(),
   materials: {},

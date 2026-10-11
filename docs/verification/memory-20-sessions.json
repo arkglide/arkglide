@@ -1,0 +1,142 @@
+[
+  {
+    "cycle": 0,
+    "usedSize": 91406168,
+    "backingStorageSize": 57507842,
+    "embedderHeapUsedSize": 8962888,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 1,
+    "usedSize": 91999192,
+    "backingStorageSize": 57512527,
+    "embedderHeapUsedSize": 9092424,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 2,
+    "usedSize": 90506456,
+    "backingStorageSize": 57505403,
+    "embedderHeapUsedSize": 8857968,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 3,
+    "usedSize": 91414400,
+    "backingStorageSize": 57508356,
+    "embedderHeapUsedSize": 8843872,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 4,
+    "usedSize": 91541004,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 8870928,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 5,
+    "usedSize": 91511164,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 8922912,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 6,
+    "usedSize": 91632216,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 8953888,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 7,
+    "usedSize": 91646176,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 8963560,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 8,
+    "usedSize": 91647136,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 8964160,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 9,
+    "usedSize": 91700348,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 8974320,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 10,
+    "usedSize": 91774960,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 9062528,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 11,
+    "usedSize": 91724416,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 9005024,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 12,
+    "usedSize": 91783224,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 9054368,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 13,
+    "usedSize": 91730184,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 9037512,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 14,
+    "usedSize": 91814576,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 9085960,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 15,
+    "usedSize": 91848116,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 9074920,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 16,
+    "usedSize": 91861776,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 9115936,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 17,
+    "usedSize": 91894908,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 9107984,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 18,
+    "usedSize": 91908784,
+    "backingStorageSize": 57512290,
+    "embedderHeapUsedSize": 9140416,
+    "wasmBytes": 134217728
+  },
+  {
+    "cycle": 19,
+    "usedSize": 91919812,
+    "backingStorageSize": 57512267,
+    "embedderHeapUsedSize": 9127600,
+    "wasmBytes": 134217728
+  }
+]

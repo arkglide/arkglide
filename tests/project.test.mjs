@@ -295,13 +295,13 @@ test("legacy project migration adds time defaults; future versions and invalid r
     scripts: { "main.js": "" },
   };
   const upgraded = normalize(old);
-  assert.equal(upgraded.version, "0.5");
+  assert.equal(upgraded.version, "0.6");
   assert.equal(upgraded.settings.fixedTimeStep, 1 / 60);
   assert.equal(upgraded.settings.timeScale, 1);
-  assert.throws(() => normalize({ ...old, version: "0.6" }), /版本/);
+  assert.throws(() => normalize({ ...old, version: "0.7" }), /版本/);
   const { zipSync, strToU8 } = await import("fflate");
   const bytes = zipSync({
-    "project.json": strToU8(JSON.stringify({ ...old, version: "0.6" })),
+    "project.json": strToU8(JSON.stringify({ ...old, version: "0.7" })),
   });
   await assert.rejects(
     archive.importProject(new File([bytes], "future.arkglide")),
@@ -339,7 +339,7 @@ test("automatic recovery atomically stores script, scene and binary data without
     await controller.flush();
     const draft = await storage.loadRecovery(id);
     assert.ok(draft);
-    assert.equal(draft.project.version, "0.5");
+    assert.equal(draft.project.version, "0.6");
     assert.deepEqual([...new Uint8Array(draft.buffers.get(model))], [3, 4, 5]);
     assert.ok(
       !(await storage.loadProject(projectId)).scene.nodes.some(

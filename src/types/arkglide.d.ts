@@ -222,7 +222,9 @@ declare const prefabs: PrefabsAPI;
 
 interface PhysicsOptions {
   motion: "static" | "dynamic" | "kinematic";
-  shape: "box" | "sphere" | "capsule";
+  shape: "box" | "sphere" | "capsule" | "convex" | "mesh";
+  group?: string;
+  parts?: string[];
   size: Vec3;
   mass: number;
   friction: number;
@@ -341,4 +343,256 @@ interface ScriptContext {
   audio: AudioAPI;
   ui: UIAPI;
   animation: AnimationAPI;
+}
+
+/** Advanced third-batch APIs. User scripts remain JavaScript. */
+interface PhysicsQueryFilter {
+  group?: string;
+  mask?: number;
+  sensors?: boolean;
+  ignore?: (Entity | string)[];
+  all?: boolean;
+  /** Unit quaternion: shape cast and overlap only. */
+  rotation?: Quat;
+}
+type PhysicsQueryShape =
+  | { kind: "box"; size: Vec3 }
+  | { kind: "sphere"; radius: number }
+  | { kind: "capsule"; radius: number; height: number };
+interface PhysicsHit {
+  entity: Entity;
+  point: Vec3;
+  normal: Vec3;
+  fraction: number;
+  distance: number;
+  penetration?: number;
+}
+interface CharacterOptions {
+  radius: number;
+  height: number;
+  stepHeight: number;
+  maxSlope: number;
+  speed: number;
+  jumpSpeed: number;
+  group?: string;
+}
+interface CharacterHandle {
+  /** World X/Z direction; magnitude clamped to 1 and multiplied by configured speed. */
+  move(direction: Vec3): void;
+  jump(): void;
+  teleport(worldPosition: Vec3): void;
+  readonly grounded: boolean;
+  readonly velocity: Vec3;
+  readonly groundNormal: Vec3;
+}
+interface JointOptions {
+  kind: "fixed" | "hinge" | "slider" | "distance";
+  anchor?: Vec3;
+  anchor2?: Vec3;
+  axis?: Vec3;
+  min?: number;
+  max?: number;
+  motor?: { velocity: number; force: number };
+}
+interface JointHandle {
+  readonly id: string;
+  readonly active: boolean;
+  destroy(): void;
+}
+interface PhysicsAPI {
+  raycast(
+    origin: Vec3,
+    direction: Vec3,
+    filter?: PhysicsQueryFilter & { all?: false },
+  ): PhysicsHit | null;
+  raycast(
+    origin: Vec3,
+    direction: Vec3,
+    filter: PhysicsQueryFilter & { all: true },
+  ): PhysicsHit[];
+  shapeCast(
+    shape: PhysicsQueryShape,
+    position: Vec3,
+    direction: Vec3,
+    filter?: PhysicsQueryFilter & { all?: false },
+  ): PhysicsHit | null;
+  shapeCast(
+    shape: PhysicsQueryShape,
+    position: Vec3,
+    direction: Vec3,
+    filter: PhysicsQueryFilter & { all: true },
+  ): PhysicsHit[];
+  overlap(
+    shape: PhysicsQueryShape,
+    position: Vec3,
+    filter?: PhysicsQueryFilter,
+  ): PhysicsHit[];
+  character(entity: Entity): CharacterHandle;
+  addCharacter(entity: Entity, options: CharacterOptions): CharacterHandle;
+  removeCharacter(entity: Entity): void;
+  /** Script API anchors are world coordinates; Inspector anchors are local to their endpoints. */
+  createJoint(
+    entity: Entity,
+    target: Entity,
+    options: JointOptions,
+  ): JointHandle;
+  setDebug(value: boolean): void;
+}
+interface AnimationControllerHandle {
+  readonly state: string;
+  setParameter(name: string, value: number | boolean): void;
+  getParameter(name: string): number | boolean;
+  setState(name: string, fade?: number): void;
+  inspect(): {
+    state: string;
+    parameters: Record<string, number | boolean>;
+    weights: { clip: string; weight: number }[];
+    time: number;
+  };
+  destroy(): void;
+}
+interface AnimationEventPayload {
+  entity: Entity;
+  state: string;
+  name: string;
+  data?: string | number | boolean | null;
+  time: number;
+  loop: number;
+}
+interface RetargetOptions {
+  mapping: Record<string, string>;
+  scale: number;
+  sourcePose?: Record<string, { position: Vec3; rotation: Quat }>;
+  targetPose?: Record<string, { position: Vec3; rotation: Quat }>;
+}
+interface AnimationAPI {
+  createController(
+    entity: Entity,
+    controllerId: string,
+    options?: {
+      rootMotion?: { target: string; translation: boolean; rotation: boolean };
+    },
+  ): AnimationControllerHandle;
+  controller(entity: Entity): AnimationControllerHandle | null;
+  onEvent(
+    entity: Entity,
+    callback: (event: AnimationEventPayload) => void,
+  ): () => void;
+  retarget(
+    source: Entity,
+    target: Entity,
+    profileIdOrOptions: string | RetargetOptions,
+  ): string[];
+}
+interface AudioPlayOptions {
+  bus?: string;
+  priority?: number;
+  stream?: boolean;
+  preservePitch?: boolean;
+}
+interface AudioVoice {
+  readonly position: number;
+  readonly duration: number | null;
+  readonly reason?: string;
+  fadeTo(volume: number, seconds?: number, stopAfter?: boolean): void;
+  setRate(rate: number): void;
+  pause(): void;
+  resume(): void;
+  /** Local media stream only. */
+  seek(seconds: number): void;
+}
+interface AudioAPI {
+  buses(): {
+    id: string;
+    name: string;
+    parentId: string | null;
+    volume: number;
+    mute: boolean;
+    duck: number;
+  }[];
+  setBusVolume(id: string, value: number): void;
+  setBusMuted(id: string, value: boolean): void;
+  applySnapshot(
+    id: string,
+    seconds?: number,
+  ): { readonly transitioning: boolean; release(): void };
+}
+interface GamepadBinding {
+  kind: "button" | "axis";
+  index: number;
+  direction: 1 | -1;
+  deadzone: number;
+}
+interface ActionBinding {
+  name: string;
+  positive: string[];
+  negative: string[];
+  gamepad?: GamepadBinding[];
+}
+interface InputBindingResult {
+  applied: boolean;
+  conflicts?: { action: string; kind: string; code?: string; index?: number }[];
+  cancelled?: boolean;
+  code?: string;
+}
+interface InputAPI {
+  gamepads(): { index: number; id: string; mapping: string }[];
+  bindings(): ActionBinding[];
+  rebind(
+    name: string,
+    binding: Partial<Omit<ActionBinding, "name">>,
+    acceptConflicts?: boolean,
+  ): InputBindingResult;
+  resetBindings(name?: string): void;
+  /** Captures one keyboard code. Escape cancels. Editor mappings are persisted separately. */
+  captureBinding(
+    name: string,
+    direction?: "positive" | "negative",
+  ): Promise<InputBindingResult>;
+}
+type UIKind =
+  | "text"
+  | "button"
+  | "container"
+  | "image"
+  | "richtext"
+  | "input"
+  | "joystick";
+interface HUDOptions {
+  parentId?: string | null;
+  width?: number;
+  height?: number;
+  unit?: "px" | "percent";
+  anchorX?: number;
+  anchorY?: number;
+  margin?: number;
+  gap?: number;
+  columns?: number;
+  layout?: "absolute" | "row" | "column" | "grid";
+  zIndex?: number;
+  disabled?: boolean;
+  visible?: boolean;
+  textureId?: string;
+  blockInput?: boolean;
+  tabIndex?: number;
+  joystick?: {
+    mode: "fixed" | "floating";
+    radius: number;
+    deadzone: number;
+    actionX: string;
+    actionY: string;
+  };
+}
+interface UIEvent {
+  id: string;
+  type: "click" | "press" | "release" | "change" | "focus" | "blur";
+  value: string | Vec2;
+}
+interface HUDHandle {
+  setDisabled(value: boolean): void;
+  focus(): void;
+  on(type: UIEvent["type"], callback: (event: UIEvent) => void): () => void;
+}
+interface UIAPI {
+  create(options: HUDOptions & { kind: UIKind }): HUDHandle;
 }

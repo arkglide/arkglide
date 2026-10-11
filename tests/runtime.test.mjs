@@ -46,6 +46,8 @@ function setup() {
     setTimeout: () => 1,
     clearTimeout() {},
     URL,
+    URLSearchParams,
+    location:{search:""},
     Blob,
     structuredClone,
     crypto,

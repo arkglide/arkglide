@@ -42,6 +42,34 @@ export default function DiagnosticsPanel() {
           `${stats.animationPlayers || 0} / ${stats.hudElements || 0} / ${stats.inputHeld || 0}`,
         ],
         [
+          "角色 / 关节 / 活跃查询",
+          `${stats.physicsCharacters || 0} / ${stats.physicsConstraints || 0} / ${stats.physicsQueriesActive || 0}`,
+        ],
+        [
+          "碰撞缓存 / 调试网格",
+          `${stats.physicsShapeCache || 0} (${((stats.physicsCacheBytes || 0) / 1048576).toFixed(1)} MiB) / ${stats.physicsDebugMeshes || 0}`,
+        ],
+        [
+          "控制器 / 事件订阅 / 重定向组",
+          `${stats.animationControllers || 0} / ${stats.animationEventSubscriptions || 0} / ${stats.animationRetargetGroups || 0}`,
+        ],
+        [
+          "音频总线 / 流 / Worklet",
+          `${stats.audioBuses || 0} / ${stats.audioStreams || 0} / ${stats.audioWorklets || 0}`,
+        ],
+        [
+          "音频过渡 / Blob URL",
+          `${stats.audioTransitions || 0} / ${stats.audioBlobURLs || 0}`,
+        ],
+        [
+          "UI 订阅 / 图片 URL / 重绑捕获",
+          `${stats.uiSubscriptions || 0} / ${stats.uiBlobURLs || 0} / ${stats.inputCaptures || 0}`,
+        ],
+        [
+          "手柄设备 / Jolt WASM 堆",
+          `${stats.inputGamepads || 0} / ${((stats.wasmHeapBytes || 0) / 1048576).toFixed(1)} MiB`,
+        ],
+        [
           "游戏时间 / 未缩放时间",
           `${stats.totalTime.toFixed(2)} / ${stats.unscaledTotalTime.toFixed(2)} s`,
         ],

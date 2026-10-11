@@ -16,7 +16,7 @@ test("third batch playable project: real WASM collision, animation, sound, HUD/i
       await import("/src/store/useEditorStore.ts")
     ).useEditorStore;
   });
-  const runtime = page.frames().find((f) => f.url().endsWith("/runtime.html"))!;
+  const runtime = page.frames().find((f) => f.url().split("?")[0].endsWith("/runtime.html"))!;
   await runtime.waitForFunction(
     () =>
       (window as any).joltModule && (window as any).math?.backend === "wasm",
@@ -115,6 +115,7 @@ test("third batch playable project: real WASM collision, animation, sound, HUD/i
   );
   expect(x).toBeLessThan(3.1);
   await page.evaluate(() => (window as any).s.getState().pause());
+  await runtime.waitForFunction(()=>!(window as any).running&&(window as any).desiredState==="paused",undefined,{polling:50});
   const frozen = await runtime.evaluate(() => ({
     p: (window as any).sceneAPI.find("Player").getPosition(),
     t: (window as any).time.totalTime,

@@ -1,3 +1,8 @@
+import { remapGameplayReferences } from "../types/advancedGameplay";
+import type {
+  CharacterComponent,
+  JointComponent,
+} from "../types/advancedGameplay";
 import type {
   PhysicsComponent,
   AnimationComponent,
@@ -73,6 +78,8 @@ export interface SceneNode {
   modelRevision?: string;
   modelUrl?: string; // 模型文件 URL（type='model' 时用）
   physics?: PhysicsComponent;
+  character?: CharacterComponent;
+  joints?: JointComponent[];
   animation?: AnimationComponent;
   audioSource?: AudioSourceComponent;
   materialId?: string;
@@ -116,6 +123,26 @@ export interface RuntimeStats {
   fixedSteps: number;
   timeScale: number;
   droppedTime: number;
+  physicsCharacters?: number;
+  physicsConstraints?: number;
+  physicsShapeCache?: number;
+  physicsCacheBytes?: number;
+  physicsQueriesActive?: number;
+  physicsDebugMeshes?: number;
+  animationControllers?: number;
+  animationEventSubscriptions?: number;
+  animationRetargetGroups?: number;
+  animationDroppedEvents?: number;
+  audioBuses?: number;
+  audioStreams?: number;
+  audioWorklets?: number;
+  audioTransitions?: number;
+  audioBlobURLs?: number;
+  uiSubscriptions?: number;
+  uiBlobURLs?: number;
+  inputGamepads?: number;
+  inputCaptures?: number;
+  wasmHeapBytes?: number;
   physicsBodies?: number;
   physicsContacts?: number;
   physicsSubscriptions?: number;
@@ -202,6 +229,14 @@ export interface EditorState {
   importAudio: (asset: AudioAsset, bytes: ArrayBuffer) => void;
   deleteAudio: (id: string) => void;
   updateGameplay: (value: GameplayConfig) => void;
+  updateAdvancedContent: (
+    patch: Partial<
+      Pick<
+        ProjectContent,
+        "physics" | "mixer" | "animationControllers" | "retargetProfiles"
+      >
+    >,
+  ) => void;
   modelAnimations: Record<string, string[]>;
   setModelAnimations: (id: string, names: string[]) => void;
   content: ProjectContent;
@@ -311,6 +346,8 @@ export interface EditorState {
         | "modelUrl"
         | "primitive"
         | "lightType"
+        | "character"
+        | "joints"
         | "physics"
         | "animation"
         | "audioSource"
@@ -683,6 +720,44 @@ function restoreClipboardResources(
       const b = state.clipboardAudioBuffers.get(a.id);
       if (b) audio.set(a.id, b.slice(0));
     }
+  if (snapshot) {
+    content.animationControllers = {
+      ...structuredClone(snapshot.animationControllers || {}),
+      ...content.animationControllers,
+    };
+    content.retargetProfiles = {
+      ...structuredClone(snapshot.retargetProfiles || {}),
+      ...content.retargetProfiles,
+    };
+    if (snapshot.physics && content.physics) {
+      const old = snapshot.physics.groups,
+        current = content.physics.groups,
+        missing = old.filter((g) => !current.some((v) => v.name === g.name));
+      const combined = [...current, ...missing.map((g) => ({ ...g, mask: 0 }))];
+      for (const g of combined) {
+        const prior = old.find((v) => v.name === g.name);
+        if (!prior) continue;
+        for (let bit = 0; bit < old.length; bit++) {
+          if (!(prior.mask & (1 << bit))) continue;
+          const target = combined.findIndex((v) => v.name === old[bit].name);
+          if (
+            missing.some((v) => v.name === g.name) ||
+            missing.some((v) => v.name === old[bit].name)
+          )
+            g.mask |= 1 << target;
+        }
+      }
+      content.physics.groups = combined;
+    }
+    if (snapshot.mixer && content.mixer) {
+      for (const b of snapshot.mixer.buses)
+        if (!content.mixer.buses.some((v) => v.id === b.id))
+          content.mixer.buses.push(structuredClone(b));
+      for (const s of snapshot.mixer.snapshots)
+        if (!content.mixer.snapshots.some((v) => v.id === s.id))
+          content.mixer.snapshots.push(structuredClone(s));
+    }
+  }
   return { content, buffers, textures, audio };
 }
 
@@ -732,6 +807,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         audio: s.content.audio?.filter((a) => a.id !== id),
       },
     });
+  },
+  updateAdvancedContent: (patch) => {
+    const s = get();
+    assertEditing(s);
+    const content = { ...s.content, ...structuredClone(patch) };
+    validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    pushHistory(get, set);
+    set({ content });
   },
   updateGameplay: (value) => {
     const s = get();
@@ -951,7 +1034,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               ? node.parentId
               : null;
       newNodes.push({
-        ...node,
+        ...remapGameplayReferences(node, idMap),
         id: newId,
         name: node.name + "_copy",
         parentId: newParentId,
@@ -1025,7 +1108,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? idMap.get(n.parentId) || n.parentId
         : n.parentId;
       return {
-        ...n,
+        ...remapGameplayReferences(n, idMap),
         id: newId,
         name: n.name + "_copy",
         // 根节点保持同级（沿用原 parentId），子节点映射到新父 ID
@@ -1145,7 +1228,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   updateTransform: (id, partial, recordHistory = true) => {
     if (
-      ["physics", "animation", "audioSource"].some((k) =>
+      ["physics", "character", "joints", "animation", "audioSource"].some((k) =>
         Object.hasOwn(partial, k),
       )
     ) {
@@ -1236,7 +1319,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             ),
           ),
         },
-        nodes: state.nodes.filter((n) => !toDelete.has(n.id)),
+        nodes: state.nodes
+          .filter((n) => !toDelete.has(n.id))
+          .map((n) => ({
+            ...n,
+            joints: n.joints?.filter((j) => !toDelete.has(j.targetId)),
+            animation:
+              n.animation?.retarget &&
+              toDelete.has(n.animation.retarget.sourceId)
+                ? { ...n.animation, retarget: undefined }
+                : n.animation,
+          })),
         modelBuffers: new Map(
           [...state.modelBuffers].filter(([id]) => !toDelete.has(id)),
         ),
@@ -1854,6 +1947,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       )
     )
       throw new Error("贴图仍被材质引用，请先解除引用");
+    if (s.content.gameplay?.hud.some((h) => h.textureId === id))
+      throw Error("贴图仍被图片 UI 引用，请先解除引用");
     const buffers = new Map(s.textureBuffers);
     buffers.delete(id);
     pushHistory(get, set);
