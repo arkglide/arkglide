@@ -22,6 +22,9 @@ dist-ssr
 .arts
 .codeartsdoer
 
+# 本地 Agent 规则
+[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
+
 # 误创建的空文件
 nul
 

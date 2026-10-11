@@ -69,7 +69,7 @@ const label = ui.createText({id:'status',text:'就绪',x:5,y:5});
 ui.createButton({id:'restart',text:'重开',x:70,y:10}, () => console.log('clicked'));
 ```
 
-脚本创建的 HUD 随脚本销毁释放，项目配置的 HUD 随停止释放。文字使用 textContent，不注入 HTML。句柄支持 setText/setVisible/destroy。当前没有拖拽式 UI 画布编辑器、布局容器、富文本/图片 HUD、游戏手柄或摇杆控件；触屏采用动作按钮。
+脚本创建的 HUD 随脚本销毁释放，项目配置的 HUD 随停止释放。文字使用 textContent，不注入 HTML。句柄支持 setText/setVisible/destroy；隐藏动作按钮会释放该按钮持有的触摸输入，重新显示时须再次按下，其他按钮与键盘输入不受影响。暂停期间新建的按钮也保持禁用，恢复后启用。当前没有拖拽式 UI 画布编辑器、布局容器、富文本/图片 HUD、游戏手柄或摇杆控件；触屏采用动作按钮。
 
 ## F18：模型动画
 
