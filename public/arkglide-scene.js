@@ -54,6 +54,7 @@
           };
         options.onLoading?.(1);
         const item = {
+          materialId,
           id: textureId,
           buffer,
           promise,
@@ -99,7 +100,7 @@
           mat.dispose(false, false);
           materials.delete(id);
           for (const [key, item] of slots)
-            if (key.startsWith(id + ":")) {
+            if (item.materialId === id) {
               release(item);
               slots.delete(key);
             }

@@ -446,3 +446,28 @@ test("reloading an enclosing model preserves independently owned child-model mat
     engine.dispose();
   }
 });
+
+test("removing a material does not release texture slots of IDs sharing its prefix", async () => {
+  const engine = new B.NullEngine(), scene = new B.Scene(engine);
+  const textures = [];
+  class Texture {
+    static TRILINEAR_SAMPLINGMODE = 1;
+    constructor(url, scene, a, b, mode, ready) { this.disposed = false; textures.push(this); ready(); }
+    dispose() { this.disposed = true; }
+  }
+  const adapter = ArkGlideScene.createSceneAdapter({ ...B, Texture }, scene);
+  const definition = id => ({ id, name: id, baseColor: "#FFFFFF", emissiveColor: "#000000", metallic: 0, roughness: 1, alpha: 1, doubleSided: false, uvScale: { u: 1, v: 1 }, albedoTextureId: "tex" });
+  const content = { materials: { m: definition("m"), "m:child": definition("m:child") }, textures: [{ id: "tex", name: "image.png", mime: "image/png" }] };
+  const buffers = new Map([["tex", new ArrayBuffer(3)]]);
+  try {
+    await adapter.sync([], new Map(), content, buffers);
+    assert.equal(textures.length, 2);
+    const survivor = adapter.materials.get("m:child").albedoTexture;
+    await adapter.sync([], new Map(), { ...content, materials: { "m:child": content.materials["m:child"] } }, buffers);
+    assert.equal(survivor.disposed, false);
+    assert.equal(adapter.materials.get("m:child").albedoTexture, survivor);
+    assert.equal(textures.length, 2);
+  } finally {
+    adapter.dispose();engine.dispose();
+  }
+});
