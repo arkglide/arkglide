@@ -847,3 +847,21 @@ test("normal script imports load contents and existing scripts open without rere
   assert.equal(store.getState().scripts[asset.name], "edited");
   assert.equal(store.getState().activeFileId, asset.name);
 });
+
+test("recovery rejects truncated texture binaries before replacing the current document", async () => {
+  store.getState().newProject();
+  store.getState().importTexture({ id: "texture", name: "image.png", mime: "image/png", byteLength: 3 }, new Uint8Array([1, 2, 3]).buffer);
+  const project = recovery.captureEditorProject(store.getState());
+  const id = "broken-texture-" + crypto.randomUUID();
+  await storage.saveRecovery({ recoveryId: id, project, buffers: new Map(), textureBuffers: new Map([["texture", new ArrayBuffer(1)]]), updatedAt: Date.now() });
+  store.getState().newProject();
+  store.getState().renameNode("cube", "keep current");
+  const current = store.getState();
+  try {
+    await assert.rejects(recovery.restoreRecovery(id), /贴图大小不一致/);
+    assert.equal(store.getState().documentId, current.documentId);
+    assert.equal(store.getState().nodes, current.nodes);
+  } finally {
+    await storage.deleteRecovery(id);
+  }
+});

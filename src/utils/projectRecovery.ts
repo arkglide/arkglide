@@ -334,7 +334,11 @@ export async function restoreRecovery(id: string): Promise<void> {
     throw new Error("恢复记录贴图损坏");
   for (const t of project.content?.textures || []) {
     const b = record.textureBuffers?.get(t.id);
-    if (b instanceof ArrayBuffer) textures.set(t.id, b);
+    if (b instanceof ArrayBuffer) {
+      if (b.byteLength !== t.byteLength)
+        throw new Error("恢复记录贴图大小不一致: " + t.name);
+      textures.set(t.id, b);
+    }
   }
   // Validate everything first; keep the draft until explicitly discarded or manually saved.
   useEditorStore
