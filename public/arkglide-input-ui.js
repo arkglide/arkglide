@@ -72,6 +72,7 @@
     const defaults = structuredClone(config.defaults || config.actions),
       keys = new Set(),
       codes = new Set(),
+      keyCodes = new Map(),
       virtual = new Map(),
       padValues = new Map(),
       pressed = new Set(),
@@ -143,6 +144,7 @@
     function reset() {
       keys.clear();
       codes.clear();
+      keyCodes.clear();
       virtual.clear();
       padValues.clear();
       pressed.clear();
@@ -296,10 +298,12 @@
       }
       if (!allow() || interactive(e)) return;
       mutate(() => {
-        const k = upper(e.key);
+        const code = e.code || upper(e.key),
+          k = keyCodes.get(code) ?? upper(e.key);
         if (!keys.has(k)) pressed.add(k);
         keys.add(k);
         codes.add(e.code);
+        keyCodes.set(code, k);
       });
       if (
         config.captureInput &&
@@ -311,10 +315,14 @@
     });
     listen(win, "keyup", (e) => {
       mutate(() => {
-        const k = upper(e.key);
-        if (keys.has(k)) released.add(k);
-        keys.delete(k);
+        const code = e.code || upper(e.key),
+          k = keyCodes.get(code) ?? upper(e.key);
+        keyCodes.delete(code);
         codes.delete(e.code);
+        if (![...keyCodes.values()].includes(k)) {
+          if (keys.has(k)) released.add(k);
+          keys.delete(k);
+        }
       });
     });
     listen(canvas, "pointerdown", (e) => {
@@ -739,6 +747,7 @@
               blockers.add(def.id);
               codes.clear();
               keys.clear();
+              keyCodes.clear();
             });
           if (def.kind === "button" && def.action && allow())
             mutate(() =>

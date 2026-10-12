@@ -400,3 +400,61 @@ test("invalid button callbacks fail without leaving window listeners or HUD elem
     t.done();
   }
 });
+
+test("key release follows the original physical key when modifiers change its character", () => {
+  const t = fixture();
+  try {
+    t.window.emit("keydown", { key: "!", code: "Digit1" });
+    assert.equal(t.ui.input.isKeyDown("!"), true);
+    t.window.emit("keyup", { key: "1", code: "Digit1" });
+    assert.equal(t.ui.input.isKeyDown("!"), false);
+    assert.equal(t.ui.input.wasKeyReleased("!"), true);
+    t.ui.endFrame();
+    t.window.emit("keydown", { key: "1", code: "Digit1" });
+    t.window.emit("keydown", { key: "!", code: "Digit1", repeat: true });
+    t.window.emit("keyup", { key: "!", code: "Digit1" });
+    assert.equal(t.ui.input.isKeyDown("1"), false);
+    assert.equal(t.ui.input.isKeyDown("!"), false);
+  } finally {
+    t.done();
+  }
+});
+
+test("releasing one of two physical modifier keys leaves the other held", () => {
+  const t = fixture();
+  try {
+    t.window.emit("keydown", { key: "Shift", code: "ShiftLeft" });
+    t.window.emit("keydown", { key: "Shift", code: "ShiftRight" });
+    t.ui.endFrame();
+    t.window.emit("keyup", { key: "Shift", code: "ShiftLeft" });
+    assert.equal(t.ui.input.isKeyDown("Shift"), true);
+    assert.equal(t.ui.input.wasKeyReleased("Shift"), false);
+    t.window.emit("keyup", { key: "Shift", code: "ShiftRight" });
+    assert.equal(t.ui.input.isKeyDown("Shift"), false);
+    assert.equal(t.ui.input.wasKeyReleased("Shift"), true);
+  } finally {
+    t.done();
+  }
+});
+
+test("keyboard reset clears physical-key associations while action mappings retain their edges", () => {
+  const t = fixture();
+  try {
+    t.window.emit("keydown", { key: "d", code: "KeyD" });
+    assert.equal(t.ui.input.getAction("moveX"), 1);
+    assert.equal(t.ui.input.wasActionPressed("moveX"), true);
+    t.ui.endFrame();
+    t.window.emit("keyup", { key: "D", code: "KeyD" });
+    assert.equal(t.ui.input.getAction("moveX"), 0);
+    assert.equal(t.ui.input.wasActionReleased("moveX"), true);
+    t.window.emit("keydown", { key: "!", code: "Digit1" });
+    t.ui.reset();
+    t.window.emit("keydown", { key: "1", code: "Digit1" });
+    assert.equal(t.ui.input.isKeyDown("1"), true);
+    assert.equal(t.ui.input.isKeyDown("!"), false);
+    t.window.emit("keyup", { key: "1", code: "Digit1" });
+    assert.equal(t.ui.input.isKeyDown("1"), false);
+  } finally {
+    t.done();
+  }
+});
