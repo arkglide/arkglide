@@ -467,15 +467,19 @@
         if (!["positive", "negative"].includes(direction) || binding)
           throw Error("重绑捕获正在进行或方向无效");
         reset();
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           binding = {
             finish(code) {
               binding = null;
-              resolve(
-                code
-                  ? { code, ...rebind(name, { [direction]: [code] }) }
-                  : { applied: false, cancelled: true },
-              );
+              try {
+                resolve(
+                  code
+                    ? { code, ...rebind(name, { [direction]: [code] }) }
+                    : { applied: false, cancelled: true },
+                );
+              } catch (error) {
+                reject(error);
+              }
             },
           };
         });

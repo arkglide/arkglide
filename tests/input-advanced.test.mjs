@@ -330,3 +330,22 @@ test("reverse menu navigation starts at the last item and Shift+Tab moves backwa
     t.done();
   }
 });
+
+test("invalid captured bindings reject promptly without escaping the keyboard handler", async () => {
+  const t = fixture();
+  try {
+    const capture = t.ui.inputForOwner(t.owner).captureBinding("moveX");
+    const rejected = assert.rejects(capture, /正反方向/);
+    assert.doesNotThrow(() =>
+      t.window.emit("keydown", { code: "KeyA", key: "a" }),
+    );
+    await rejected;
+    assert.equal(t.ui.stats().inputCaptures, 0);
+    assert.deepEqual(t.ui.input.bindings()[0].positive, ["KeyD"]);
+    const next = t.ui.input.captureBinding("moveX");
+    t.window.emit("keydown", { code: "KeyL", key: "l" });
+    assert.equal((await next).applied, true);
+  } finally {
+    t.done();
+  }
+});
