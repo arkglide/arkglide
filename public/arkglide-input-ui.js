@@ -832,7 +832,10 @@
         el,
         "input",
         () => {
-          if (def.disabled) return;
+          if (!enabled(r) || !active) {
+            if (def.kind === "input") el.value = def.text;
+            return;
+          }
           def.text = el.value;
           r.emit("change", el.value);
         },

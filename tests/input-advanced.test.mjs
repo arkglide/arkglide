@@ -475,3 +475,25 @@ test("blocking HUD interaction releases mouse state and pending mouse movement",
     t.done();
   }
 });
+
+test("input events under disabled parents preserve their text and do not emit changes", () => {
+  const t = fixture([def("panel", "container", { disabled: true }), def("field", "input", { parentId: "panel", text: "original" })]);
+  try {
+    const api = t.ui.forOwner(t.owner), field = api.get("field");
+    let changes = 0;
+    field.on("change", () => changes++);
+    const el = t.layer.children[0].children[0];
+    el.value = "edited while disabled";
+    el.emit("input");
+    assert.equal(field.text, "original");
+    assert.equal(el.value, "original");
+    assert.equal(changes, 0);
+    api.get("panel").setDisabled(false);
+    el.value = "allowed edit";
+    el.emit("input");
+    assert.equal(field.text, "allowed edit");
+    assert.equal(changes, 1);
+  } finally {
+    t.done();
+  }
+});
