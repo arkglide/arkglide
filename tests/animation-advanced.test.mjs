@@ -376,3 +376,50 @@ test("destroying an obsolete controller handle leaves its replacement running", 
     s.done();
   }
 });
+
+test("animation event destruction stops frame writes, root motion and further event dispatch", () => {
+  for (const rootMotion of [false, true]) {
+    const s = setup();
+    try {
+      const { entity, bone } = s.model("player");
+      s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+      s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+      s.controller.states[1].events.push({ time: 0.3, name: "later" });
+      const { api } = s.api();
+      const c = api.createController(entity, "locomotion", rootMotion ? {
+        rootMotion: { target: "Bone", translation: true, rotation: false },
+      } : {});
+      const events = [];
+      api.onEvent(entity, e => { events.push(e.name); c.destroy(); });
+      c.setState("Move");
+      s.runtime.fixedUpdate(0.5);
+      assert.deepEqual(events, ["step"]);
+      assert.equal(bone.position.x, 0);
+      assert.equal(s.motions.length, 0);
+    } finally {
+      s.done();
+    }
+  }
+});
+
+test("controller replacement inside an event is not overwritten by the old frame", () => {
+  const s = setup();
+  try {
+    const { entity, bone } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    const { api } = s.api();
+    const previous = api.createController(entity, "locomotion");
+    let replacement;
+    api.onEvent(entity, () => {
+      replacement = api.createController(entity, "locomotion");
+    });
+    previous.setState("Move");
+    s.runtime.fixedUpdate(0.5);
+    assert.equal(replacement.state, "Idle");
+    assert.equal(bone.position.x, 0);
+    assert.throws(() => previous.state, /已销毁/);
+  } finally {
+    s.done();
+  }
+});

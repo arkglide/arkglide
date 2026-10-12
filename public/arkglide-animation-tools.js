@@ -115,7 +115,12 @@
     }
     function emit(c, event) {
       for (const sub of [...listeners])
-        if (sub.id === c.entity.id && sub.owner.record.active) {
+        if (
+          c.live &&
+          !c.entity.destroyed &&
+          sub.id === c.entity.id &&
+          sub.owner.record.active
+        ) {
           try {
             sub.fn({ ...event, entity: c.entity, state: c.state });
           } catch (error) {
@@ -159,6 +164,7 @@
             time: event.time,
             loop: cycle,
           });
+          if (!c.live || c.entity.destroyed) return;
         }
       droppedEvents += Math.max(0, scheduled - count);
     }
@@ -394,7 +400,8 @@
         },
       });
       events(c, getState(c, c.state), -1e-9, 0);
-      tracks(c, [{ state: getState(c, c.state), time: 0, weight: 1 }]);
+      if (c.live && !c.entity.destroyed)
+        tracks(c, [{ state: getState(c, c.state), time: 0, weight: 1 }]);
       return c.handle;
     }
     function transition(c, to, fade) {
@@ -417,6 +424,7 @@
     function update(dt) {
       if (disposed || dt <= 0) return;
       for (const c of [...live.values()]) {
+        if (!c.live) continue;
         if (c.entity.destroyed) {
           remove(c.entity.id);
           continue;
@@ -432,11 +440,13 @@
         );
         if (t) {
           transition(c, t.to, t.duration);
+          if (!c.live || c.entity.destroyed) continue;
           state = getState(c, c.state);
         }
         const before = c.time;
         c.time += dt * state.speed;
         events(c, state, before, c.time);
+        if (!c.live || c.entity.destroyed) continue;
         c.fadeTime += dt;
         const w = c.previous && c.fade ? Math.min(1, c.fadeTime / c.fade) : 1;
         const list = [{ state, time: c.time, weight: w }];
