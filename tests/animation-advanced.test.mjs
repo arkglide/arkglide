@@ -423,3 +423,51 @@ test("controller replacement inside an event is not overwritten by the old frame
     s.done();
   }
 });
+
+test("state changes inside animation events stop old-state events and pose writes", () => {
+  const s = setup();
+  try {
+    const { entity, bone } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    s.controller.states[1].events.push({ time: 0.3, name: "later" });
+    const { api } = s.api();
+    const c = api.createController(entity, "locomotion");
+    const events = [];
+    api.onEvent(entity, e => { events.push(e.name); c.setState("Idle"); });
+    c.setState("Move");
+    s.runtime.fixedUpdate(0.5);
+    assert.deepEqual(events, ["step"]);
+    assert.equal(c.state, "Idle");
+    assert.equal(c.inspect().time, 0);
+    assert.equal(bone.position.x, 0);
+  } finally {
+    s.done();
+  }
+});
+
+test("event-triggered state restarts cancel old dispatch without breaking subsequent fixed updates", () => {
+  const s = setup();
+  try {
+    const { entity, bone } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    const { api } = s.api();
+    const c = api.createController(entity, "locomotion");
+    let first = 0, second = 0;
+    const unsubscribe = api.onEvent(entity, () => { first++; c.setState("Move"); });
+    api.onEvent(entity, () => second++);
+    c.setState("Move");
+    s.runtime.fixedUpdate(0.5);
+    assert.equal(first, 1);
+    assert.equal(second, 0);
+    assert.equal(c.inspect().time, 0);
+    unsubscribe();
+    s.runtime.fixedUpdate(0.1);
+    assert.ok(Math.abs(bone.position.x - 0.2) < 1e-6);
+    s.runtime.fixedUpdate(0.2);
+    assert.equal(second, 1);
+  } finally {
+    s.done();
+  }
+});

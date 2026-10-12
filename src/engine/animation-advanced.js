@@ -114,9 +114,11 @@
       throw Error("控制器不支持混合动画通道: " + property);
     }
     function emit(c, event) {
+      const revision = c.revision;
       for (const sub of [...listeners])
         if (
           c.live &&
+          c.revision === revision &&
           !c.entity.destroyed &&
           sub.id === c.entity.id &&
           sub.owner.record.active
@@ -135,6 +137,7 @@
         }
     }
     function events(c, state, from, to) {
+      const revision = c.revision;
       const d = stateDuration(c, state),
         first = state.loop ? Math.floor(Math.max(0, from) / d) : 0,
         last = state.loop ? Math.floor(to / d) : 0;
@@ -164,7 +167,7 @@
             time: event.time,
             loop: cycle,
           });
-          if (!c.live || c.entity.destroyed) return;
+          if (!c.live || c.entity.destroyed || c.revision !== revision) return;
         }
       droppedEvents += Math.max(0, scheduled - count);
     }
@@ -295,6 +298,7 @@
         parameters: structuredClone(resource.parameters),
         groups: imported,
         state: resource.defaultState,
+        revision: 0,
         time: 0,
         previous: null,
         fade: 0,
@@ -405,6 +409,7 @@
       return c.handle;
     }
     function transition(c, to, fade) {
+      c.revision++;
       c.previous =
         fade > 0 ? { state: getState(c, c.state), time: c.time } : null;
       c.state = to;
@@ -439,14 +444,17 @@
             t.conditions.every((d) => condition(c, d)),
         );
         if (t) {
+          const revision = c.revision;
           transition(c, t.to, t.duration);
+          if (c.revision !== revision + 1) continue;
           if (!c.live || c.entity.destroyed) continue;
           state = getState(c, c.state);
         }
-        const before = c.time;
+        const before = c.time,
+          revision = c.revision;
         c.time += dt * state.speed;
         events(c, state, before, c.time);
-        if (!c.live || c.entity.destroyed) continue;
+        if (!c.live || c.entity.destroyed || c.revision !== revision) continue;
         c.fadeTime += dt;
         const w = c.previous && c.fade ? Math.min(1, c.fadeTime / c.fade) : 1;
         const list = [{ state, time: c.time, weight: w }];
