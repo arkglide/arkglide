@@ -610,7 +610,15 @@
           .get(target.id)
           .filter((g) => names.includes(g.name));
         owner.track(() => {
-          remove(target.id);
+          const controller = live.get(target.id);
+          if (
+            controller?.resource.states.some((state) =>
+              (state.blend ? state.blend.children : [{ clip: state.clip }]).some(
+                (entry) => created.some((group) => group.name === entry.clip),
+              ),
+            )
+          )
+            remove(target.id);
           for (const g of created) g.dispose();
           retargeted.set(
             target.id,

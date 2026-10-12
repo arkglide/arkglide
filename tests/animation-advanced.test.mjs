@@ -491,3 +491,31 @@ test("animation subscriptions canceled during dispatch do not receive the curren
     s.done();
   }
 });
+
+test("retarget owner cleanup only removes controllers that reference its generated clips", () => {
+  for (const dependent of [false, true]) {
+    const s = setup();
+    try {
+      const source = s.model("source", "SourceBone");
+      const target = s.model("target", "TargetBone");
+      s.clip("source", "Walk", B.Vector3.Zero(), new B.Vector3(3, 0, 0));
+      s.clip("target", "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+      s.clip("target", "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+      const retarget = s.api();
+      retarget.api.retarget(source.entity, target.entity, { mapping: { SourceBone: "TargetBone" }, scale: 1 });
+      if (dependent) s.controller.states[1].clip = "Walk";
+      const current = s.api().api.createController(target.entity, "locomotion");
+      current.setState("Move");
+      retarget.owner.abort();
+      assert.equal(s.runtime.stats().animationRetargetGroups, 0);
+      if (dependent) assert.throws(() => current.state, /已销毁/);
+      else {
+        assert.equal(current.state, "Move");
+        s.runtime.fixedUpdate(0.25);
+        assert.ok(Math.abs(target.bone.position.x - 0.5) < 1e-6);
+      }
+    } finally {
+      s.done();
+    }
+  }
+});
