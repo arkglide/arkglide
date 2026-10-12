@@ -471,3 +471,23 @@ test("event-triggered state restarts cancel old dispatch without breaking subseq
     s.done();
   }
 });
+
+test("animation subscriptions canceled during dispatch do not receive the current event", () => {
+  const s = setup();
+  try {
+    const { entity } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    const { api } = s.api();
+    const c = api.createController(entity, "locomotion");
+    let cancel, called = 0;
+    api.onEvent(entity, () => cancel());
+    cancel = api.onEvent(entity, () => called++);
+    c.setState("Move");
+    s.runtime.fixedUpdate(0.5);
+    assert.equal(called, 0);
+    assert.equal(c.state, "Move");
+  } finally {
+    s.done();
+  }
+});

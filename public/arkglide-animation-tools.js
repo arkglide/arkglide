@@ -121,6 +121,7 @@
           c.revision === revision &&
           !c.entity.destroyed &&
           sub.id === c.entity.id &&
+          listeners.has(sub) &&
           sub.owner.record.active
         ) {
           try {

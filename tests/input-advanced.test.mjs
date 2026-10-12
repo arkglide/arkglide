@@ -349,3 +349,37 @@ test("invalid captured bindings reject promptly without escaping the keyboard ha
     t.done();
   }
 });
+
+test("UI subscriptions canceled inside a callback do not fire in the same dispatch", () => {
+  const t = fixture([def("button")]);
+  try {
+    const handle = t.ui.forOwner(t.owner).get("button");
+    let cancel, called = 0;
+    handle.on("click", () => cancel());
+    cancel = handle.on("click", () => called++);
+    t.layer.children[0].emit("click");
+    assert.equal(called, 0);
+    t.layer.children[0].emit("click");
+    assert.equal(called, 0);
+  } finally {
+    t.done();
+  }
+});
+
+test("hiding a UI element inside an event prevents subsequent callbacks until shown", () => {
+  const t = fixture([def("button")]);
+  try {
+    const handle = t.ui.forOwner(t.owner).get("button");
+    let called = 0;
+    const cancelHide = handle.on("click", () => handle.setVisible(false));
+    handle.on("click", () => called++);
+    t.layer.children[0].emit("click");
+    assert.equal(called, 0);
+    cancelHide();
+    handle.setVisible(true);
+    t.layer.children[0].emit("click");
+    assert.equal(called, 1);
+  } finally {
+    t.done();
+  }
+});

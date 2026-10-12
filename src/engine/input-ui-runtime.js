@@ -640,7 +640,13 @@
         emit(type, value) {
           if (!live || !enabled(r)) return;
           for (const s of [...listeners])
-            if (s.type === type && (!s.owner || s.owner.record.active)) {
+            if (
+              live &&
+              enabled(r) &&
+              listeners.has(s) &&
+              s.type === type &&
+              (!s.owner || s.owner.record.active)
+            ) {
               try {
                 s.fn({ id: def.id, type, value: value ?? def.text });
               } catch (error) {
