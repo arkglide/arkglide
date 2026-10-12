@@ -456,6 +456,10 @@ const initialNodes: SceneNode[] = [
 
 let logId = 0;
 let projectEpoch = 0;
+const activeProjectSaves = new Map<
+  string,
+  { projectId: string; pending: number }
+>();
 
 // 历史栈上限：超过时移除最旧的条目
 const HISTORY_LIMIT = 100;
@@ -1626,7 +1630,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const state = get();
     const epoch = projectEpoch;
     // 确定项目 ID：若 currentProjectId 为 null 则生成新 ID
-    const projectId = state.currentProjectId ?? crypto.randomUUID();
+    const projectId =
+      state.currentProjectId ??
+      activeProjectSaves.get(state.documentId)?.projectId ??
+      crypto.randomUUID();
     // 确定项目名称：若提供 name 参数则更新，否则沿用现有名称
     const projectName = name ?? state.currentProjectName;
     // 从 nodes 中提取模型引用：遍历 type='model' 的节点
@@ -1644,25 +1651,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       modelRefs,
       settings: state.settings,
     };
-    // 保存项目元数据
-    await saveProjectSnapshot(
-      data,
-      state.modelBuffers,
-      state.textureBuffers,
-      state.audioBuffers,
-    );
-    // 更新 currentProjectId / currentProjectName 状态
-    if (epoch === projectEpoch)
-      set({
-        currentProjectId: projectId,
-        currentProjectName: projectName,
-        savedSnapshot: {
-          project: data,
-          buffers: state.modelBuffers,
-          audio: state.audioBuffers,
-          textures: state.textureBuffers,
-        },
-      });
+    const activeSave = activeProjectSaves.get(state.documentId) || {
+      projectId,
+      pending: 0,
+    };
+    activeSave.pending++;
+    activeProjectSaves.set(state.documentId, activeSave);
+    try {
+      await saveProjectSnapshot(
+        data,
+        state.modelBuffers,
+        state.textureBuffers,
+        state.audioBuffers,
+      );
+      // 更新 currentProjectId / currentProjectName 状态
+      if (epoch === projectEpoch)
+        set({
+          currentProjectId: projectId,
+          currentProjectName: projectName,
+          savedSnapshot: {
+            project: data,
+            buffers: state.modelBuffers,
+            audio: state.audioBuffers,
+            textures: state.textureBuffers,
+          },
+        });
+    } finally {
+      if (--activeSave.pending === 0) activeProjectSaves.delete(state.documentId);
+    }
   },
   // 从 IndexedDB 加载项目并恢复全部状态
   // 读取 StoredProject → 恢复 nodes/scripts/activeFileId/currentProjectId/currentProjectName

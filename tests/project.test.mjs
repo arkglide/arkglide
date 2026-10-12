@@ -675,3 +675,36 @@ test("project replacement clears model part catalogs from the previous document"
   store.getState().setModelParts(model, [{ key: "mesh:0/slot:0", name: "Reloaded model" }]);
   assert.equal(store.getState().modelParts[model][0].name, "Reloaded model");
 });
+
+test("overlapping first saves use one project ID and retain the later snapshot", async () => {
+  store.getState().newProject();
+  const name = "overlapping-" + crypto.randomUUID();
+  const first = store.getState().saveCurrentProject(name);
+  store.getState().renameNode("cube", "latest cube");
+  const second = store.getState().saveCurrentProject(name);
+  await Promise.all([first, second]);
+  const projects = (await storage.listProjects()).filter(p => p.name === name);
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].projectId, store.getState().currentProjectId);
+  assert.equal(projects[0].scene.nodes.find(n => n.id === "cube").name, "latest cube");
+  await storage.deleteProject(projects[0].projectId);
+});
+
+test("overlapping saves from different documents keep separate IDs and current state", async () => {
+  const prefix = "separate-" + crypto.randomUUID();
+  store.getState().newProject();
+  const first = store.getState().saveCurrentProject(prefix + "-old");
+  store.getState().newProject();
+  const documentId = store.getState().documentId;
+  const second = store.getState().saveCurrentProject(prefix + "-new");
+  await Promise.all([first, second]);
+  const projects = (await storage.listProjects()).filter(p => p.name.startsWith(prefix));
+  assert.equal(projects.length, 2);
+  assert.notEqual(projects[0].projectId, projects[1].projectId);
+  assert.equal(store.getState().documentId, documentId);
+  assert.equal(store.getState().currentProjectName, prefix + "-new");
+  const currentId = store.getState().currentProjectId;
+  await store.getState().saveCurrentProject();
+  assert.equal(store.getState().currentProjectId, currentId);
+  for (const project of projects) await storage.deleteProject(project.projectId);
+});
