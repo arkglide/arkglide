@@ -662,3 +662,16 @@ test("prefab snapshots and clipboard preserve gameplay components and referenced
   assert.ok(s().nodes.some((n) => n.audioSource?.assetId === "sound"));
   validate(recovery.captureEditorProject(s()));
 });
+
+test("project replacement clears model part catalogs from the previous document", () => {
+  store.getState().newProject();
+  const model = store.getState().addNode("model", "model");
+  const project = recovery.captureEditorProject(store.getState());
+  store.getState().setModelParts(model, [{ key: "mesh:7/slot:2", name: "Old model" }]);
+  store.getState().setModelAnimations(model, ["Old clip"]);
+  store.getState().replaceProject(project, new Map(), new Set([model]));
+  assert.deepEqual(store.getState().modelParts, {});
+  assert.deepEqual(store.getState().modelAnimations, {});
+  store.getState().setModelParts(model, [{ key: "mesh:0/slot:0", name: "Reloaded model" }]);
+  assert.equal(store.getState().modelParts[model][0].name, "Reloaded model");
+});

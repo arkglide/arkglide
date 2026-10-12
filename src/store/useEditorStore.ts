@@ -1718,6 +1718,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     ++projectEpoch;
     set({
       modelAnimations: {},
+      modelParts: {},
       content: valid.content,
       audioBuffers: audio,
       textureBuffers: textures,
