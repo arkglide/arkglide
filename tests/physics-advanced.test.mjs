@@ -499,3 +499,33 @@ test("aborting an old character owner leaves another owner's replacement alive",
     s.done();
   }
 });
+
+test("invalid joint anchors are rejected before allocating native settings or vectors", () => {
+  const s = setup();
+  const original = J.FixedConstraintSettings;
+  let allocations = 0;
+  const allocated = [];
+  try {
+    const a = s.body("a", { x: 0, y: 0, z: 0 });
+    const b = s.body("b", { x: 0, y: 2, z: 0 }, "dynamic");
+    J.FixedConstraintSettings = function (...args) {
+      allocations++;
+      const settings = new original(...args);
+      allocated.push(settings);
+      return settings;
+    };
+    assert.throws(() => s.api.createJoint(a, b, {
+      kind: "fixed", anchor: { x: NaN, y: 0, z: 0 },
+    }), /Vec3/);
+    assert.equal(allocations, 0);
+    assert.throws(() => s.api.createJoint(a, b, {
+      kind: "fixed", anchor2: { x: 0, y: Infinity, z: 0 },
+    }), /Vec3/);
+    assert.equal(allocations, 0);
+    assert.equal(s.physics.stats().physicsConstraints, 0);
+  } finally {
+    J.FixedConstraintSettings = original;
+    for (const settings of allocated) J.destroy(settings);
+    s.done();
+  }
+});

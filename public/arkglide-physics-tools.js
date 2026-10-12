@@ -579,6 +579,8 @@
       const anchor = c.anchor || v(a.body.GetPosition()),
         anchor2 = c.anchor2 || anchor,
         axis = c.axis || { x: 0, y: 1, z: 0 };
+      finite(anchor);
+      finite(anchor2);
       finite(axis);
       const len = Math.hypot(axis.x, axis.y, axis.z);
       if (len < 1e-6) throw Error("关节轴不能为零");
