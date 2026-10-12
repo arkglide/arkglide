@@ -383,3 +383,20 @@ test("hiding a UI element inside an event prevents subsequent callbacks until sh
     t.done();
   }
 });
+
+test("invalid button callbacks fail without leaving window listeners or HUD elements", () => {
+  const t = fixture();
+  try {
+    const count = () => [...t.window.listeners.values()].reduce((n, list) => n + list.size, 0);
+    const before = count();
+    assert.throws(() => t.ui.forOwner(t.owner).createButton(def("invalid"), 42), /回调|订阅无效/);
+    assert.equal(count(), before);
+    assert.equal(t.layer.children.length, 0);
+    const button = t.ui.forOwner(t.owner).createButton(def("valid"), () => {});
+    assert.equal(t.layer.children.length, 1);
+    button.destroy();
+    assert.equal(count(), before);
+  } finally {
+    t.done();
+  }
+});

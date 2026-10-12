@@ -488,6 +488,8 @@
     function create(def, owner, callback) {
       if (disposed || (owner && !owner.record.active))
         throw Error("HUD session stopped");
+      if (callback && typeof callback !== "function")
+        throw Error("UI回调无效");
       if (
         !def ||
         typeof def.id !== "string" ||
