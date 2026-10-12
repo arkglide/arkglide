@@ -505,3 +505,27 @@ test("invalid spatial audio parameters allocate no Web Audio nodes", async () =>
     assert.equal(a.stats().audioVoices, 0);
   } finally { a.dispose(); }
 });
+
+test("aborted script physics APIs cannot mutate surviving rigid bodies", () => {
+  const s = physical();
+  try {
+    const { e, m } = s.add("survivor", [0, 3, 0]);
+    const owner = s.session.owner(null, "old-script.js");
+    const api = s.p.forOwner(owner);
+    owner.abort();
+    assert.throws(() => api.setVelocity(e, { x: 8, y: 0, z: 0 }), /已销毁/);
+    assert.throws(() => api.addImpulse(e, { x: 8, y: 0, z: 0 }), /已销毁/);
+    assert.throws(() => api.teleport(e, { x: 9, y: 3, z: 0 }), /已销毁/);
+    assert.throws(() => api.remove(e), /已销毁/);
+    assert.equal(m.position.x, 0);
+    const current = s.p.forOwner(s.session.owner(null, "current.js"));
+    current.setVelocity(e, { x: 1, y: 0, z: 0 });
+    assert.ok(Math.abs(current.getVelocity(e).x - 1) < 1e-6);
+    current.teleport(e, { x: 2, y: 3, z: 0 });
+    assert.equal(m.position.x, 2);
+    current.remove(e);
+    assert.equal(current.has(e), false);
+  } finally {
+    s.done();
+  }
+});

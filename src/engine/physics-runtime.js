@@ -349,6 +349,9 @@
       return bodies.get(entity.id);
     }
     function forOwner(owner) {
+      const guard = () => {
+        if (!owner.record.active) throw new Error("脚本已销毁");
+      };
       return Object.freeze({
         ...tools?.ownerAPI(owner),
         backend: "jolt-wasm",
@@ -362,12 +365,14 @@
           add({ id: entity.id, name: entity.name, physics: config });
         },
         remove: (entity) => {
+          guard();
           requireBody(entity);
           remove(entity.id);
         },
         getVelocity: (entity) =>
           value(requireBody(entity).body.GetLinearVelocity()),
         setVelocity(entity, v) {
+          guard();
           const r = requireBody(entity);
           vec(v);
           const n = new J.Vec3(v.x, v.y, v.z);
@@ -378,6 +383,7 @@
           }
         },
         addImpulse(entity, v) {
+          guard();
           const r = requireBody(entity);
           if (r.config.motion !== "dynamic")
             throw new Error("冲量仅支持动态刚体");
@@ -390,6 +396,7 @@
           }
         },
         teleport(entity, v) {
+          guard();
           const r = requireBody(entity);
           vec(v);
           const n = new J.RVec3(v.x, v.y, v.z);
