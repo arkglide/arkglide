@@ -283,9 +283,6 @@
       const resource = o.controllers?.[id];
       if (!resource) throw Error("动画控制器不存在: " + id);
       const imported = groups(entity);
-      remove(entity.id);
-      o.stopLegacy?.(entity);
-      for (const g of imported) g.stop();
       const c = {
         entity,
         resource: structuredClone(resource),
@@ -338,6 +335,17 @@
         )
           throw Error("根运动节点没有四元数轨道");
       }
+      remove(entity.id);
+      o.stopLegacy?.(entity);
+      for (const g of imported) g.stop();
+      // The previous controller restores its bind pose when removed.
+      // Capture that restored pose rather than its last animated frame.
+      for (const [target, paths] of c.bindPose)
+        for (const path of paths.keys()) {
+          let value = target;
+          for (const key of path.split(".")) value = value[key];
+          paths.set(path, clone(value));
+        }
       live.set(entity.id, c);
       if (owner) c.untrack = owner.track(() => remove(entity.id));
       const valid = () => {

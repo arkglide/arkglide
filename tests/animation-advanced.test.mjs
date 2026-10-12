@@ -320,3 +320,36 @@ test("rejected legacy animation playback preserves the active controller", () =>
     s.done();
   }
 });
+
+test("invalid replacement controllers preserve the previous controller and bind pose", () => {
+  const s = setup();
+  try {
+    const { entity, bone } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    const { api } = s.api();
+    const previous = api.createController(entity, "locomotion");
+    previous.setState("Move");
+    s.runtime.fixedUpdate(0.25);
+    assert.ok(Math.abs(bone.position.x - 0.5) < 1e-6);
+    assert.throws(() => api.createController(entity, "locomotion", {
+      rootMotion: { target: "missing", translation: true, rotation: false },
+    }), /根运动节点不存在/);
+    assert.equal(previous.state, "Move");
+    assert.ok(Math.abs(bone.position.x - 0.5) < 1e-6);
+    s.controller.states[1].clip = "missing";
+    assert.throws(() => api.createController(entity, "locomotion"), /片段不存在/);
+    assert.equal(previous.state, "Move");
+    assert.ok(Math.abs(bone.position.x - 0.5) < 1e-6);
+    s.controller.states[1].clip = "Move";
+    const replacement = api.createController(entity, "locomotion");
+    assert.throws(() => previous.state, /已销毁/);
+    assert.equal(replacement.state, "Idle");
+    s.runtime.fixedUpdate(0.1);
+    assert.equal(bone.position.x, 0);
+    api.stop(entity);
+    assert.equal(bone.position.x, 0);
+  } finally {
+    s.done();
+  }
+});
