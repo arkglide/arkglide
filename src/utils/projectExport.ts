@@ -53,7 +53,10 @@ export function exportProject(): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export async function importProject(file: File): Promise<void> {
+  const documentId = useEditorStore.getState().documentId;
   const bytes = await file.arrayBuffer();
+  if (useEditorStore.getState().documentId !== documentId)
+    throw new Error("当前项目已切换，请重新选择导入文件");
   let expanded = 0;
   const files = unzipSync(new Uint8Array(bytes), {
     filter(entry) {

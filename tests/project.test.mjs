@@ -708,3 +708,20 @@ test("overlapping saves from different documents keep separate IDs and current s
   assert.equal(store.getState().currentProjectId, currentId);
   for (const project of projects) await storage.deleteProject(project.projectId);
 });
+
+test("a delayed file import cannot overwrite a document opened while reading", async () => {
+  store.getState().newProject();
+  const bytes = archive.createProjectArchive();
+  let release;
+  const reading = new Promise(resolve => { release = resolve; });
+  const pending = archive.importProject({ arrayBuffer: () => reading });
+  const rejected = assert.rejects(pending, /当前项目已切换/);
+  store.getState().newProject();
+  store.getState().renameNode("cube", "keep this document");
+  const current = store.getState();
+  release(bytes.slice().buffer);
+  await rejected;
+  assert.equal(store.getState().documentId, current.documentId);
+  assert.equal(store.getState().nodes, current.nodes);
+  assert.equal(store.getState().nodes.find(n => n.id === "cube").name, "keep this document");
+});
