@@ -519,3 +519,25 @@ test("retarget owner cleanup only removes controllers that reference its generat
     }
   }
 });
+
+test("nested time-zero state events share the dispatch limit without overflowing the stack", () => {
+  const s = setup();
+  try {
+    const { entity } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    s.controller.states[0].events = [{ time: 0, name: "enter" }];
+    const { api } = s.api();
+    const c = api.createController(entity, "locomotion");
+    let events = 0;
+    api.onEvent(entity, () => { events++; c.setState("Idle"); });
+    c.setState("Idle");
+    assert.ok(events <= 128, `dispatched ${events}`);
+    assert.equal(events, 128);
+    assert.equal(s.errors.length, 0);
+    assert.equal(c.state, "Idle");
+    assert.ok(s.runtime.stats().animationDroppedEvents > 0);
+  } finally {
+    s.done();
+  }
+});

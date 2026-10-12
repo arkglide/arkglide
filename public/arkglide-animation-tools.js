@@ -64,7 +64,9 @@
       retargeted = new Map(),
       listeners = new Set();
     let disposed = false,
-      droppedEvents = 0;
+      droppedEvents = 0,
+      eventDepth = 0,
+      eventBudget = 0;
     const clone = (v) => (v?.clone ? v.clone() : v);
     function groups(e) {
       if (disposed || !e || e.destroyed || o.find(e.id) !== e)
@@ -138,6 +140,15 @@
         }
     }
     function events(c, state, from, to) {
+      if (!eventDepth) eventBudget = 128;
+      eventDepth++;
+      try {
+        dispatchEvents(c, state, from, to);
+      } finally {
+        eventDepth--;
+      }
+    }
+    function dispatchEvents(c, state, from, to) {
       const revision = c.revision;
       const d = stateDuration(c, state),
         first = state.loop ? Math.floor(Math.max(0, from) / d) : 0,
@@ -157,11 +168,12 @@
         for (const event of state.events || []) {
           const t = cycle * d + event.time;
           if (event.time > d || t <= from || t > to) continue;
-          if (count >= 128) {
+          if (eventBudget <= 0) {
             droppedEvents += Math.max(0, scheduled - count);
             return;
           }
           count++;
+          eventBudget--;
           emit(c, {
             name: event.name,
             data: event.data,
