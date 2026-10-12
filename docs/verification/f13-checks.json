@@ -1,0 +1,41 @@
+{
+  "base": "2b7d0ff703924f58cea8215370a4fca865b485cb",
+  "originalF13Base": "1f7bacd421f9ede86a46079e9cf47f84288f4b81",
+  "startedAt": "2026-10-12T10:59:07.428Z",
+  "node": "v24.19.0",
+  "steps": [
+    {
+      "name": "unit",
+      "command": "npm test",
+      "passed": true,
+      "exitCode": 0,
+      "signal": null,
+      "durationSeconds": 7.444
+    },
+    {
+      "name": "static-browser",
+      "command": "npm run test:static",
+      "passed": true,
+      "exitCode": 0,
+      "signal": null,
+      "durationSeconds": 46.554
+    },
+    {
+      "name": "build",
+      "command": "npm run build",
+      "passed": true,
+      "exitCode": 0,
+      "signal": null,
+      "durationSeconds": 160.187
+    },
+    {
+      "name": "editor-browser",
+      "command": "npm run test:browser",
+      "passed": true,
+      "exitCode": 0,
+      "signal": null,
+      "durationSeconds": 142.484
+    }
+  ],
+  "finishedAt": "2026-10-12T11:05:04.100Z"
+}

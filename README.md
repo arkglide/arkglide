@@ -27,7 +27,7 @@ npm run benchmark:math
 ```
 
 `npm run dev/build/build:wasm` 会同步共享场景脚本及 iframe 使用的经典脚本 WASM 版本。
-F11 已接入 Jolt WASM 基础物理；F12 C++ 场景图、F13 可玩项目导出、F14 联机仍待实现。
+F11 已接入 Jolt WASM 进阶物理；F13 已支持独立静态游戏导出。F12 C++ 场景图与 F14 联机仍待实现。
 
 ### 第一批可靠性功能
 
@@ -43,6 +43,12 @@ F11 已接入 Jolt WASM 基础物理；F12 C++ 场景图、F13 可玩项目导�
 
 支持 Jolt WASM 基础物理、音频、动作输入/触屏 HUD 和模型动画。启动后导入 `examples/collect-gems.arkglide`，播放并点击启用音频即可测试移动、碰撞、收集与计分。详见 [第三批说明](docs/third-batch.md)。
 
-当前项目格式为 0.5，兼容无版本标记及 0.1–0.4 的旧项目。`npm run build` 构建编辑器；可玩项目的独立静态导出仍属于 F13。
+当前项目格式为 0.6，兼容无版本标记及 0.1–0.5 的旧项目。`npm run build` 构建编辑器；游戏静态包使用独立导出入口。
 
 用户脚本采用 JavaScript；[项目内 import/export 使用方法](docs/javascript-modules.md)。第三批基础玩法已完成，进阶任务见 [完整任务单](docs/third-batch-full-tasklist.md)。
+
+## 第四批独立静态导出
+
+停止运行后打开「菜单 → 导出独立游戏…」，下载可部署在根路径或子目录的游戏 ZIP。已导出的示例位于 `examples/fourth-static-game/`，可使用 `node scripts/serve-static.mjs examples/fourth-static-game 8080` 启动普通静态服务器。
+
+CLI：`npm run export:game -- examples/fourth-static.arkglide 空输出目录`。资源规则、使用方法、中文变更和实际验收见 [第四批交付说明](FOURTH_BATCH_README.md)。`npm run test:static` 验证无编辑器运行；`npm run verify:fourth` 串行执行单测、静态部署、生产构建和编辑器回归。真实手柄与实体目标设备人工验收仍待完成。

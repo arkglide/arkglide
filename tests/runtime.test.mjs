@@ -100,7 +100,9 @@ function setup() {
     new URL("../public/runtime.html", import.meta.url),
     "utf8",
   );
-  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
+  // Execute every inline block in document order, including the early boot reporter.
+  for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
+    vm.runInContext(match[1], context);
   return {
     context,
     messages,
@@ -642,4 +644,22 @@ test("repeated model spawn/destroy releases model buffers, factory records and s
     await t.send({ type: "stop" });
     t.context.engine?.dispose();
   }
+});
+
+
+test("early bootstrap resource failures report fatal errors with the current boot token", () => {
+  const messages = [], handlers = {};
+  const context = vm.createContext({
+    window: {parent: {postMessage: msg => messages.push(msg)}, addEventListener: (name, callback) => {handlers[name] = callback;}},
+    URLSearchParams, location: {search: "?boot=f13-probe"},
+  });
+  const html = fs.readFileSync(new URL("../public/runtime.html", import.meta.url), "utf8");
+  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
+  handlers.error({target: {tagName: "SCRIPT", src: "http://localhost/game/lib/missing.js"}});
+  assert.equal(messages[0].type, "fatal");
+  assert.equal(messages[0].bootToken, "f13-probe");
+  assert.match(messages[0].message, /missing.js/);
+  context.arkglideBootFinished = true;
+  handlers.error({target: {tagName: "CANVAS"}, message: "later script error"});
+  assert.equal(messages.length, 1);
 });

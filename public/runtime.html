@@ -21,25 +21,38 @@
         touch-action: none;
       }
     </style>
+    <script>
+      // Bootstrap errors must be visible even before the gameplay reporter exists.
+      var arkglideBootFinished = false;
+      window.addEventListener("error", function (event) {
+        var resource = event.target && event.target.tagName === "SCRIPT";
+        if (arkglideBootFinished && !resource) return;
+        window.parent.postMessage({
+          type: "fatal",
+          bootToken: new URLSearchParams(location.search).get("boot") || "",
+          message: resource ? "运行时脚本加载失败: " + event.target.src : "运行时初始化失败: " + event.message,
+        }, "*");
+      }, true);
+    </script>
     <!-- 本地 Babylon UMD（离线可用） -->
-    <script src="/lib/babylon.js"></script>
-    <script src="/lib/babylon.glTFFileLoader.min.js"></script>
-    <script src="/arkglide-math.js"></script>
-    <script src="/lib/arkglide_math.js"></script>
-    <script src="/arkglide-api.js"></script>
-    <script src="/arkglide-lifecycle.js"></script>
-    <script src="/arkglide-scene.js"></script>
-    <script src="/arkglide-prefabs.js"></script>
-    <script src="/lib/jolt-physics.js"></script>
-    <script src="/arkglide-physics-tools.js"></script>
-    <script src="/arkglide-physics.js"></script>
-    <script src="/arkglide-input-ui.js"></script>
-    <script src="/arkglide-audio-stretch.js"></script>
-    <script src="/arkglide-audio.js"></script>
-    <script src="/arkglide-animation-tools.js"></script>
-    <script src="/arkglide-animation.js"></script>
-    <script src="/lib/acorn.js"></script>
-    <script src="/arkglide-modules.js"></script>
+    <script src="./lib/babylon.js"></script>
+    <script src="./lib/babylon.glTFFileLoader.min.js"></script>
+    <script src="./arkglide-math.js"></script>
+    <script src="./lib/arkglide_math.js"></script>
+    <script src="./arkglide-api.js"></script>
+    <script src="./arkglide-lifecycle.js"></script>
+    <script src="./arkglide-scene.js"></script>
+    <script src="./arkglide-prefabs.js"></script>
+    <script src="./lib/jolt-physics.js"></script>
+    <script src="./arkglide-physics-tools.js"></script>
+    <script src="./arkglide-physics.js"></script>
+    <script src="./arkglide-input-ui.js"></script>
+    <script src="./arkglide-audio-stretch.js"></script>
+    <script src="./arkglide-audio.js"></script>
+    <script src="./arkglide-animation-tools.js"></script>
+    <script src="./arkglide-animation.js"></script>
+    <script src="./lib/acorn.js"></script>
+    <script src="./arkglide-modules.js"></script>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
@@ -643,6 +656,7 @@
           ? "block"
           : "none";
         telemetry(true);
+        sendToEditor({ type: "started" });
       }
       var runtimeSettings = {};
       function stopRun() {
@@ -788,6 +802,8 @@
             break;
         }
       });
+
+      arkglideBootFinished = true;
 
       // handshake：通知编辑器 iframe 已就绪（只发一次）
       Promise.all([mathReady, joltReady])

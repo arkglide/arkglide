@@ -1,0 +1,1060 @@
+{
+  "config": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/9285e21fd877/arkglide-f13-current/node_modules/.bin/playwright",
+      "test"
+    ],
+    "configFile": "/workspace/scratch/9285e21fd877/arkglide-f13-current/playwright.config.ts",
+    "rootDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "editor",
+        "name": "editor",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/editor.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "batch1",
+        "name": "batch1",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/batch1.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "batch2",
+        "name": "batch2",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/batch2.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "batch2-complete",
+        "name": "batch2-complete",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/batch2-complete.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "batch3",
+        "name": "batch3",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/batch3.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "modules",
+        "name": "modules",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/modules.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "third-full",
+        "name": "third-full",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/third-full.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "f13-export",
+        "name": "f13-export",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/f13-export.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "editor",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/editor.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "editor"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "batch1",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/batch1.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "batch1"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "batch2",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/batch2.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "batch2"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "batch2-complete",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/batch2-complete.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "batch2-complete"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "batch3",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/batch3.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "batch3"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "modules",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/modules.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "modules"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "third-full",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/third-full.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "third-full"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "f13-export",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/browser",
+        "testIgnore": [],
+        "testMatch": "**/f13-export.spec.ts",
+        "timeout": 120000,
+        "use": {
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "baseURL": "http://127.0.0.1:5196",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "f13-export"
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "docs/verification/f13-editor-browser.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev -- --host 127.0.0.1 --port 5196",
+      "url": "http://127.0.0.1:5196",
+      "timeout": 120000,
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "editor.spec.ts",
+      "file": "editor.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "editor roadmap: model authoring, persistence, runtime, isolation and WASM",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 19991,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "GLB loader, asset drag/drop and restored model geometry",
+                      "duration": 599
+                    },
+                    {
+                      "title": "shape, groups, light, camera and scripts on all entity types",
+                      "duration": 595
+                    },
+                    {
+                      "title": "coordinates, group rotation/scale, copy and undo",
+                      "duration": 590
+                    },
+                    {
+                      "title": "stop cancels delayed model load and pending scripts",
+                      "duration": 1495
+                    },
+                    {
+                      "title": "viewport additive selection and flight/shortcut focus",
+                      "duration": 305
+                    },
+                    {
+                      "title": "stop before iframe handshake clears the pending project",
+                      "duration": 3876
+                    },
+                    {
+                      "title": "Monaco math API completion and browser benchmark",
+                      "duration": 2984
+                    }
+                  ],
+                  "startTime": "2026-10-12T11:02:44.128Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2f56d7d370f0ba02e91-d2666db35798c573a0a9",
+          "file": "editor.spec.ts",
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "batch1.spec.ts",
+      "file": "batch1.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "batch one: clock, cleanup, diagnostics and crash recovery",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "batch1",
+              "projectName": "batch1",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12824,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "fixed hooks, scaled timers and pause-safe simulation",
+                      "duration": 1326
+                    },
+                    {
+                      "title": "error source mapping opens the actual Monaco line",
+                      "duration": 2357
+                    },
+                    {
+                      "title": "auto-save survives reload and preserves binary assets",
+                      "duration": 5413
+                    },
+                    {
+                      "title": "unknown versions fail atomically and missing models appear in diagnostics",
+                      "duration": 163
+                    }
+                  ],
+                  "startTime": "2026-10-12T11:03:04.603Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be6b8e3e9314cc6ad52f-5e9c794070cd9e5b70a2",
+          "file": "batch1.spec.ts",
+          "line": 4,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "batch2.spec.ts",
+      "file": "batch2.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "batch two: material editing, texture rendering, prefabs, runtime and portable recovery",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "batch2",
+              "projectName": "batch2",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15055,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "material and texture controls create a persistent PBR material",
+                      "duration": 2368
+                    },
+                    {
+                      "title": "a mixed subtree becomes a template with independent model resources",
+                      "duration": 755
+                    },
+                    {
+                      "title": "template updates retain per-axis overrides; reset and undo restore the expected state",
+                      "duration": 873
+                    },
+                    {
+                      "title": "runtime receives live textures and independent prefab script factories; destroy does not break shared material",
+                      "duration": 871
+                    },
+                    {
+                      "title": "ZIP and IndexedDB preserve template-only binaries after source deletion",
+                      "duration": 622
+                    },
+                    {
+                      "title": "auto recovery retains content, texture replacements and overrides across reload",
+                      "duration": 5416
+                    }
+                  ],
+                  "startTime": "2026-10-12T11:03:18.024Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "582b212f433568eb1960-e01eb69b6ff307df60cb",
+          "file": "batch2.spec.ts",
+          "line": 40,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "batch2-complete.spec.ts",
+      "file": "batch2-complete.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "second batch completion: real model slots, nested template updates, script-driven runtime spawning and persistence",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "batch2-complete",
+              "projectName": "batch2-complete",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14071,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "actual model parts expose material slots; original and inherited assignments render separately",
+                      "duration": 2221
+                    },
+                    {
+                      "title": "nested templates retain associations and merge per-slot overrides when inner templates update",
+                      "duration": 724
+                    },
+                    {
+                      "title": "injected prefab API loads template models, starts independent scripts and preserves existing movement",
+                      "duration": 1077
+                    },
+                    {
+                      "title": "native archive download, import and reload recovery retain nested mappings and part materials",
+                      "duration": 5860
+                    }
+                  ],
+                  "startTime": "2026-10-12T11:03:33.587Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "94a08d989a98503e3d79-d48c497701e0903d69f3",
+          "file": "batch2-complete.spec.ts",
+          "line": 56,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "batch3.spec.ts",
+      "file": "batch3.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "third batch playable project: real WASM collision, animation, sound, HUD/input, persistence and cleanup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "batch3",
+              "projectName": "batch3",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14482,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "STAGE loaded\n"
+                    },
+                    {
+                      "text": "STAGE play\n"
+                    },
+                    {
+                      "text": "STAGE running\n"
+                    },
+                    {
+                      "text": "STAGE move\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T11:03:48.154Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4e0d1c9b531e887cdf54-63b352556e18308bdcf2",
+          "file": "batch3.spec.ts",
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "modules.spec.ts",
+      "file": "modules.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "JavaScript project modules: real sandbox imports, live bindings, prefab instances, diagnostics and restart",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "modules",
+              "projectName": "modules",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7506,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "legacy imports and module factories retain instance ownership and share module state once per play",
+                      "duration": 1506
+                    },
+                    {
+                      "title": "rename/undo and ZIP roundtrip keep module source and relative references",
+                      "duration": 229
+                    },
+                    {
+                      "title": "module error navigation points at the original utility line and other entities keep running",
+                      "duration": 1133
+                    },
+                    {
+                      "title": "stopping pending module imports cannot start a stale lifecycle",
+                      "duration": 1206
+                    }
+                  ],
+                  "startTime": "2026-10-12T11:04:03.179Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c30cd39e1c87f9ff656a-c368ce8cf28a264e0706",
+          "file": "modules.spec.ts",
+          "line": 2,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "third-full.spec.ts",
+      "file": "third-full.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "full third batch: real skinned assets, root-motion character, mixer/worklet, UI editing, nested spawning and 20-session memory regression",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 300000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "third-full",
+              "projectName": "third-full",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 41271,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "FULL loaded and UI undo verified\n"
+                    },
+                    {
+                      "text": "FULL playing\n"
+                    },
+                    {
+                      "text": "FULL movement and pause menu verified\n"
+                    },
+                    {
+                      "text": "FULL AudioWorklet measured\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m0\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m1\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m2\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m3\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m4\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m5\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m6\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m7\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m8\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m9\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m10\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m11\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m12\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m13\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m14\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m15\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m16\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m17\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m18\u001b[39m\n"
+                    },
+                    {
+                      "text": "FULL stress cycle \u001b[33m19\u001b[39m\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "actual browser AudioWorklet retains a 440 Hz pitch at 0.5/1/2x",
+                      "duration": 1105
+                    }
+                  ],
+                  "startTime": "2026-10-12T11:04:11.162Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8c6df4c53b65cba735fb-fdc82ca06944ec4e9e36",
+          "file": "third-full.spec.ts",
+          "line": 4,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "f13-export.spec.ts",
+      "file": "f13-export.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "F13 editor exports a real independent archive, exposes settings and refuses missing prefab dependencies",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "f13-export",
+              "projectName": "f13-export",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10817,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T11:04:53.010Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6f67570f5767c0c99025-2c3b24f977b49d1ec112",
+          "file": "f13-export.spec.ts",
+          "line": 5,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-12T11:02:42.241Z",
+    "duration": 141789.698,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

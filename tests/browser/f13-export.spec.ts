@@ -1,0 +1,27 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {unzipSync,strFromU8} from 'fflate';
+test('F13 editor exports a real independent archive, exposes settings and refuses missing prefab dependencies',async({page},info)=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.locator('input[accept=".arkglide"]').setInputFiles(fileURLToPath(new URL('../../examples/fourth-static.arkglide',import.meta.url)));
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await page.getByRole('menuitem',{name:'导出独立游戏…',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'导出独立游戏',exact:true});
+ await dialog.getByLabel('游戏标题').fill('F13 测试游戏');
+ await dialog.getByLabel('运行尺寸').click();await page.getByRole('option',{name:'按设计比例缩放（留黑边）'}).click();
+ const downloadPromise=page.waitForEvent('download');await dialog.getByRole('button',{name:'下载游戏 ZIP'}).click();const download=await downloadPromise;
+ expect(download.suggestedFilename()).toBe('F13 测试游戏-static.zip');
+ const saved=info.outputPath('editor-export.zip');await download.saveAs(saved);
+ const files=unzipSync(new Uint8Array(await fs.readFile(saved)));const manifest=JSON.parse(strFromU8(files['game-manifest.json']));
+ expect(manifest.settings).toMatchObject({title:'F13 测试游戏',fit:'contain',width:1280,height:720});
+ expect(manifest.resources).toHaveLength(10);expect(files['index.html']).toBeTruthy();expect(files['lib/jolt-physics.js']).toBeTruthy();
+ expect(files['assets/asset.glb']).toBeUndefined();
+ const state=await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');(window as any).f13store=s;return s.getState().playState;});expect(state).toBe('stopped');
+ await page.evaluate(()=>{const s=(window as any).f13store;const map=new Map(s.getState().modelBuffers);const id=[...map.keys()].find((k:any)=>k.startsWith('prefab:'));map.delete(id);s.setState({modelBuffers:map});});
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await page.getByRole('menuitem',{name:'导出独立游戏…',exact:true}).click();await dialog.getByRole('button',{name:'下载游戏 ZIP'}).click();
+ await expect(dialog.getByRole('alert')).toContainText('资源缺失');
+ await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+ await page.evaluate(()=>{const s=(window as any).f13store;s.getState().play();});
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await expect(page.getByRole('menuitem',{name:'导出独立游戏…',exact:true})).toHaveAttribute('aria-disabled','true');
+ await page.keyboard.press('Escape');await page.evaluate(()=>(window as any).f13store.getState().stop());
+});

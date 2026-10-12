@@ -40,3 +40,7 @@ copyFileSync(
   new URL("../src/engine/module-runtime.js", import.meta.url),
   new URL("../public/arkglide-modules.js", import.meta.url),
 );
+
+// Licenses must travel with independent static games.
+copyFileSync(new URL("../LICENSE", import.meta.url), new URL("../public/lib/arkglide-LICENSE.txt", import.meta.url));
+copyFileSync(new URL("../node_modules/@babylonjs/core/license.md", import.meta.url), new URL("../public/lib/babylon-LICENSE.md", import.meta.url));

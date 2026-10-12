@@ -1,0 +1,720 @@
+{
+  "config": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/9285e21fd877/arkglide-f13-current/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "playwright.static.config.ts"
+    ],
+    "configFile": "/workspace/scratch/9285e21fd877/arkglide-f13-current/playwright.static.config.ts",
+    "rootDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "root",
+        "name": "root",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "subpath",
+        "name": "subpath",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "missing-asset",
+        "name": "missing-asset",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "truncated",
+        "name": "truncated",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "cancel-download",
+        "name": "cancel-download",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "cancel-initialize",
+        "name": "cancel-initialize",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "aspect-diagnostic",
+        "name": "aspect-diagnostic",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "root",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "root"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "subpath",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "subpath"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "missing-asset",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "missing-asset"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "truncated",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "truncated"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "cancel-download",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "cancel-download"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "cancel-initialize",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "cancel-initialize"
+      },
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/test-results/static-browser",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "aspect-diagnostic",
+        "testDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "snapshotDir": "/workspace/scratch/9285e21fd877/arkglide-f13-current/tests/static",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5197",
+          "viewport": {
+            "width": 1280,
+            "height": 850
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/2e88c259b11a/browser-runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--no-zygote",
+              "--single-process",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "aspect-diagnostic"
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "docs/verification/f13-static-browser.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.0",
+    "workers": 1,
+    "webServer": {
+      "command": "node scripts/prepare-static-tests.mjs && node scripts/serve-static.mjs .static-test-fixtures/served 5197",
+      "url": "http://127.0.0.1:5197",
+      "timeout": 30000,
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "game.spec.ts",
+      "file": "game.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "independent startup, full dependencies, audio/input, runtime prefab, restart and cleanup at /",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "root",
+              "projectName": "root",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11669,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:17.796Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "static-cleanup",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiLyIsCiAgImluaXRpYWwiOiB7CiAgICAiZW50aXRpZXMiOiAxOCwKICAgICJjb250cm9sbGVycyI6IDIsCiAgICAiY2hhcmFjdGVycyI6IDIsCiAgICAiaW1hZ2VzIjogMTAKICB9LAogICJjbGVhbmVkIjogewogICAgInNjcmlwdHMiOiAwLAogICAgInRpbWVycyI6IDAsCiAgICAic3Vic2NyaXB0aW9ucyI6IDAsCiAgICAibGlzdGVuZXJzIjogMCwKICAgICJzY3JpcHRNcyI6IDAuNSwKICAgICJkcm9wcGVkVGltZSI6IDAsCiAgICAiZXJyb3JzIjogMCwKICAgICJmaXhlZFN0ZXBzIjogMCwKICAgICJ0aW1lU2NhbGUiOiAxLAogICAgInBoeXNpY3NCb2RpZXMiOiAwLAogICAgInBoeXNpY3NDb250YWN0cyI6IDAsCiAgICAicGh5c2ljc1N1YnNjcmlwdGlvbnMiOiAwLAogICAgInBoeXNpY3NCYWNrZW5kIjogImpvbHQtd2FzbSIsCiAgICAicGh5c2ljc0NoYXJhY3RlcnMiOiAwLAogICAgInBoeXNpY3NDb25zdHJhaW50cyI6IDAsCiAgICAicGh5c2ljc1NoYXBlQ2FjaGUiOiAwLAogICAgInBoeXNpY3NDYWNoZUJ5dGVzIjogMCwKICAgICJwaHlzaWNzUXVlcmllc0FjdGl2ZSI6IDAsCiAgICAicGh5c2ljc0RlYnVnTWVzaGVzIjogMCwKICAgICJhdWRpb1ZvaWNlcyI6IDAsCiAgICAiYXVkaW9CdWZmZXJzIjogMCwKICAgICJhdWRpb1N0YXRlIjogImNsb3NlZCIsCiAgICAiYXVkaW9CdXNlcyI6IDAsCiAgICAiYXVkaW9TdHJlYW1zIjogMCwKICAgICJhdWRpb1dvcmtsZXRzIjogMCwKICAgICJhdWRpb1RyYW5zaXRpb25zIjogMCwKICAgICJhdWRpb0Jsb2JVUkxzIjogMCwKICAgICJhbmltYXRpb25QbGF5ZXJzIjogMCwKICAgICJhbmltYXRpb25Db250cm9sbGVycyI6IDAsCiAgICAiYW5pbWF0aW9uRXZlbnRTdWJzY3JpcHRpb25zIjogMCwKICAgICJhbmltYXRpb25SZXRhcmdldEdyb3VwcyI6IDAsCiAgICAiYW5pbWF0aW9uRHJvcHBlZEV2ZW50cyI6IDAsCiAgICAiaHVkRWxlbWVudHMiOiAwLAogICAgImlucHV0SGVsZCI6IDAsCiAgICAidWlTdWJzY3JpcHRpb25zIjogMCwKICAgICJ1aUJsb2JVUkxzIjogMCwKICAgICJpbnB1dEdhbWVwYWRzIjogMCwKICAgICJpbnB1dENhcHR1cmVzIjogMCwKICAgICJzdGF0ZSI6ICJzdG9wcGVkIiwKICAgICJtYXRoQmFja2VuZCI6ICJ3YXNtIiwKICAgICJmcHMiOiAyNy44MDg2NzYzMDcwMDk1ODgsCiAgICAiZnJhbWVNcyI6IDIsCiAgICAicGVha0ZyYW1lTXMiOiAzNC43OTk5OTk5OTk5ODgzNiwKICAgICJyZW5kZXJNcyI6IDAuNzk5OTk5OTk5OTg4MzU4NSwKICAgICJlbnRpdGllcyI6IDAsCiAgICAibWVzaGVzIjogMCwKICAgICJtYXRlcmlhbHMiOiAxLAogICAgInRleHR1cmVzIjogMSwKICAgICJtb2RlbExvYWRzIjogMCwKICAgICJsaWdodHMiOiAxLAogICAgImNhbWVyYXMiOiAxLAogICAgIndhc21IZWFwQnl0ZXMiOiAxMzQyMTc3MjgsCiAgICAiaGVhcEJ5dGVzIjogMzczMDAwMDAsCiAgICAidG90YWxUaW1lIjogMCwKICAgICJ1bnNjYWxlZFRvdGFsVGltZSI6IDAKICB9LAogICJzZXNzaW9ucyI6IDUsCiAgIm91dHNpZGUiOiBbXSwKICAiZXJyb3JzIjogW10KfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-d82aa3c74f126a221845",
+          "file": "game.spec.ts",
+          "line": 5,
+          "column": 45
+        },
+        {
+          "title": "independent startup, full dependencies, audio/input, runtime prefab, restart and cleanup at /deep/games/demo/",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "subpath",
+              "projectName": "subpath",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12092,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:30.038Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "static-cleanup",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiL2RlZXAvZ2FtZXMvZGVtby8iLAogICJpbml0aWFsIjogewogICAgImVudGl0aWVzIjogMTgsCiAgICAiY29udHJvbGxlcnMiOiAyLAogICAgImNoYXJhY3RlcnMiOiAyLAogICAgImltYWdlcyI6IDEwCiAgfSwKICAiY2xlYW5lZCI6IHsKICAgICJzY3JpcHRzIjogMCwKICAgICJ0aW1lcnMiOiAwLAogICAgInN1YnNjcmlwdGlvbnMiOiAwLAogICAgImxpc3RlbmVycyI6IDAsCiAgICAic2NyaXB0TXMiOiAyLjQwMDAwMDAwMDAyMzI4MywKICAgICJkcm9wcGVkVGltZSI6IDAsCiAgICAiZXJyb3JzIjogMCwKICAgICJmaXhlZFN0ZXBzIjogMCwKICAgICJ0aW1lU2NhbGUiOiAxLAogICAgInBoeXNpY3NCb2RpZXMiOiAwLAogICAgInBoeXNpY3NDb250YWN0cyI6IDAsCiAgICAicGh5c2ljc1N1YnNjcmlwdGlvbnMiOiAwLAogICAgInBoeXNpY3NCYWNrZW5kIjogImpvbHQtd2FzbSIsCiAgICAicGh5c2ljc0NoYXJhY3RlcnMiOiAwLAogICAgInBoeXNpY3NDb25zdHJhaW50cyI6IDAsCiAgICAicGh5c2ljc1NoYXBlQ2FjaGUiOiAwLAogICAgInBoeXNpY3NDYWNoZUJ5dGVzIjogMCwKICAgICJwaHlzaWNzUXVlcmllc0FjdGl2ZSI6IDAsCiAgICAicGh5c2ljc0RlYnVnTWVzaGVzIjogMCwKICAgICJhdWRpb1ZvaWNlcyI6IDAsCiAgICAiYXVkaW9CdWZmZXJzIjogMCwKICAgICJhdWRpb1N0YXRlIjogImNsb3NlZCIsCiAgICAiYXVkaW9CdXNlcyI6IDAsCiAgICAiYXVkaW9TdHJlYW1zIjogMCwKICAgICJhdWRpb1dvcmtsZXRzIjogMCwKICAgICJhdWRpb1RyYW5zaXRpb25zIjogMCwKICAgICJhdWRpb0Jsb2JVUkxzIjogMCwKICAgICJhbmltYXRpb25QbGF5ZXJzIjogMCwKICAgICJhbmltYXRpb25Db250cm9sbGVycyI6IDAsCiAgICAiYW5pbWF0aW9uRXZlbnRTdWJzY3JpcHRpb25zIjogMCwKICAgICJhbmltYXRpb25SZXRhcmdldEdyb3VwcyI6IDAsCiAgICAiYW5pbWF0aW9uRHJvcHBlZEV2ZW50cyI6IDAsCiAgICAiaHVkRWxlbWVudHMiOiAwLAogICAgImlucHV0SGVsZCI6IDAsCiAgICAidWlTdWJzY3JpcHRpb25zIjogMCwKICAgICJ1aUJsb2JVUkxzIjogMCwKICAgICJpbnB1dEdhbWVwYWRzIjogMCwKICAgICJpbnB1dENhcHR1cmVzIjogMCwKICAgICJzdGF0ZSI6ICJzdG9wcGVkIiwKICAgICJtYXRoQmFja2VuZCI6ICJ3YXNtIiwKICAgICJmcHMiOiAyNy45NTI0ODA3ODI2NzQwMSwKICAgICJmcmFtZU1zIjogMi4yMDAwMDAwMDAwMTE2NDE1LAogICAgInBlYWtGcmFtZU1zIjogMTUuNTk5OTk5OTk5OTc2NzE3LAogICAgInJlbmRlck1zIjogMC43MDAwMDAwMDAwMTE2NDE1LAogICAgImVudGl0aWVzIjogMCwKICAgICJtZXNoZXMiOiAwLAogICAgIm1hdGVyaWFscyI6IDEsCiAgICAidGV4dHVyZXMiOiAxLAogICAgIm1vZGVsTG9hZHMiOiAwLAogICAgImxpZ2h0cyI6IDEsCiAgICAiY2FtZXJhcyI6IDEsCiAgICAid2FzbUhlYXBCeXRlcyI6IDEzNDIxNzcyOCwKICAgICJoZWFwQnl0ZXMiOiAzNzMwMDAwMCwKICAgICJ0b3RhbFRpbWUiOiAwLAogICAgInVuc2NhbGVkVG90YWxUaW1lIjogMAogIH0sCiAgInNlc3Npb25zIjogNSwKICAib3V0c2lkZSI6IFtdLAogICJlcnJvcnMiOiBbXQp9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-88b1a4a8ab2e11bbb6cb",
+          "file": "game.spec.ts",
+          "line": 5,
+          "column": 45
+        },
+        {
+          "title": "missing asset HTTP errors are actionable and retry works",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "missing-asset",
+              "projectName": "missing-asset",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3462,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:42.611Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-050bd153c0673e27c2bc",
+          "file": "game.spec.ts",
+          "line": 37,
+          "column": 1
+        },
+        {
+          "title": "truncated deployment file is detected before runtime startup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "truncated",
+              "projectName": "truncated",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 412,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:46.526Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-feabadb4f85750727188",
+          "file": "game.spec.ts",
+          "line": 41,
+          "column": 1
+        },
+        {
+          "title": "cancel downloading does not start later, then restart succeeds",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cancel-download",
+              "projectName": "cancel-download",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3592,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:47.412Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-2369dc170019b562f5b9",
+          "file": "game.spec.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "cancel iframe/WASM initialization rejects stale ready messages",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cancel-initialize",
+              "projectName": "cancel-initialize",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4803,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:51.450Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-dce5de74154f3b357800",
+          "file": "game.spec.ts",
+          "line": 49,
+          "column": 1
+        },
+        {
+          "title": "fixed aspect sizing and diagnostic startup failure are visible",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "aspect-diagnostic",
+              "projectName": "aspect-diagnostic",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4579,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-12T10:59:56.710Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-a621334cafafcc6ab912",
+          "file": "game.spec.ts",
+          "line": 54,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-12T10:59:15.471Z",
+    "duration": 45936.263,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

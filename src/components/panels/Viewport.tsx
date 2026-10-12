@@ -365,7 +365,6 @@ export default function Viewport() {
   }, [playState]);
 
   const editing = playState === "stopped";
-  const [focusHintDismissed, setFocusHintDismissed] = useState(false);
 
   // 编辑模式：键盘快捷键（F聚焦/W/E/R切换Gizmo）+ 右键WASD飞行模式
   useEffect(() => {
@@ -667,29 +666,8 @@ export default function Viewport() {
           inset: 0,
           display: editing ? "none" : "block",
         }}
-        onClick={() => setFocusHintDismissed(true)}
       >
         <RuntimeFrame />
-        {/* 焦点提示（点击后隐藏） */}
-        {!focusHintDismissed && (
-          <Box
-            sx={{
-              position: "absolute",
-              bottom: 8,
-              right: 8,
-              bgcolor: "rgba(0,0,0,0.6)",
-              color: "rgba(255,255,255,0.7)",
-              fontSize: 11,
-              px: 1,
-              py: 0.5,
-              borderRadius: 1,
-              pointerEvents: "none",
-              userSelect: "none",
-            }}
-          >
-            点击此处激活运行窗口 (Click to focus)
-          </Box>
-        )}
       </Box>
     </Box>
   );

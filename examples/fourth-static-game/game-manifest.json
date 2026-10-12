@@ -1,0 +1,254 @@
+{
+  "format": "arkglide-static-1",
+  "settings": {
+    "title": "ArkGlide 独立导出演示",
+    "fit": "responsive",
+    "width": 1280,
+    "height": 720
+  },
+  "project": "project.json",
+  "resources": [
+    {
+      "kind": "model",
+      "id": "Player",
+      "path": "assets/model-0.bin",
+      "byteLength": 8528
+    },
+    {
+      "kind": "model",
+      "id": "Mirror",
+      "path": "assets/model-1.bin",
+      "byteLength": 2048
+    },
+    {
+      "kind": "model",
+      "id": "Crate",
+      "path": "assets/model-2.bin",
+      "byteLength": 688
+    },
+    {
+      "kind": "model",
+      "id": "MeshPlatform",
+      "path": "assets/model-3.bin",
+      "byteLength": 688
+    },
+    {
+      "kind": "model",
+      "id": "40a05f35-01d5-4cf7-9efb-2d17855210f8",
+      "path": "assets/model-4.bin",
+      "byteLength": 688
+    },
+    {
+      "kind": "model",
+      "id": "prefab:df7a5172-5543-4a93-a87a-9eba77580d52:3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0",
+      "path": "assets/model-5.bin",
+      "byteLength": 688
+    },
+    {
+      "kind": "model",
+      "id": "prefab:efedb031-9583-4d21-bf31-7b64b57b41e1:8e5f1cbd-433c-47f9-a01c-181533599256",
+      "path": "assets/model-6.bin",
+      "byteLength": 688
+    },
+    {
+      "kind": "texture",
+      "id": "icon",
+      "path": "assets/texture-7.bin",
+      "byteLength": 556
+    },
+    {
+      "kind": "audio",
+      "id": "tone",
+      "path": "assets/audio-8.bin",
+      "byteLength": 8864
+    },
+    {
+      "kind": "audio",
+      "id": "music",
+      "path": "assets/audio-9.bin",
+      "byteLength": 529244
+    }
+  ],
+  "modules": {
+    "entries": [
+      "player.js",
+      "mirror.js",
+      "crate.js",
+      "export-demo.js"
+    ],
+    "graph": {
+      "movement.js": [],
+      "player.js": [
+        "movement.js"
+      ],
+      "mirror.js": [],
+      "crate.js": [],
+      "main.js": [],
+      "lib/export-counter.js": [],
+      "lib/export-label.js": [],
+      "export-demo.js": [
+        "lib/export-counter.js",
+        "lib/export-label.js"
+      ]
+    }
+  },
+  "wasm": "embedded-single-file",
+  "files": [
+    {
+      "path": "runtime.html",
+      "byteLength": 29033
+    },
+    {
+      "path": "standalone-player.js",
+      "byteLength": 11329
+    },
+    {
+      "path": "index.html",
+      "byteLength": 2207
+    },
+    {
+      "path": "arkglide-math.js",
+      "byteLength": 7320
+    },
+    {
+      "path": "arkglide-api.js",
+      "byteLength": 8101
+    },
+    {
+      "path": "arkglide-lifecycle.js",
+      "byteLength": 11932
+    },
+    {
+      "path": "arkglide-scene.js",
+      "byteLength": 17697
+    },
+    {
+      "path": "arkglide-prefabs.js",
+      "byteLength": 6788
+    },
+    {
+      "path": "arkglide-physics-tools.js",
+      "byteLength": 34103
+    },
+    {
+      "path": "arkglide-physics.js",
+      "byteLength": 17306
+    },
+    {
+      "path": "arkglide-input-ui.js",
+      "byteLength": 33454
+    },
+    {
+      "path": "arkglide-audio-stretch.js",
+      "byteLength": 5767
+    },
+    {
+      "path": "arkglide-audio.js",
+      "byteLength": 22604
+    },
+    {
+      "path": "arkglide-animation-tools.js",
+      "byteLength": 24643
+    },
+    {
+      "path": "arkglide-animation.js",
+      "byteLength": 4365
+    },
+    {
+      "path": "arkglide-modules.js",
+      "byteLength": 14634
+    },
+    {
+      "path": "lib/babylon.js",
+      "byteLength": 8592001
+    },
+    {
+      "path": "lib/babylon.glTFFileLoader.min.js",
+      "byteLength": 432065
+    },
+    {
+      "path": "lib/arkglide_math.js",
+      "byteLength": 73534
+    },
+    {
+      "path": "lib/jolt-physics.js",
+      "byteLength": 3222606
+    },
+    {
+      "path": "lib/acorn.js",
+      "byteLength": 241575
+    },
+    {
+      "path": "lib/ACORN_LICENSE.txt",
+      "byteLength": 1099
+    },
+    {
+      "path": "lib/babylon-loaders-LICENSE.md",
+      "byteLength": 9155
+    },
+    {
+      "path": "lib/babylon-LICENSE.md",
+      "byteLength": 9226
+    },
+    {
+      "path": "lib/arkglide-LICENSE.txt",
+      "byteLength": 34523
+    },
+    {
+      "path": "lib/jolt-LICENSE.txt",
+      "byteLength": 1074
+    },
+    {
+      "path": "lib/jolt-NOTICE.md",
+      "byteLength": 302
+    },
+    {
+      "path": "assets/model-0.bin",
+      "byteLength": 8528
+    },
+    {
+      "path": "assets/model-1.bin",
+      "byteLength": 2048
+    },
+    {
+      "path": "assets/model-2.bin",
+      "byteLength": 688
+    },
+    {
+      "path": "assets/model-3.bin",
+      "byteLength": 688
+    },
+    {
+      "path": "assets/model-4.bin",
+      "byteLength": 688
+    },
+    {
+      "path": "assets/model-5.bin",
+      "byteLength": 688
+    },
+    {
+      "path": "assets/model-6.bin",
+      "byteLength": 688
+    },
+    {
+      "path": "assets/texture-7.bin",
+      "byteLength": 556
+    },
+    {
+      "path": "assets/audio-8.bin",
+      "byteLength": 8864
+    },
+    {
+      "path": "assets/audio-9.bin",
+      "byteLength": 529244
+    },
+    {
+      "path": "project.json",
+      "byteLength": 23490
+    },
+    {
+      "path": "DEPLOY-README.txt",
+      "byteLength": 462
+    }
+  ]
+}

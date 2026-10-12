@@ -1,0 +1,76 @@
+{
+  "currentMain": "2b7d0ff703924f58cea8215370a4fca865b485cb",
+  "originalF13Base": "1f7bacd421f9ede86a46079e9cf47f84288f4b81",
+  "upstreamCommits": 30,
+  "upstreamChangedFiles": 31,
+  "directFileOverlap": [],
+  "allUpstreamFilesUnchanged": true,
+  "upstreamSHA256": {
+    "public/arkglide-animation-tools.js": "d05cb0026936d5b8a1d2e51b6185ffe78f380516e190f723aca9327604e740bc",
+    "public/arkglide-animation.js": "4f0368296d0a67902835bdf86125e02525f7386d907a1908dfbe6dbee28911f8",
+    "public/arkglide-input-ui.js": "cfda0d2bab42bc1721a9814916a97e7e57560fda2fe8a5c4c138dd7a9250b32b",
+    "public/arkglide-lifecycle.js": "ac0b3208116f803f30c0a498a80934ee62e1a7d30adc89c32d090b0f95f3d599",
+    "public/arkglide-physics-tools.js": "8554113e2c2db22d653160a83ef112523f6ab52ae8e47325d7a06290a2765527",
+    "public/arkglide-physics.js": "9ca74300bfccb22c311113cfc82cf137840daf88c946c862eb2a96083e04e680",
+    "public/arkglide-scene.js": "45fd6c4e3711d0d9b7a0a5ac26c4d4df1f2d7586c14ca2b0c030d21a29e944b0",
+    "src/components/panels/AssetBrowser.tsx": "7f4fd9aa5be74900de3d4c8677f8bcc8290bb2342c9a35646bc48ca775a25301",
+    "src/components/panels/Inspector.tsx": "93197b97e2e48c597f69a8e2af4eea6212241911122b9fe0161890e0850d35f8",
+    "src/components/panels/Viewport.tsx": "2be64781c74051ecb86cc59330758d2f1bf538f0221479eb9456efaee62d1296",
+    "src/engine/animation-advanced.js": "d05cb0026936d5b8a1d2e51b6185ffe78f380516e190f723aca9327604e740bc",
+    "src/engine/animation-runtime.js": "4f0368296d0a67902835bdf86125e02525f7386d907a1908dfbe6dbee28911f8",
+    "src/engine/input-ui-runtime.js": "cfda0d2bab42bc1721a9814916a97e7e57560fda2fe8a5c4c138dd7a9250b32b",
+    "src/engine/lifecycle-runtime.js": "ac0b3208116f803f30c0a498a80934ee62e1a7d30adc89c32d090b0f95f3d599",
+    "src/engine/physics-advanced.js": "8554113e2c2db22d653160a83ef112523f6ab52ae8e47325d7a06290a2765527",
+    "src/engine/physics-runtime.js": "9ca74300bfccb22c311113cfc82cf137840daf88c946c862eb2a96083e04e680",
+    "src/engine/scene-runtime.js": "45fd6c4e3711d0d9b7a0a5ac26c4d4df1f2d7586c14ca2b0c030d21a29e944b0",
+    "src/store/useEditorStore.ts": "a0e58ccabab6ae1290f0a109950fd8f542bec4e3a30c8ccf07717198b04f3d8e",
+    "src/utils/audioImport.ts": "95d8ff56fc771dd9d8557f2ece8dec2ac2ccc90f692c22ddc83acb87c4234e0c",
+    "src/utils/modelImport.ts": "b8fe599695dba68afcb009f7b7888a588d4d54804c0ac4a9f38ceabb39139dbb",
+    "src/utils/projectExport.ts": "d7acac2dd532405300aeac19b163858d8960e81771c62418adeebc0159582bc2",
+    "src/utils/projectRecovery.ts": "b583fb7d6b9cfbf46bd11a70175253ebf078d85d7e1f364cb03c8db02ff63a75",
+    "src/utils/scriptImport.ts": "9c2be304906a084f00b942a12fa07d5816b670ea7acf13d2b7b8ea99f8cf6064",
+    "src/utils/textureImport.ts": "711ce011cdac4e439d7d2f96c6911fc79e128fa8782f3fdb874ee8910624a2b6",
+    "tests/animation-advanced.test.mjs": "b1f7629f16c1458c322754616d47b0dd785bdbeb6311e2b5e8e1bb312a96b2f9",
+    "tests/gameplay.test.mjs": "011f66fdc32acebb4a20619963da5ae087af906a16482d83cb7d4e9b6335e816",
+    "tests/input-advanced.test.mjs": "3c4fd429c689f168345f285567d517b2f41a237d5002f11ddb5604deb7ad6175",
+    "tests/lifecycle.test.mjs": "0a5f33433deacb0cd93b43b263eb07795dbc1a6d23a6fb9835c296d413529a41",
+    "tests/physics-advanced.test.mjs": "be69671a30374e379ac855d842a2b5e4049367b3790c5c011694579d1e2d97b1",
+    "tests/project.test.mjs": "9987c533d884942d7d2c19b3c3c043e13733be0926bdf7c0020e48aa2f4dd490",
+    "tests/scene.test.mjs": "4c775ba519b03bc7f884864d10fb8c9ceceb959274a46a421b6e07cff40976f2"
+  },
+  "exampleMatchesCurrentRuntime": true,
+  "unit": {
+    "tests": 196,
+    "passed": 196,
+    "failed": 0,
+    "skipped": 0
+  },
+  "editorBrowser": {
+    "startTime": "2026-10-12T11:02:42.241Z",
+    "duration": 141789.698,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "staticBrowser": {
+    "startTime": "2026-10-12T10:59:15.471Z",
+    "duration": 45936.263,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "build": {
+    "passed": true,
+    "nodeHeapMiB": 5120,
+    "warning": "large editor bundle"
+  },
+  "manualAcceptance": {
+    "realGamepad": "pending",
+    "physicalTargetDevices": "pending",
+    "productionHosting": "pending"
+  },
+  "gitCommitOrPush": false,
+  "verifiedAt": "2026-10-12T11:06:57.615543+00:00"
+}

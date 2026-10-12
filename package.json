@@ -18,7 +18,11 @@
     "example:playable": "node scripts/create-playable-example.mjs",
     "example:modules": "node scripts/create-modules-example.mjs",
     "example:third": "node scripts/create-third-full-example.mjs",
-    "pretest": "npm run sync:runtime"
+    "pretest": "npm run sync:runtime",
+    "export:game": "npm run sync:runtime && node scripts/export-static-game.mjs",
+    "example:fourth": "node scripts/create-fourth-example.mjs",
+    "test:static": "playwright test --config playwright.static.config.ts",
+    "verify:fourth": "node scripts/verify-fourth.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",

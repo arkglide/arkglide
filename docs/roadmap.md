@@ -16,7 +16,7 @@
 | F10 WASM 数学库     | 🔄 接入完成，性能优化待做            | Vector3/Matrix4/Quaternion；脚本 math、实体增量运算和世界矩阵使用 WASM；CLI/浏览器基准                           |
 | F11 物理引擎        | ✅ 第三批进阶实现/自动验收           | Jolt、碰撞分组、调试、模型凸包/静态网格、查询、胶囊角色、常用关节、固定步与清理                                  |
 | F12 场景图迁移      | ⏳                                   | 尚未把场景、生命周期和实体管理迁到 C++                                                                           |
-| F13 静态导出        | ⏳                                   | 尚未支持独立可玩项目导出与部署；Vite build 仍是编辑器构建                                                        |
+| F13 静态导出        | ✅ 第四批实现/自动验收                | 独立游戏 ZIP、依赖校验、本地运行时/WASM、启动进度、停止重启、子目录、编辑器入口；目标设备人工验收待做             |
 | F14 Network Adapter | ⏳                                   | 尚未实现 Mock/Local/Relay Adapter                                                                                |
 | F15 材质与贴图      | ✅                                   | PBR 材质编辑、三类贴图、UV、共享/独立材质、模型整体与分部件/子材质槽覆盖、完整持久化                             |
 | F16 Prefab          | ✅ 本阶段目标                        | 实体子树与模型模板、嵌套关联、独立实例、逐轴/逐槽覆盖、依赖传播、运行时异步生成、取消与清理                      |
@@ -82,3 +82,7 @@ npm run build
 基础批次的配置与示例见 [third-batch.md](third-batch.md)。本次进阶更新采用 0.6 格式，兼容旧项目；完整示例为 `examples/third-full.arkglide`。变更见 [third-full-changes.md](third-full-changes.md)，API 见 [third-full-api.md](third-full-api.md)，验收见 [third-full-verification.md](third-full-verification.md)。
 
 逐项状态见 [第三批完整任务单](third-batch-full-tasklist.md)。实现与自动化已完成，真实手柄人工验收保留待完成。
+
+## 第四批交付
+
+F13 使用当前 JS/Babylon 场景运行时，不等待 F12。导出器、资源规则和独立部署示例见 [fourth-batch.md](fourth-batch.md)，开工前任务单见 [fourth-batch-tasklist.md](fourth-batch-tasklist.md)，最新实际验收见 [fourth-batch-verification.md](fourth-batch-verification.md)。`npm run build` 仍构建编辑器；游戏导出使用「导出独立游戏」或 `npm run export:game`。真实手柄与实体移动设备人工验收仍未完成。

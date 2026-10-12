@@ -1,0 +1,123 @@
+import '../vendor/acorn.js';
+import '../engine/module-runtime.js';
+import { zipSync, strToU8 } from 'fflate';
+
+// Explicit offline runtime contract, shared by the editor and command-line exporter.
+export const RUNTIME_FILES = [
+  'runtime.html', 'standalone-player.js', 'standalone.html',
+  'arkglide-math.js', 'arkglide-api.js', 'arkglide-lifecycle.js',
+  'arkglide-scene.js', 'arkglide-prefabs.js', 'arkglide-physics-tools.js',
+  'arkglide-physics.js', 'arkglide-input-ui.js', 'arkglide-audio-stretch.js',
+  'arkglide-audio.js', 'arkglide-animation-tools.js', 'arkglide-animation.js',
+  'arkglide-modules.js', 'lib/babylon.js', 'lib/babylon.glTFFileLoader.min.js',
+  'lib/arkglide_math.js', 'lib/jolt-physics.js', 'lib/acorn.js',
+  'lib/ACORN_LICENSE.txt', 'lib/babylon-loaders-LICENSE.md',
+  'lib/babylon-LICENSE.md', 'lib/arkglide-LICENSE.txt', 'lib/jolt-LICENSE.txt', 'lib/jolt-NOTICE.md',
+];
+export function exportSettings(input = {}) {
+  const title = String(input.title || 'ArkGlide Game').trim();
+  if (!title || title.length > 120) throw Error('游戏标题应为 1～120 个字符');
+  const fit = input.fit || 'responsive';
+  if (!['responsive', 'contain'].includes(fit)) throw Error('无效运行尺寸模式');
+  const width = input.width ?? 1280, height = input.height ?? 720;
+  if (![width, height].every(v => Number.isInteger(v) && v >= 240 && v <= 7680))
+    throw Error('设计尺寸必须是 240～7680 的整数');
+  return { title, fit, width, height };
+}
+export function validateScriptGraph(scripts, nodes, prefabs = {}) {
+  const api = globalThis.ArkGlideModules, entries = new Set();
+  for (const n of [...nodes, ...Object.values(prefabs).flatMap(p => p.nodes)])
+    for (const file of n.scripts || []) entries.add(file);
+  const info = new Map(), graph = {};
+  for (const [file, source] of Object.entries(scripts)) {
+    if (!file.endsWith('.js') || /[\\\u0000?#:]/.test(file) || file.startsWith('/') || file.split('/').some(p => !p || p === '.' || p === '..'))
+      throw Error('脚本必须使用项目内 .js 路径: ' + file);
+    info.set(file, api.inspect(source, file));
+  }
+  for (const entry of entries) if (!info.has(entry)) throw Error('脚本绑定缺失: ' + entry);
+  for (const [file, analysis] of info) {
+    graph[file] = analysis.references.map(ref => {
+      const target = api.resolve(file, ref.value, scripts), dep = info.get(target);
+      if (dep.topReturn || (entries.has(target) && !dep.hasExports))
+        throw Error('不能导入旧式实体脚本: ' + file + ' → ' + target);
+      return target;
+    });
+  }
+  const visiting = new Set(), visited = new Set();
+  function visit(file) {
+    if (visiting.has(file)) throw Error('暂不支持循环模块依赖: ' + file);
+    if (visited.has(file)) return;
+    visiting.add(file);
+    graph[file].forEach(visit);
+    visiting.delete(file); visited.add(file);
+  }
+  Object.keys(graph).forEach(visit);
+  return { entries: [...entries], graph };
+}
+function bytes(value, label, expected) {
+  const result = value instanceof Uint8Array ? value : value instanceof ArrayBuffer ? new Uint8Array(value) : null;
+  if (!result?.byteLength) throw Error('导出资源缺失或为空: ' + label);
+  if (expected !== undefined && result.byteLength !== expected) throw Error('资源大小不一致: ' + label);
+  return result;
+}
+function validateModel(raw, label) {
+  let gltf;
+  try {
+    const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+    if (raw.length >= 12 && view.getUint32(0, true) === 0x46546c67) {
+      if (view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== raw.length || raw.length < 20 || view.getUint32(16, true) !== 0x4e4f534a)
+        throw Error('无效 GLB 头部');
+      const size = view.getUint32(12, true);
+      if (20 + size > raw.length) throw Error('GLB JSON 越界');
+      gltf = JSON.parse(new TextDecoder().decode(raw.subarray(20, 20 + size)));
+    } else gltf = JSON.parse(new TextDecoder().decode(raw));
+  } catch (error) { throw Error('模型不是有效 GLB/glTF: ' + label + '；' + error.message); }
+  if (gltf.asset?.version !== '2.0') throw Error('仅支持 glTF 2.0: ' + label);
+  for (const ref of [...(gltf.buffers || []), ...(gltf.images || [])])
+    if (ref.uri && !/^data:/i.test(ref.uri)) throw Error('模型包含未打包的外部资源: ' + label + ' → ' + ref.uri + '；请重新挂载整个资源文件夹');
+  const unsupported = new Set(['KHR_draco_mesh_compression', 'EXT_meshopt_compression', 'KHR_texture_basisu']);
+  for (const extension of new Set([...(gltf.extensionsUsed || []), ...(gltf.extensionsRequired || [])]))
+    if (unsupported.has(extension)) throw Error('独立包未内置该解码器: ' + label + ' → ' + extension);
+}
+/** Input must already have passed normalizeProject; no user scripts are evaluated here. */
+export function createStaticGame(project, resourceMaps, runtime, settings = {}) {
+  const options = exportSettings({ title: project.name, ...settings });
+  const scripts = project.scripts || {}, content = project.content || {};
+  const modules = validateScriptGraph(scripts, project.scene.nodes, content.prefabs);
+  const files = Object.create(null), resources = [];
+  for (const name of RUNTIME_FILES) files[name === 'standalone.html' ? 'index.html' : name] = bytes(runtime[name], name);
+  const runtimeHTML = new TextDecoder().decode(files['runtime.html']);
+  for (const match of runtimeHTML.matchAll(/<script\s+src="([^"]+)"/g)) {
+    const path = match[1].replace(/^\.\//, '');
+    if (!Object.hasOwn(files, path)) throw Error('运行时清单遗漏依赖: ' + path);
+  }
+  const modelIds = new Set();
+  for (const ref of project.modelRefs || []) {
+    if (modelIds.has(ref.assetId)) continue;
+    modelIds.add(ref.assetId);
+    const raw = bytes(resourceMaps.models.get(ref.assetId), ref.assetId);
+    validateModel(raw, ref.assetId);
+    const path = 'assets/model-' + resources.length + '.bin';
+    files[path] = raw;
+    resources.push({ kind: 'model', id: ref.assetId, path, byteLength: raw.byteLength });
+  }
+  for (const [kind, list, map] of [
+    ['texture', content.textures || [], resourceMaps.textures],
+    ['audio', content.audio || [], resourceMaps.audio],
+  ]) for (const asset of list) {
+    const raw = bytes(map.get(asset.id), asset.name, asset.byteLength);
+    const path = 'assets/' + kind + '-' + resources.length + '.bin';
+    files[path] = raw;
+    resources.push({ kind, id: asset.id, path, byteLength: raw.byteLength });
+  }
+  // All scripts and templates are retained: runtime prefab IDs may be computed.
+  files['project.json'] = strToU8(JSON.stringify(project));
+  files['DEPLOY-README.txt'] = strToU8('ArkGlide 独立静态游戏\n将整个目录放在 HTTP/HTTPS 静态服务器上，打开 index.html。支持子目录；不要直接双击 file://。\n本地试运行：python -m http.server 8080\n开始后在游戏内点击“启用音频”或点击画面解锁音频。停止后可重新开始。\n所有项目脚本及预制体资源已包含；未登记的脚本 fetch/远程资源不自动打包。\n数学与 Jolt WASM 内嵌在 lib/*.js，无外置 .wasm。\n');
+  const manifest = {
+    format: 'arkglide-static-1', settings: options, project: 'project.json', resources, modules,
+    wasm: 'embedded-single-file',
+    files: Object.entries(files).map(([path, raw]) => ({ path, byteLength: raw.byteLength })),
+  };
+  files['game-manifest.json'] = strToU8(JSON.stringify(manifest, null, 2));
+  return { files, manifest, zip: () => zipSync(files, { level: 6 }) };
+}

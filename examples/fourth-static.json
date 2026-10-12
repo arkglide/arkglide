@@ -1,0 +1,1764 @@
+{
+  "projectId": "",
+  "name": "ArkGlide 独立导出演示",
+  "version": "0.6",
+  "updatedAt": 1791697181540,
+  "scene": {
+    "nodes": [
+      {
+        "id": "Player",
+        "name": "Player",
+        "type": "model",
+        "transform": {
+          "x": 0,
+          "y": 2,
+          "z": -2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": null,
+        "modelUrl": "third-player.glb",
+        "character": {
+          "radius": 0.3,
+          "height": 1.8,
+          "stepHeight": 0.3,
+          "maxSlope": 45,
+          "speed": 2,
+          "jumpSpeed": 5
+        },
+        "animation": {
+          "clip": "Idle",
+          "autoplay": true,
+          "loop": true,
+          "speed": 1,
+          "controllerId": "locomotion",
+          "rootMotion": {
+            "target": "Root",
+            "translation": true,
+            "rotation": false
+          }
+        },
+        "scripts": [
+          "player.js"
+        ]
+      },
+      {
+        "id": "Mirror",
+        "name": "Mirror",
+        "type": "model",
+        "transform": {
+          "x": -4,
+          "y": 2,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": null,
+        "modelUrl": "third-mirror.glb",
+        "character": {
+          "radius": 0.3,
+          "height": 1.8,
+          "stepHeight": 0.3,
+          "maxSlope": 45,
+          "speed": 2,
+          "jumpSpeed": 5
+        },
+        "animation": {
+          "clip": "Idle",
+          "autoplay": true,
+          "loop": true,
+          "speed": 1,
+          "controllerId": "locomotion",
+          "rootMotion": {
+            "target": "OtherRoot",
+            "translation": true,
+            "rotation": false
+          },
+          "retarget": {
+            "sourceId": "Player",
+            "profileId": "mirror"
+          }
+        },
+        "scripts": [
+          "mirror.js"
+        ]
+      },
+      {
+        "id": "Floor",
+        "name": "Floor",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": -0.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 20,
+          "y": 1,
+          "z": 20
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "color": "#28394B",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        },
+        "materialId": "export-material"
+      },
+      {
+        "id": "Ramp",
+        "name": "Ramp",
+        "type": "mesh",
+        "transform": {
+          "x": -3,
+          "y": 0.2,
+          "z": 3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0.3
+        },
+        "scale": {
+          "x": 4,
+          "y": 0.2,
+          "z": 3
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "color": "#758B63",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        }
+      },
+      {
+        "id": "Step",
+        "name": "Step",
+        "type": "mesh",
+        "transform": {
+          "x": 1,
+          "y": 0.1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 2,
+          "y": 0.2,
+          "z": 2
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "color": "#8A784C",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        }
+      },
+      {
+        "id": "Wall",
+        "name": "Wall",
+        "type": "mesh",
+        "transform": {
+          "x": 4,
+          "y": 1.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.3,
+          "y": 3,
+          "z": 6
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "color": "#5C617A",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        }
+      },
+      {
+        "id": "Platform",
+        "name": "Platform",
+        "type": "mesh",
+        "transform": {
+          "x": -1,
+          "y": 0.2,
+          "z": 5
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 3,
+          "y": 0.4,
+          "z": 3
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "color": "#9966AA",
+        "physics": {
+          "motion": "kinematic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        }
+      },
+      {
+        "id": "Trigger",
+        "name": "Trigger",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": 1,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 3,
+          "y": 2,
+          "z": 1
+        },
+        "visible": false,
+        "parentId": null,
+        "primitive": "box",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": true,
+          "lockRotation": false,
+          "group": "Trigger"
+        }
+      },
+      {
+        "id": "HingeBase",
+        "name": "HingeBase",
+        "type": "mesh",
+        "transform": {
+          "x": 3,
+          "y": 0.1,
+          "z": 4
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        }
+      },
+      {
+        "id": "Door",
+        "name": "Door",
+        "type": "mesh",
+        "transform": {
+          "x": 3,
+          "y": 1.5,
+          "z": 4
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.6,
+          "y": 2,
+          "z": 0.2
+        },
+        "visible": true,
+        "parentId": null,
+        "primitive": "box",
+        "color": "#B48152",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false
+        },
+        "joints": [
+          {
+            "id": "door-hinge",
+            "kind": "hinge",
+            "targetId": "HingeBase",
+            "anchor": {
+              "x": 0,
+              "y": -0.7,
+              "z": 0
+            },
+            "anchor2": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "axis": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "min": -1.2,
+            "max": 1.2,
+            "motor": {
+              "velocity": 0.3,
+              "force": 8
+            }
+          }
+        ]
+      },
+      {
+        "id": "CrateGroup",
+        "name": "CrateGroup",
+        "type": "empty",
+        "transform": {
+          "x": 6,
+          "y": 1,
+          "z": 3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": null,
+        "prefab": {
+          "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+          "instanceId": "8c27245c-c2d7-41b8-a454-c64432dfae9e",
+          "nodeId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c"
+        }
+      },
+      {
+        "id": "Crate",
+        "name": "Crate",
+        "type": "model",
+        "transform": {
+          "x": 0,
+          "y": 1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": "CrateGroup",
+        "modelUrl": "third-crate.glb",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "convex",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "parts": [
+            "CratePart"
+          ]
+        },
+        "scripts": [
+          "crate.js"
+        ],
+        "prefab": {
+          "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+          "instanceId": "8c27245c-c2d7-41b8-a454-c64432dfae9e",
+          "nodeId": "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0"
+        }
+      },
+      {
+        "id": "MeshPlatform",
+        "name": "MeshPlatform",
+        "type": "model",
+        "transform": {
+          "x": -5,
+          "y": 0.4,
+          "z": 5
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 3,
+          "y": 0.5,
+          "z": 3
+        },
+        "visible": true,
+        "parentId": null,
+        "modelUrl": "third-crate.glb",
+        "physics": {
+          "motion": "static",
+          "shape": "mesh",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "parts": [
+            "CratePart"
+          ]
+        }
+      },
+      {
+        "id": "Camera",
+        "name": "Camera",
+        "type": "camera",
+        "transform": {
+          "x": 0,
+          "y": 9,
+          "z": -13
+        },
+        "rotation": {
+          "x": 0.52,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": null,
+        "activeCamera": true,
+        "fov": 60
+      },
+      {
+        "id": "empty_505b5ecb-3ac5-4fe3-9489-ec8bb9695714",
+        "name": "补给箱组合",
+        "type": "empty",
+        "transform": {
+          "x": 6,
+          "y": 2,
+          "z": -3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": null,
+        "prefab": {
+          "prefabId": "efedb031-9583-4d21-bf31-7b64b57b41e1",
+          "instanceId": "0b9f3a3b-9257-4ebe-b0b3-cd34df4f0643",
+          "nodeId": "d1383a44-8eaa-4753-9d74-ca22e1c910dd"
+        }
+      },
+      {
+        "id": "ef6acd5b-f541-4f84-a163-1c7292d2ceaf",
+        "name": "CrateGroup",
+        "type": "empty",
+        "transform": {
+          "x": 0,
+          "y": 0.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": "empty_505b5ecb-3ac5-4fe3-9489-ec8bb9695714",
+        "prefab": {
+          "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+          "instanceId": "1bf92af9-0098-4774-ac49-efbb02e80d56",
+          "nodeId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c"
+        }
+      },
+      {
+        "id": "40a05f35-01d5-4cf7-9efb-2d17855210f8",
+        "name": "Crate",
+        "type": "model",
+        "transform": {
+          "x": 0,
+          "y": 1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "parentId": "ef6acd5b-f541-4f84-a163-1c7292d2ceaf",
+        "modelUrl": "third-crate.glb",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "convex",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 1,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "parts": [
+            "CratePart"
+          ]
+        },
+        "scripts": [
+          "crate.js"
+        ],
+        "prefab": {
+          "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+          "instanceId": "1bf92af9-0098-4774-ac49-efbb02e80d56",
+          "nodeId": "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0"
+        }
+      },
+      {
+        "id": "export-demo",
+        "name": "独立模块验证",
+        "type": "empty",
+        "parentId": null,
+        "transform": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "scripts": [
+          "export-demo.js"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "movement.js": "export const direction = input => ({x:input.getAction('moveX'), z:input.getAction('moveZ')});\nexport const rates=[.5,1,2];\n",
+    "player.js": "import {direction,rates} from './movement.js';\nexport default function({entity,input,scene,time,physics,animation,audio,ui,prefabs,timers}) {\nlet char,controller,music,snapshot=null,rateIndex=1,paused=false,spawned=[];\nconst clickSound=()=>audio.play('tone',{bus:'UI',volume:.25,priority:10});\nfunction menu(){paused=!paused;if(snapshot)snapshot.release();snapshot=paused?audio.applySnapshot('pause',.25):null;time.timeScale=paused?0:1;ui.get('menu').setVisible(paused);ui.get('menu').setText('暂停菜单');clickSound();}\nreturn {onStart(){char=physics.character(entity);controller=animation.controller(entity);music=audio.play('music',{bus:'Music',stream:true,loop:true,volume:.2,priority:5,preservePitch:true});animation.onEvent(entity,e=>{if(e.name==='footstep'&&controller.getParameter('speed')>.1)audio.play('tone',{bus:'SFX',volume:.15,spatial:true,entity,priority:1});});ui.get('pause').on('click',menu);ui.get('resume').on('click',menu);ui.get('rate').on('click',()=>{rateIndex=(rateIndex+1)%rates.length;music.setRate(rates[rateIndex]);ui.get('rate').setText('音乐倍率：'+rates[rateIndex]);clickSound();});ui.get('rebind').on('click',()=>input.captureBinding('jump').then(r=>{if(r.cancelled)return;ui.get('status').setText(r.applied?'跳跃改绑：'+r.code:'改绑取消或冲突');}));timers.every(5,()=>{const p=prefabs.findByName('补给箱组合');if(p)prefabs.instantiate(p.id,{position:{x:entity.position.x+1,y:3,z:entity.position.z}}).then(h=>{spawned.push(h);if(spawned.length>2)spawned.shift().destroy();});});},onFixedUpdate(){const d=direction(input);controller.setParameter('moveX',d.x);controller.setParameter('moveZ',d.z);controller.setParameter('speed',Math.hypot(d.x,d.z));controller.setParameter('airborne',!char.grounded);if(input.wasActionPressed('jump'))char.jump();const platform=scene.find('Platform');platform.position.x=-1+Math.sin(time.fixedTotalTime)*1.5;},onUpdate(){const hits=physics.overlap({kind:'sphere',radius:.6},entity.getWorldPosition(),{mask:2,sensors:true});ui.get('status').setText((char.grounded?'地面':'空中')+' · '+controller.state+' · 触发区 '+hits.length+' · 音乐 '+music.position.toFixed(1)+'s');},onDestroy(){for(const h of spawned)h.destroy();}};\n}",
+    "mirror.js": "export default function({entity,time,animation}){let c;return {onStart(){c=animation.controller(entity);},onFixedUpdate(){c.setParameter('moveX',Math.sin(time.fixedTotalTime)*.3);c.setParameter('speed',.3);}};}\n",
+    "crate.js": "export default function({entity,audio}){return {onStart(){audio.play('tone',{bus:'SFX',volume:.08,entity,spatial:true,priority:0});}};}\n",
+    "main.js": "",
+    "lib/export-counter.js": "let count=0; export function next(){return ++count;}",
+    "lib/export-label.js": "export const label=\"独立包中的字面量动态导入已就绪\";",
+    "export-demo.js": "import {next} from './lib/export-counter.js';\nexport default function({timers,console,prefabs,scene}) {\n  return {\n    onStart(){\n      console.log('export session counter',next());\n      import('./lib/export-label.js').then(({label})=>{if(!this.entity.destroyed)console.log(label);});\n      // The third project exposes its runtime template via the gameplay action;\n      // list all templates so the exported project visibly verifies inclusion.\n      console.log('打包模板',prefabs.list().map(p=>p.name).join(', '));\n    },\n    onDestroy(){console.log('独立示例脚本已销毁');}\n  };\n}"
+  },
+  "activeFileId": "player.js",
+  "modelRefs": [
+    {
+      "assetId": "Player",
+      "fileName": "third-player.glb"
+    },
+    {
+      "assetId": "Mirror",
+      "fileName": "third-mirror.glb"
+    },
+    {
+      "assetId": "Crate",
+      "fileName": "third-crate.glb"
+    },
+    {
+      "assetId": "MeshPlatform",
+      "fileName": "third-crate_1.glb"
+    },
+    {
+      "assetId": "40a05f35-01d5-4cf7-9efb-2d17855210f8",
+      "fileName": "third-crate_2.glb"
+    },
+    {
+      "assetId": "prefab:df7a5172-5543-4a93-a87a-9eba77580d52:3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0",
+      "fileName": "third-crate_3.glb"
+    },
+    {
+      "assetId": "prefab:efedb031-9583-4d21-bf31-7b64b57b41e1:8e5f1cbd-433c-47f9-a01c-181533599256",
+      "fileName": "third-crate_4.glb"
+    }
+  ],
+  "settings": {
+    "gravity": {
+      "x": 0,
+      "y": -9.8,
+      "z": 0
+    },
+    "backgroundColor": "#0D1724",
+    "ambientIntensity": 0.8,
+    "ambientColor": "#FFFFFF",
+    "fpsCap": 60,
+    "fixedTimeStep": 0.016666666666666666,
+    "maxSubSteps": 8,
+    "timeScale": 1
+  },
+  "content": {
+    "materials": {
+      "export-material": {
+        "id": "export-material",
+        "name": "导出示例 PBR 贴图材质",
+        "baseColor": "#809BCC",
+        "emissiveColor": "#000000",
+        "metallic": 0.1,
+        "roughness": 0.7,
+        "alpha": 1,
+        "doubleSided": false,
+        "uvScale": {
+          "u": 2,
+          "v": 2
+        },
+        "albedoTextureId": "icon"
+      }
+    },
+    "textures": [
+      {
+        "id": "icon",
+        "name": "本地图标.png",
+        "mime": "image/png",
+        "byteLength": 556
+      }
+    ],
+    "prefabs": {
+      "df7a5172-5543-4a93-a87a-9eba77580d52": {
+        "id": "df7a5172-5543-4a93-a87a-9eba77580d52",
+        "name": "补给箱",
+        "revision": 1,
+        "rootId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+        "nodes": [
+          {
+            "id": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+            "name": "CrateGroup",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": null
+          },
+          {
+            "id": "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0",
+            "name": "Crate",
+            "type": "model",
+            "transform": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+            "modelUrl": "third-crate.glb",
+            "physics": {
+              "motion": "dynamic",
+              "shape": "convex",
+              "size": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "mass": 1,
+              "friction": 0.5,
+              "restitution": 0,
+              "sensor": false,
+              "lockRotation": false,
+              "parts": [
+                "CratePart"
+              ]
+            },
+            "scripts": [
+              "crate.js"
+            ]
+          }
+        ],
+        "modelKeys": {
+          "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0": "prefab:df7a5172-5543-4a93-a87a-9eba77580d52:3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0"
+        },
+        "nestedInstances": {}
+      },
+      "efedb031-9583-4d21-bf31-7b64b57b41e1": {
+        "id": "efedb031-9583-4d21-bf31-7b64b57b41e1",
+        "name": "补给箱组合",
+        "revision": 1,
+        "rootId": "d1383a44-8eaa-4753-9d74-ca22e1c910dd",
+        "nodes": [
+          {
+            "id": "d1383a44-8eaa-4753-9d74-ca22e1c910dd",
+            "name": "补给箱组合",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": null
+          },
+          {
+            "id": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+            "name": "CrateGroup",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0.5,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "d1383a44-8eaa-4753-9d74-ca22e1c910dd"
+          },
+          {
+            "id": "8e5f1cbd-433c-47f9-a01c-181533599256",
+            "name": "Crate",
+            "type": "model",
+            "transform": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+            "modelUrl": "third-crate.glb",
+            "physics": {
+              "motion": "dynamic",
+              "shape": "convex",
+              "size": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "mass": 1,
+              "friction": 0.5,
+              "restitution": 0,
+              "sensor": false,
+              "lockRotation": false,
+              "parts": [
+                "CratePart"
+              ]
+            },
+            "scripts": [
+              "crate.js"
+            ]
+          }
+        ],
+        "modelKeys": {
+          "8e5f1cbd-433c-47f9-a01c-181533599256": "prefab:efedb031-9583-4d21-bf31-7b64b57b41e1:8e5f1cbd-433c-47f9-a01c-181533599256"
+        },
+        "nestedInstances": {
+          "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d": {
+            "id": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+            "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+            "rootId": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+            "nodeMap": {
+              "15237cf7-9bce-4e54-8b98-ac6387c8c89c": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+              "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0": "8e5f1cbd-433c-47f9-a01c-181533599256"
+            },
+            "baseline": [
+              {
+                "id": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+                "name": "CrateGroup",
+                "type": "empty",
+                "transform": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "rotation": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "scale": {
+                  "x": 1,
+                  "y": 1,
+                  "z": 1
+                },
+                "visible": true,
+                "parentId": null
+              },
+              {
+                "id": "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0",
+                "name": "Crate",
+                "type": "model",
+                "transform": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0
+                },
+                "rotation": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "scale": {
+                  "x": 1,
+                  "y": 1,
+                  "z": 1
+                },
+                "visible": true,
+                "parentId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+                "modelUrl": "third-crate.glb",
+                "physics": {
+                  "motion": "dynamic",
+                  "shape": "convex",
+                  "size": {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                  },
+                  "mass": 1,
+                  "friction": 0.5,
+                  "restitution": 0,
+                  "sensor": false,
+                  "lockRotation": false,
+                  "parts": [
+                    "CratePart"
+                  ]
+                },
+                "scripts": [
+                  "crate.js"
+                ]
+              }
+            ],
+            "revision": 1
+          }
+        }
+      }
+    },
+    "prefabInstances": {
+      "8c27245c-c2d7-41b8-a454-c64432dfae9e": {
+        "id": "8c27245c-c2d7-41b8-a454-c64432dfae9e",
+        "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+        "rootId": "CrateGroup",
+        "nodeMap": {
+          "15237cf7-9bce-4e54-8b98-ac6387c8c89c": "CrateGroup",
+          "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0": "Crate"
+        },
+        "baseline": [
+          {
+            "id": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+            "name": "CrateGroup",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": null
+          },
+          {
+            "id": "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0",
+            "name": "Crate",
+            "type": "model",
+            "transform": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+            "modelUrl": "third-crate.glb",
+            "physics": {
+              "motion": "dynamic",
+              "shape": "convex",
+              "size": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "mass": 1,
+              "friction": 0.5,
+              "restitution": 0,
+              "sensor": false,
+              "lockRotation": false,
+              "parts": [
+                "CratePart"
+              ]
+            },
+            "scripts": [
+              "crate.js"
+            ]
+          }
+        ],
+        "revision": 1
+      },
+      "0b9f3a3b-9257-4ebe-b0b3-cd34df4f0643": {
+        "id": "0b9f3a3b-9257-4ebe-b0b3-cd34df4f0643",
+        "prefabId": "efedb031-9583-4d21-bf31-7b64b57b41e1",
+        "rootId": "empty_505b5ecb-3ac5-4fe3-9489-ec8bb9695714",
+        "nodeMap": {
+          "d1383a44-8eaa-4753-9d74-ca22e1c910dd": "empty_505b5ecb-3ac5-4fe3-9489-ec8bb9695714",
+          "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d": "ef6acd5b-f541-4f84-a163-1c7292d2ceaf",
+          "8e5f1cbd-433c-47f9-a01c-181533599256": "40a05f35-01d5-4cf7-9efb-2d17855210f8"
+        },
+        "baseline": [
+          {
+            "id": "d1383a44-8eaa-4753-9d74-ca22e1c910dd",
+            "name": "补给箱组合",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": null
+          },
+          {
+            "id": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+            "name": "CrateGroup",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0.5,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "d1383a44-8eaa-4753-9d74-ca22e1c910dd"
+          },
+          {
+            "id": "8e5f1cbd-433c-47f9-a01c-181533599256",
+            "name": "Crate",
+            "type": "model",
+            "transform": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d",
+            "modelUrl": "third-crate.glb",
+            "physics": {
+              "motion": "dynamic",
+              "shape": "convex",
+              "size": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "mass": 1,
+              "friction": 0.5,
+              "restitution": 0,
+              "sensor": false,
+              "lockRotation": false,
+              "parts": [
+                "CratePart"
+              ]
+            },
+            "scripts": [
+              "crate.js"
+            ]
+          }
+        ],
+        "revision": 1
+      },
+      "1bf92af9-0098-4774-ac49-efbb02e80d56": {
+        "id": "1bf92af9-0098-4774-ac49-efbb02e80d56",
+        "prefabId": "df7a5172-5543-4a93-a87a-9eba77580d52",
+        "rootId": "ef6acd5b-f541-4f84-a163-1c7292d2ceaf",
+        "nodeMap": {
+          "15237cf7-9bce-4e54-8b98-ac6387c8c89c": "ef6acd5b-f541-4f84-a163-1c7292d2ceaf",
+          "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0": "40a05f35-01d5-4cf7-9efb-2d17855210f8"
+        },
+        "baseline": [
+          {
+            "id": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+            "name": "CrateGroup",
+            "type": "empty",
+            "transform": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": null
+          },
+          {
+            "id": "3c25bba7-d2fe-4f76-8ecf-492fdbe7f3c0",
+            "name": "Crate",
+            "type": "model",
+            "transform": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "visible": true,
+            "parentId": "15237cf7-9bce-4e54-8b98-ac6387c8c89c",
+            "modelUrl": "third-crate.glb",
+            "physics": {
+              "motion": "dynamic",
+              "shape": "convex",
+              "size": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "mass": 1,
+              "friction": 0.5,
+              "restitution": 0,
+              "sensor": false,
+              "lockRotation": false,
+              "parts": [
+                "CratePart"
+              ]
+            },
+            "scripts": [
+              "crate.js"
+            ]
+          }
+        ],
+        "revision": 1,
+        "parentInstanceId": "0b9f3a3b-9257-4ebe-b0b3-cd34df4f0643",
+        "mountId": "33d8d6f3-e090-4ea0-8ccf-fb4711427a5d"
+      }
+    },
+    "audio": [
+      {
+        "id": "tone",
+        "name": "脚步与按钮.wav",
+        "mime": "audio/wav",
+        "byteLength": 8864
+      },
+      {
+        "id": "music",
+        "name": "流式背景音乐.wav",
+        "mime": "audio/wav",
+        "byteLength": 529244,
+        "stream": true
+      }
+    ],
+    "physics": {
+      "groups": [
+        {
+          "name": "Default",
+          "mask": 3
+        },
+        {
+          "name": "Trigger",
+          "mask": 1
+        }
+      ],
+      "debug": false
+    },
+    "animationControllers": {
+      "locomotion": {
+        "id": "locomotion",
+        "name": "角色方向状态机",
+        "defaultState": "Locomotion",
+        "parameters": {
+          "moveX": 0,
+          "moveZ": 0,
+          "airborne": false,
+          "speed": 0
+        },
+        "states": [
+          {
+            "name": "Locomotion",
+            "clip": "Idle",
+            "speed": 1,
+            "loop": true,
+            "blend": {
+              "kind": "2d",
+              "parameterX": "moveX",
+              "parameterY": "moveZ",
+              "children": [
+                {
+                  "clip": "Idle",
+                  "x": 0,
+                  "y": 0,
+                  "threshold": 0
+                },
+                {
+                  "clip": "Right",
+                  "x": 1,
+                  "y": 0,
+                  "threshold": 1
+                },
+                {
+                  "clip": "Left",
+                  "x": -1,
+                  "y": 0,
+                  "threshold": -1
+                },
+                {
+                  "clip": "Forward",
+                  "x": 0,
+                  "y": 1,
+                  "threshold": 0
+                },
+                {
+                  "clip": "Back",
+                  "x": 0,
+                  "y": -1,
+                  "threshold": 0
+                }
+              ]
+            },
+            "events": [
+              {
+                "time": 0.2,
+                "name": "footstep"
+              },
+              {
+                "time": 0.7,
+                "name": "footstep"
+              }
+            ]
+          },
+          {
+            "name": "Jump",
+            "clip": "Jump",
+            "speed": 1,
+            "loop": false,
+            "events": [
+              {
+                "time": 0,
+                "name": "jump"
+              },
+              {
+                "time": 0.8,
+                "name": "land"
+              }
+            ]
+          }
+        ],
+        "transitions": [
+          {
+            "from": "Locomotion",
+            "to": "Jump",
+            "duration": 0.1,
+            "conditions": [
+              {
+                "parameter": "airborne",
+                "op": "==",
+                "value": true
+              }
+            ]
+          },
+          {
+            "from": "Jump",
+            "to": "Locomotion",
+            "duration": 0.15,
+            "conditions": [
+              {
+                "parameter": "airborne",
+                "op": "==",
+                "value": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "retargetProfiles": {
+      "mirror": {
+        "id": "mirror",
+        "name": "兼容骨架异名映射",
+        "scale": 1,
+        "mapping": {
+          "Root": "OtherRoot",
+          "Spine": "OtherSpine",
+          "LeftLeg": "OtherLeft",
+          "RightLeg": "OtherRight"
+        },
+        "sourcePose": {},
+        "targetPose": {}
+      }
+    },
+    "mixer": {
+      "buses": [
+        {
+          "id": "Master",
+          "name": "Master",
+          "parentId": null,
+          "volume": 1,
+          "mute": false
+        },
+        {
+          "id": "Music",
+          "name": "Music",
+          "parentId": "Master",
+          "volume": 1,
+          "mute": false
+        },
+        {
+          "id": "SFX",
+          "name": "SFX",
+          "parentId": "Master",
+          "volume": 1,
+          "mute": false
+        },
+        {
+          "id": "UI",
+          "name": "UI",
+          "parentId": "Master",
+          "volume": 1,
+          "mute": false
+        }
+      ],
+      "snapshots": [
+        {
+          "id": "pause",
+          "name": "暂停菜单",
+          "buses": {
+            "Music": {
+              "volume": 0.25,
+              "mute": false
+            },
+            "SFX": {
+              "volume": 0.2,
+              "mute": false
+            },
+            "UI": {
+              "volume": 1,
+              "mute": false
+            }
+          }
+        }
+      ],
+      "ducking": [
+        {
+          "sourceBus": "SFX",
+          "targetBus": "Music",
+          "amount": 0.5,
+          "attack": 0.03,
+          "release": 0.2
+        }
+      ],
+      "maxVoices": 16
+    },
+    "gameplay": {
+      "captureInput": true,
+      "actions": [
+        {
+          "name": "moveX",
+          "positive": [
+            "KeyD"
+          ],
+          "negative": [
+            "KeyA"
+          ],
+          "gamepad": [
+            {
+              "kind": "axis",
+              "index": 0,
+              "direction": 1,
+              "deadzone": 0.15
+            }
+          ]
+        },
+        {
+          "name": "moveZ",
+          "positive": [
+            "KeyW"
+          ],
+          "negative": [
+            "KeyS"
+          ],
+          "gamepad": [
+            {
+              "kind": "axis",
+              "index": 1,
+              "direction": -1,
+              "deadzone": 0.15
+            }
+          ]
+        },
+        {
+          "name": "jump",
+          "positive": [
+            "Space"
+          ],
+          "negative": [],
+          "gamepad": [
+            {
+              "kind": "button",
+              "index": 0,
+              "direction": 1,
+              "deadzone": 0.1
+            }
+          ]
+        }
+      ],
+      "defaults": [
+        {
+          "name": "moveX",
+          "positive": [
+            "KeyD"
+          ],
+          "negative": [
+            "KeyA"
+          ],
+          "gamepad": [
+            {
+              "kind": "axis",
+              "index": 0,
+              "direction": 1,
+              "deadzone": 0.15
+            }
+          ]
+        },
+        {
+          "name": "moveZ",
+          "positive": [
+            "KeyW"
+          ],
+          "negative": [
+            "KeyS"
+          ],
+          "gamepad": [
+            {
+              "kind": "axis",
+              "index": 1,
+              "direction": -1,
+              "deadzone": 0.15
+            }
+          ]
+        },
+        {
+          "name": "jump",
+          "positive": [
+            "Space"
+          ],
+          "negative": [],
+          "gamepad": [
+            {
+              "kind": "button",
+              "index": 0,
+              "direction": 1,
+              "deadzone": 0.1
+            }
+          ]
+        }
+      ],
+      "hud": [
+        {
+          "id": "status",
+          "kind": "text",
+          "text": "加载中",
+          "x": 3,
+          "y": 3,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "width": 70,
+          "height": 8
+        },
+        {
+          "id": "hint",
+          "kind": "richtext",
+          "text": "[b]WASD[/b] 移动 / 空格跳跃 · 斜坡 / 台阶 / 平台 / 关节门",
+          "x": 3,
+          "y": 12,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "width": 75,
+          "height": 8
+        },
+        {
+          "id": "pause",
+          "kind": "button",
+          "text": "暂停菜单",
+          "x": 82,
+          "y": 3,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "width": 16,
+          "height": 10
+        },
+        {
+          "id": "stick",
+          "kind": "joystick",
+          "text": "",
+          "x": 3,
+          "y": 65,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "width": 20,
+          "height": 30,
+          "joystick": {
+            "mode": "floating",
+            "radius": 60,
+            "deadzone": 0.15,
+            "actionX": "moveX",
+            "actionY": "moveZ"
+          }
+        },
+        {
+          "id": "jump",
+          "kind": "button",
+          "text": "跳跃",
+          "x": 82,
+          "y": 78,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "action": "jump",
+          "width": 16,
+          "height": 12
+        },
+        {
+          "id": "menu",
+          "kind": "container",
+          "text": "暂停菜单",
+          "x": 50,
+          "y": 40,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "anchorX": 0.5,
+          "anchorY": 0.5,
+          "width": 60,
+          "height": 40,
+          "layout": "column",
+          "gap": 8,
+          "visible": false,
+          "blockInput": true
+        },
+        {
+          "id": "icon",
+          "kind": "image",
+          "text": "本地图标",
+          "x": 0,
+          "y": 0,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "parentId": "menu",
+          "textureId": "icon",
+          "width": 8,
+          "height": 20
+        },
+        {
+          "id": "resume",
+          "kind": "button",
+          "text": "继续",
+          "x": 0,
+          "y": 0,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "parentId": "menu",
+          "width": 100,
+          "height": 22,
+          "tabIndex": 0
+        },
+        {
+          "id": "rate",
+          "kind": "button",
+          "text": "音乐倍率：1",
+          "x": 0,
+          "y": 0,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "parentId": "menu",
+          "width": 100,
+          "height": 22,
+          "tabIndex": 1
+        },
+        {
+          "id": "rebind",
+          "kind": "button",
+          "text": "修改跳跃键（Esc 取消）",
+          "x": 0,
+          "y": 0,
+          "fontSize": 18,
+          "color": "#FFFFFF",
+          "background": "#253044",
+          "parentId": "menu",
+          "width": 100,
+          "height": 22,
+          "tabIndex": 2
+        }
+      ]
+    }
+  }
+}

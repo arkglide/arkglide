@@ -1,0 +1,821 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ArkGlide Runtime</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0d0d0d;
+      }
+      #renderCanvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        outline: none;
+        touch-action: none;
+      }
+    </style>
+    <script>
+      // Bootstrap errors must be visible even before the gameplay reporter exists.
+      var arkglideBootFinished = false;
+      window.addEventListener("error", function (event) {
+        var resource = event.target && event.target.tagName === "SCRIPT";
+        if (arkglideBootFinished && !resource) return;
+        window.parent.postMessage({
+          type: "fatal",
+          bootToken: new URLSearchParams(location.search).get("boot") || "",
+          message: resource ? "运行时脚本加载失败: " + event.target.src : "运行时初始化失败: " + event.message,
+        }, "*");
+      }, true);
+    </script>
+    <!-- 本地 Babylon UMD（离线可用） -->
+    <script src="./lib/babylon.js"></script>
+    <script src="./lib/babylon.glTFFileLoader.min.js"></script>
+    <script src="./arkglide-math.js"></script>
+    <script src="./lib/arkglide_math.js"></script>
+    <script src="./arkglide-api.js"></script>
+    <script src="./arkglide-lifecycle.js"></script>
+    <script src="./arkglide-scene.js"></script>
+    <script src="./arkglide-prefabs.js"></script>
+    <script src="./lib/jolt-physics.js"></script>
+    <script src="./arkglide-physics-tools.js"></script>
+    <script src="./arkglide-physics.js"></script>
+    <script src="./arkglide-input-ui.js"></script>
+    <script src="./arkglide-audio-stretch.js"></script>
+    <script src="./arkglide-audio.js"></script>
+    <script src="./arkglide-animation-tools.js"></script>
+    <script src="./arkglide-animation.js"></script>
+    <script src="./lib/acorn.js"></script>
+    <script src="./arkglide-modules.js"></script>
+  </head>
+  <body>
+    <canvas id="renderCanvas"></canvas>
+    <div
+      id="hudLayer"
+      style="position: absolute; inset: 0; pointer-events: none"
+    ></div>
+    <button
+      id="audioUnlock"
+      style="
+        display: none;
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        z-index: 10;
+      "
+    >
+      启用音频
+    </button>
+    <script>
+      // ===== postMessage 通信（iframe → 编辑器）=====
+      // sandbox="allow-scripts" 无 allow-same-origin → iframe 为 opaque origin
+      // targetOrigin 用 '*'（opaque origin 无法指定），安全靠编辑器端 source 验证
+      var PARENT = window.parent;
+      var bootToken = new URLSearchParams(location.search).get("boot") || "";
+      function sendToEditor(msg) {
+        msg.bootToken = bootToken;
+        msg.runId = currentRunId;
+        PARENT.postMessage(msg, "*");
+      }
+
+      // 重写 console.log/warn/error → 转发到编辑器控制台
+      ["log", "warn", "error"].forEach(function (level) {
+        var orig = console[level].bind(console);
+        console[level] = function () {
+          var args = Array.prototype.slice.call(arguments);
+          orig.apply(console, args);
+          sendToEditor({ type: "log", level: level, args: args.map(String) });
+        };
+      });
+
+      // ===== 运行时状态 =====
+      var engine = null,
+        scene = null,
+        camera = null;
+      var currentRunId = null;
+      var lifecycle = null; // { onStart, onUpdate }（旧模型，向后兼容）
+      var lifecycleInstances = []; // 按实体分发的脚本实例列表：[{ entity, onStart, onUpdate }]
+      var running = false; // onUpdate 是否激活
+      var initialized = false; // Babylon 是否已初始化
+
+      // Script API adapter owns renderer details; scripts receive only handles.
+      var math = null;
+      var mathReady =
+        typeof createArkGlideMath === "function"
+          ? createArkGlideMath().then(function (module) {
+              math = ArkGlideMath.createMathAPI(module);
+            })
+          : Promise.resolve();
+      var joltModule = null,
+        physicsRuntime = null,
+        inputRuntime = null,
+        audioRuntime = null,
+        animationRuntime = null;
+      var joltReady = createArkGlideJolt().then(function (m) {
+        joltModule = m;
+      });
+      var sceneAdapter = null,
+        runGeneration = 0,
+        desiredState = "stopped";
+      var session = ArkGlideLifecycle.createSession({
+        onError: reportScriptError,
+      });
+      var entityAPI = ArkGlideRuntime.createEntityAPI(
+        BABYLON,
+        function () {
+          return scene;
+        },
+        function () {
+          return math;
+        },
+        {
+          onBeforeDestroy: function (id) {
+            prefabLibrary?.onEntityDestroyed(id);
+            session.destroyEntity(id);
+            physicsRuntime?.remove(id);
+            audioRuntime?.remove(id);
+            animationRuntime?.remove(id);
+            sceneAdapter?.prepareDestroy(id);
+          },
+        },
+      );
+      var entityMap = entityAPI.entities;
+      var sceneAPI = entityAPI.sceneAPI;
+      var defineScript = ArkGlideRuntime.defineScript;
+      var runtimeContent = {},
+        runtimeModelData = {},
+        runtimeTextureData = {},
+        runtimeScripts = {};
+      var moduleLoader = null;
+      var prefabLibrary = ArkGlidePrefabs.createPrefabAPI({
+        sceneAPI: sceneAPI,
+        getContent: function () {
+          return runtimeContent;
+        },
+        getBuffers: function () {
+          return runtimeModelData;
+        },
+        getTextureBuffers: function () {
+          return runtimeTextureData;
+        },
+        getAdapter: function () {
+          return sceneAdapter;
+        },
+        getGeneration: function () {
+          return runGeneration;
+        },
+        isRunning: function () {
+          return desiredState !== "stopped";
+        },
+        attachScripts: function (nodes) {
+          attachComponents(nodes);
+          var batch = attachEntityScripts(runtimeScripts, nodes);
+          session.startRecords(batch);
+        },
+      });
+      var prefabs = prefabLibrary.api;
+
+      var input = {};
+      function resetInput() {
+        inputRuntime?.reset();
+      }
+      function createSession() {
+        return ArkGlideLifecycle.createSession({
+          onError: reportScriptError,
+          onFixedStep: function (dt) {
+            animationRuntime?.fixedUpdate(dt);
+            physicsRuntime?.step(dt);
+          },
+        });
+      }
+      function attachComponents(nodes) {
+        nodes.forEach(function (n) {
+          physicsRuntime?.add(n);
+        });
+        physicsRuntime?.attachJoints(nodes);
+        audioRuntime?.attach(nodes);
+        animationRuntime?.attach(nodes);
+      }
+      function initGameplay(content, audioData) {
+        inputRuntime = ArkGlideInputUI.createInputUI({
+          canvas: document.getElementById("renderCanvas"),
+          layer: document.getElementById("hudLayer"),
+          config: content.gameplay || {
+            actions: [],
+            hud: [],
+            captureInput: true,
+          },
+          textures: content.textures,
+          textureData: runtimeTextureData,
+          onError: reportScriptError,
+        });
+        input = inputRuntime.input;
+        physicsRuntime = ArkGlidePhysics.createPhysics(joltModule, BABYLON, {
+          gravity: runtimeSettings.gravity,
+          config: content.physics,
+          getObject: function (id) {
+            return sceneAdapter.nodes.get(id);
+          },
+          find: sceneAPI.find,
+          onError: reportScriptError,
+        });
+        audioRuntime = ArkGlideAudio.createAudio({
+          config: content.mixer,
+          find: sceneAPI.find,
+          camera: function () {
+            return scene.activeCamera;
+          },
+          onError: reportScriptError,
+        });
+        animationRuntime = ArkGlideAnimation.createAnimation({
+          BABYLON,
+          controllers: content.animationControllers,
+          profiles: content.retargetProfiles,
+          getTargets: (id) =>
+            sceneAdapter.nodes.get(id)?.getDescendants(false) || [],
+          applyRootMotion: (entity, delta, rotation, dt) =>
+            physicsRuntime?.applyRootMotion(entity, delta, rotation, dt),
+          clearRootMotion: (entity) => physicsRuntime?.clearRootMotion(entity),
+          find: sceneAPI.find,
+          getGroups: function (id) {
+            return sceneAdapter.resources.get(id)?.animationGroups;
+          },
+          onError: reportScriptError,
+        });
+        return audioRuntime.load(content.audio || [], audioData || {});
+      }
+      var unlockButton = document.getElementById("audioUnlock");
+      unlockButton.addEventListener("click", function () {
+        audioRuntime
+          ?.unlock()
+          .then(function () {
+            unlockButton.style.display = "none";
+          })
+          .catch(function (error) {
+            reportScriptError({ hook: "audio.unlock", error: error });
+          });
+      });
+      document.addEventListener("pointerdown", function () {
+        if (audioRuntime)
+          audioRuntime
+            .unlock()
+            .then(function (ok) {
+              if (ok) unlockButton.style.display = "none";
+            })
+            .catch(function () {});
+      });
+      // ===== ArkGlide Time API —— 帧时间 =====
+      var time = session.time;
+      var _lastFrameTime = 0; // Compatibility for older editor probes.
+      var scriptErrors = 0;
+      var _renderFrames = 0,
+        measuredFps = 0;
+      var _lastTelemetry = 0,
+        modelLoads = 0,
+        renderMs = 0,
+        frameMs = 0,
+        peakFrameMs = 0;
+      function reportScriptError(detail) {
+        scriptErrors++;
+        var error = detail.error,
+          stack = String((error && error.stack) || "");
+        var moduleLocation = moduleLoader?.locate(error);
+        var match = stack.match(/arkglide-script:\/\/\/([^\s:]+):(\d+):(\d+)/);
+        sendToEditor({
+          type: "diagnostic",
+          level: "error",
+          message: String((error && error.message) || error),
+          file:
+            moduleLocation?.file ||
+            (match ? decodeURIComponent(match[1]) : detail.file || null),
+          line:
+            moduleLocation?.line ??
+            (match ? Math.max(1, Number(match[2]) - 2) : null),
+          column: moduleLocation?.column ?? (match ? Number(match[3]) : null),
+          hook: detail.hook,
+          entityId: detail.entityId,
+          stack: stack,
+        });
+      }
+      window.addEventListener("blur", resetInput);
+      window.addEventListener("error", function (event) {
+        reportScriptError({
+          hook: "uncaught",
+          error: event.error || event.message,
+        });
+      });
+      window.addEventListener("unhandledrejection", function (event) {
+        reportScriptError({ hook: "promise", error: event.reason });
+      });
+      function telemetry(force) {
+        var now = performance.now();
+        if (!force && now - _lastTelemetry < 500) return;
+        if (now > _lastTelemetry)
+          measuredFps = (_renderFrames * 1000) / (now - _lastTelemetry);
+        _renderFrames = 0;
+        _lastTelemetry = now;
+        var stats = Object.assign(
+          session.stats(),
+          physicsRuntime?.stats(),
+          audioRuntime?.stats(),
+          animationRuntime?.stats(),
+          inputRuntime?.stats(),
+        );
+        sendToEditor({
+          type: "telemetry",
+          stats: Object.assign(stats, {
+            errors: scriptErrors,
+            state: desiredState,
+            mathBackend: math && math.backend,
+            fps: measuredFps,
+            frameMs: frameMs,
+            peakFrameMs: peakFrameMs,
+            renderMs: renderMs,
+            entities: entityMap.size,
+            meshes: scene ? scene.meshes.length : 0,
+            materials: scene ? scene.materials.length : 0,
+            textures: scene ? scene.textures.length : 0,
+            modelLoads: modelLoads,
+            lights: scene ? scene.lights.length : 0,
+            cameras: scene ? scene.cameras.length : 0,
+            wasmHeapBytes: joltModule?.HEAPU8?.byteLength || 0,
+            heapBytes: performance.memory
+              ? performance.memory.usedJSHeapSize
+              : null,
+            totalTime: time.totalTime,
+            unscaledTotalTime: time.unscaledTotalTime,
+          }),
+        });
+      }
+      var _fpsCap = 60; // 帧率上限，0=无限
+      var _lastRenderTime = 0; // 上次渲染时间戳（用于帧率限制）
+
+      // 将 hex 颜色字符串解析为 {r, g, b}（0-1 范围）
+      // 支持 #RGB 和 #RRGGBB 格式，无效时返回默认值
+      function hexToRgb(hex, defaultR, defaultG, defaultB) {
+        if (!hex || typeof hex !== "string")
+          return { r: defaultR, g: defaultG, b: defaultB };
+        var h = hex.replace("#", "");
+        if (h.length === 3) {
+          h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+        }
+        if (h.length !== 6) return { r: defaultR, g: defaultG, b: defaultB };
+        var r = parseInt(h.substring(0, 2), 16) / 255;
+        var g = parseInt(h.substring(2, 4), 16) / 255;
+        var b = parseInt(h.substring(4, 6), 16) / 255;
+        if (isNaN(r) || isNaN(g) || isNaN(b))
+          return { r: defaultR, g: defaultG, b: defaultB };
+        return { r: r, g: g, b: b };
+      }
+
+      // 应用项目设置到 Babylon 场景
+      // settings: { gravity, backgroundColor, ambientIntensity, ambientColor, fpsCap }
+      function applySettings(settings) {
+        if (!settings) return; // 无设置则用 initBabylon 默认值
+
+        // 重力
+        if (settings.gravity) {
+          scene.gravity = new BABYLON.Vector3(
+            settings.gravity.x || 0,
+            settings.gravity.y || 0,
+            settings.gravity.z || 0,
+          );
+        }
+
+        // 背景色
+        if (settings.backgroundColor) {
+          var bg = hexToRgb(settings.backgroundColor, 0.05, 0.05, 0.05);
+          scene.clearColor = new BABYLON.Color4(bg.r, bg.g, bg.b, 1);
+        }
+
+        // 环境光：查找已有的 hemi 灯，更新强度和颜色
+        var hemi = scene.getLightByName("__ambient");
+        if (hemi) {
+          if (typeof settings.ambientIntensity === "number") {
+            hemi.intensity = settings.ambientIntensity;
+          }
+          if (settings.ambientColor) {
+            var ac = hexToRgb(settings.ambientColor, 1, 1, 1);
+            hemi.diffuse = new BABYLON.Color3(ac.r, ac.g, ac.b);
+          }
+        }
+
+        // 帧率上限：0 = 无限制
+        // Babylon Engine 没有直接 setFpsLimit API
+        // 使用 engine 的 render loop 频率控制：通过自定义时间步长
+        // 简单方案：存到全局变量，在 render loop 中按需跳帧
+        if (typeof settings.fpsCap === "number") {
+          _fpsCap = settings.fpsCap;
+        }
+      }
+
+      function initBabylon() {
+        if (initialized) return;
+        var canvas = document.getElementById("renderCanvas");
+        engine = new BABYLON.Engine(canvas, true, {
+          preserveDrawingBuffer: true,
+          stencil: true,
+        });
+        scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color4(0.05, 0.05, 0.05, 1);
+
+        camera = new BABYLON.ArcRotateCamera(
+          "camera",
+          -Math.PI / 2,
+          Math.PI / 3,
+          8,
+          new BABYLON.Vector3(0, 0.5, 0),
+          scene,
+        );
+        camera.attachControl(canvas, true);
+        camera.wheelDeltaPercentage = 0.01;
+
+        var hemi = new BABYLON.HemisphericLight(
+          "__ambient",
+          new BABYLON.Vector3(0, 1, 0),
+          scene,
+        );
+        hemi.intensity = 0.8;
+
+        var animate = scene._animate.bind(scene);
+        scene._animate = function () {
+          animate(running ? time.deltaTime * 1000 : 0);
+        };
+        engine.runRenderLoop(function () {
+          // 帧率限制：如果 _fpsCap > 0，按间隔跳帧
+          if (_fpsCap > 0) {
+            var now = performance.now();
+            var minInterval = 1000 / _fpsCap;
+            if (now - _lastRenderTime < minInterval) {
+              return; // 跳过本帧
+            }
+            _lastRenderTime = now;
+          }
+
+          var frameStart = performance.now();
+          inputRuntime?.setSimulationActive?.(time.timeScale > 0);
+          inputRuntime?.beginFrame?.();
+          if (running) {
+            try {
+              session.tick(frameStart);
+              animationRuntime?.update(time.deltaTime);
+              audioRuntime?.setScale(time.timeScale);
+              audioRuntime?.update(
+                time.deltaTime,
+                Math.min(0.1, engine.getDeltaTime() / 1000),
+              );
+              inputRuntime?.setSimulationActive?.(time.timeScale > 0);
+            } catch (error) {
+              desiredState = "stopped";
+              stopRun();
+              sendToEditor({ type: "fatal", message: String(error) });
+            }
+          }
+          if (!running)
+            audioRuntime?.update(
+              0,
+              Math.min(0.1, engine.getDeltaTime() / 1000),
+            );
+          inputRuntime?.endFrame();
+          if (!scene.activeCamera || scene.activeCamera.isDisposed())
+            scene.activeCamera = camera;
+          var renderStart = performance.now();
+          scene.render();
+          renderMs = performance.now() - renderStart;
+          _renderFrames++;
+          frameMs = performance.now() - frameStart;
+          peakFrameMs = Math.max(peakFrameMs, frameMs);
+          telemetry(false);
+        });
+
+        window.addEventListener("resize", function () {
+          engine.resize();
+        });
+        sceneAdapter = ArkGlideScene.createSceneAdapter(BABYLON, scene, {
+          onCreate: function (object, node) {
+            entityAPI.register(object, node.id, node.name);
+          },
+          onRemove: function (id) {
+            sceneAPI.destroy(id);
+          },
+          onError: function (node, error) {
+            reportScriptError({
+              hook: "model",
+              entityId: node.id,
+              error: error,
+            });
+          },
+          onLoading: function (delta) {
+            modelLoads += delta;
+          },
+        });
+        initialized = true;
+      }
+
+      function attachEntityScripts(scripts, nodes, legacyCode) {
+        var batch = [],
+          factoryCache = Object.create(null),
+          definitions = nodes.slice();
+        function depth(node) {
+          var n = node,
+            count = 0;
+          while (n && n.parentId && count < nodes.length) {
+            count++;
+            n = nodes.find(function (p) {
+              return p.id === n.parentId;
+            });
+          }
+          return count;
+        }
+        definitions.sort(function (a, b) {
+          return depth(a) - depth(b);
+        });
+        if (legacyCode !== undefined)
+          definitions = [
+            {
+              id: entityMap.size ? entityMap.keys().next().value : null,
+              scripts: ["main.js"],
+            },
+          ];
+        definitions.forEach(function (node) {
+          var entity = entityMap.get(node.id) || null;
+          if (!entity && legacyCode === undefined) return;
+          (node.scripts || []).forEach(function (file) {
+            var owner = session.owner(entity, file);
+            batch.push(owner.record);
+            try {
+              var code = legacyCode !== undefined ? legacyCode : scripts[file];
+              if (typeof code !== "string")
+                throw new Error("脚本不存在: " + file);
+              var prepared =
+                legacyCode === undefined ? moduleLoader?.get(file) : null;
+              if (!prepared && !factoryCache[file])
+                factoryCache[file] = new Function(
+                  "entity",
+                  "input",
+                  "scene",
+                  "time",
+                  "console",
+                  "defineScript",
+                  "math",
+                  "events",
+                  "timers",
+                  "setTimeout",
+                  "clearTimeout",
+                  "setInterval",
+                  "clearInterval",
+                  "prefabs",
+                  "physics",
+                  "audio",
+                  "ui",
+                  "animation",
+                  code +
+                    "\n//# sourceURL=arkglide-script:///" +
+                    encodeURIComponent(file),
+                );
+              var globals = owner.globals;
+              var args = [
+                entity,
+                inputRuntime.inputForOwner(owner),
+                sceneAPI,
+                time,
+                console,
+                defineScript,
+                math,
+                owner.events,
+                owner.timers,
+                globals.setTimeout,
+                globals.clearTimeout,
+                globals.setInterval,
+                globals.clearInterval,
+                prefabLibrary.forOwner(owner),
+                physicsRuntime.forOwner(owner),
+                audioRuntime.forOwner(owner),
+                inputRuntime.forOwner(owner),
+                animationRuntime.forOwner(owner),
+              ];
+              var context = Object.fromEntries(
+                ArkGlideModules.parameters.map(function (name, index) {
+                  return [name, args[index]];
+                }),
+              );
+              var instance = prepared?.module
+                ? prepared.factory.call({ entity: entity }, context)
+                : (prepared?.factory || factoryCache[file]).apply(
+                    { entity: entity },
+                    args,
+                  );
+              if (instance && typeof instance.then === "function") {
+                // Observe rejection without allowing an asynchronous factory to
+                // attach its lifecycle after an entity or run was stopped.
+                Promise.resolve(instance).catch(function () {});
+                throw new Error(
+                  "脚本工厂必须同步返回生命周期对象；请在 onStart 内发起异步工作",
+                );
+              }
+              if (instance && typeof instance === "object") {
+                instance.entity = entity;
+                owner.attach(instance);
+              } else owner.attach({ entity: entity });
+            } catch (error) {
+              reportScriptError({
+                file: file,
+                entityId: node.id,
+                hook: "factory",
+                error: error,
+              });
+              owner.abort();
+            }
+          });
+        });
+        return batch;
+      }
+      function runEntityScripts(scripts, nodes, legacyCode) {
+        resetInput();
+        session = createSession();
+        time = session.time;
+        lifecycleInstances = session.records;
+        attachComponents(nodes);
+        attachEntityScripts(scripts, nodes, legacyCode);
+        session.start(runtimeSettings);
+        running = true;
+        if (desiredState === "paused") {
+          session.pause();
+          running = false;
+          inputRuntime?.setActive(false);
+          audioRuntime?.setPaused(true);
+        }
+        audioRuntime?.setScale(time.timeScale);
+        unlockButton.style.display = runtimeContent.audio?.length
+          ? "block"
+          : "none";
+        telemetry(true);
+        sendToEditor({ type: "started" });
+      }
+      var runtimeSettings = {};
+      function stopRun() {
+        running = false;
+        prefabLibrary.stop();
+        session.stop();
+        sceneAPI.destroyAll();
+        moduleLoader?.dispose();
+        moduleLoader = null;
+        sceneAdapter?.clear();
+        physicsRuntime?.dispose();
+        audioRuntime?.dispose();
+        animationRuntime?.dispose();
+        inputRuntime?.dispose();
+        unlockButton.style.display = "none";
+        if (scene) scene.activeCamera = camera;
+        lifecycle = null;
+        lifecycleInstances = [];
+        runtimeContent = {};
+        runtimeModelData = {};
+        runtimeTextureData = {};
+        runtimeScripts = {};
+        resetInput();
+
+        telemetry(true);
+      }
+      // ===== 接收编辑器消息（source 验证）=====
+      window.addEventListener("message", function (ev) {
+        if (ev.source !== PARENT) return; // 只接受来自 parent 的消息
+        var msg = ev.data;
+        if (!msg || typeof msg !== "object") return;
+
+        switch (msg.type) {
+          case "run":
+            var generation = ++runGeneration;
+            stopRun();
+            currentRunId = msg.runId;
+            desiredState = "playing";
+            scriptErrors = 0;
+            _renderFrames = 0;
+            _lastTelemetry = performance.now();
+            measuredFps = 0;
+            peakFrameMs = 0;
+            frameMs = 0;
+            renderMs = 0;
+            initBabylon();
+            runtimeContent = msg.project.content || {};
+            runtimeModelData = msg.modelData || {};
+            runtimeTextureData = msg.textureData || {};
+            runtimeScripts = msg.project.scripts || {};
+            runtimeSettings = msg.project.settings || {};
+            applySettings(runtimeSettings);
+            var scriptEntries = new Set();
+            msg.project.scene.nodes.forEach(function (node) {
+              (node.scripts || []).forEach(function (file) {
+                scriptEntries.add(file);
+              });
+            });
+            Object.values(runtimeContent.prefabs || {}).forEach(
+              function (prefab) {
+                prefab.nodes.forEach(function (node) {
+                  (node.scripts || []).forEach(function (file) {
+                    scriptEntries.add(file);
+                  });
+                });
+              },
+            );
+            moduleLoader = ArkGlideModules.createLoader(
+              runtimeScripts,
+              scriptEntries,
+            );
+            Promise.all([
+              moduleLoader.prepare(),
+              mathReady,
+              joltReady,
+              sceneAdapter.sync(
+                msg.project.scene.nodes,
+                msg.modelData || {},
+                msg.project.content || {},
+                msg.textureData || {},
+              ),
+            ])
+              .then(function () {
+                if (generation !== runGeneration || desiredState === "stopped")
+                  return;
+                scene.activeCamera = sceneAdapter.activeCamera() || camera;
+                return initGameplay(runtimeContent, msg.audioData).then(
+                  function () {
+                    if (
+                      generation !== runGeneration ||
+                      desiredState === "stopped"
+                    )
+                      return;
+                    if (msg.project.scripts)
+                      runEntityScripts(
+                        msg.project.scripts,
+                        msg.project.scene.nodes,
+                      );
+                    else
+                      runEntityScripts(
+                        {},
+                        msg.project.scene.nodes,
+                        msg.project.script || "",
+                      );
+                  },
+                );
+              })
+              .catch(function (error) {
+                if (generation === runGeneration) {
+                  desiredState = "stopped";
+                  stopRun();
+                  sendToEditor({ type: "fatal", message: String(error) });
+                }
+              });
+            break;
+          case "pause":
+            if (desiredState === "stopped") break;
+            desiredState = "paused";
+            running = false;
+            session.pause();
+            inputRuntime?.setActive(false);
+            audioRuntime?.setPaused(true);
+            resetInput();
+            telemetry(true);
+            break;
+          case "resume":
+            if (desiredState !== "paused") break;
+            desiredState = "playing";
+            // Loading runs start themselves; do not advance an old session.
+            if (lifecycleInstances === session.records) {
+              session.resume();
+              running = true;
+            }
+            inputRuntime?.setActive(true);
+            audioRuntime?.setPaused(false);
+            resetInput();
+            telemetry(true);
+            break;
+          case "stop":
+            ++runGeneration;
+            desiredState = "stopped";
+            stopRun();
+            break;
+        }
+      });
+
+      arkglideBootFinished = true;
+
+      // handshake：通知编辑器 iframe 已就绪（只发一次）
+      Promise.all([mathReady, joltReady])
+        .then(function () {
+          sendToEditor({ type: "ready" });
+        })
+        .catch(function (error) {
+          sendToEditor({
+            type: "fatal",
+            message: "WASM 模块加载失败: " + String(error),
+          });
+        });
+    </script>
+  </body>
+</html>

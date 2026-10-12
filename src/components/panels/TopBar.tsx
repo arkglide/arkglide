@@ -36,6 +36,7 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import RecoveryPanel from './RecoveryPanel';
+import StaticExportDialog from './StaticExportDialog';
 import { validateProject } from '../../utils/projectValidation';
 import { useEditorStore } from '../../store/useEditorStore';
 import type { ProjectSettings } from '../../types/project';
@@ -63,6 +64,8 @@ export default function TopBar() {
   const saveCurrentProject = useEditorStore((s) => s.saveCurrentProject);
   const loadProjectById = useEditorStore((s) => s.loadProjectById);
   const newProject = useEditorStore((s) => s.newProject);
+
+  const [staticExportOpen, setStaticExportOpen] = useState(false);
 
   // 菜单 anchor
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -278,6 +281,7 @@ export default function TopBar() {
             </Box>
           </MenuItem>
           <MenuItem onClick={handleSave}>保存</MenuItem>
+          <MenuItem disabled={playState !== 'stopped'} onClick={() => { closeMenu(); setStaticExportOpen(true); }}>导出独立游戏…</MenuItem>
           <MenuItem disabled={playState !== 'stopped'} onClick={handleOpenSettings}>
             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
               <SettingsIcon fontSize="small" />
@@ -322,7 +326,7 @@ export default function TopBar() {
         <RecoveryPanel />
         <Tooltip title="导出为 .arkglide 文件">
           <Button variant="outlined" startIcon={<Download />} onClick={handleExport}>
-            导出
+            导出项目
           </Button>
         </Tooltip>
         {importError && (
@@ -331,6 +335,8 @@ export default function TopBar() {
           </Typography>
         )}
       </Toolbar>
+
+      <StaticExportDialog open={staticExportOpen} onClose={() => setStaticExportOpen(false)} />
 
       {/* 保存命名 Dialog（首次保存） */}
       <Dialog

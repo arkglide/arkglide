@@ -46,3 +46,6 @@ yarn-error.log*
 # Browser test reports
 test-results/
 playwright-report/
+
+# Temporary standalone deployment fixtures
+.static-test-fixtures/
