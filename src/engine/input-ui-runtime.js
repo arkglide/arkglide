@@ -255,13 +255,16 @@
       const list = navigable();
       if (!list.length) return;
       let index = list.findIndex((r) => r === focused);
-      index = (index + direction + list.length) % list.length;
+      index =
+        index < 0
+          ? (direction < 0 ? list.length - 1 : 0)
+          : (index + direction + list.length) % list.length;
       list[index].el.focus?.();
       focused = list[index];
     }
-    function menuKey(code) {
+    function menuKey(code, shiftKey = false) {
       if (["ArrowDown", "ArrowRight", "Tab"].includes(code)) {
-        navigate(1);
+        navigate(code === "Tab" && shiftKey ? -1 : 1);
         return true;
       }
       if (["ArrowUp", "ArrowLeft"].includes(code)) {
@@ -287,7 +290,7 @@
         return;
       }
       const menu = !!focused || !active || !simulation;
-      if (menu && !interactive(e) && !e.repeat && menuKey(e.code)) {
+      if (menu && !interactive(e) && !e.repeat && menuKey(e.code, e.shiftKey)) {
         e.preventDefault();
         return;
       }

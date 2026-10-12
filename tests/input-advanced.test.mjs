@@ -299,3 +299,34 @@ test("window blur clears menu blockers and unfocused gamepad polling cannot acti
     t.done();
   }
 });
+
+test("reverse menu navigation starts at the last item and Shift+Tab moves backwards", () => {
+  const t = fixture([
+    def("first", "button", { tabIndex: 0 }),
+    def("hidden", "button", { tabIndex: 1, visible: false }),
+    def("disabled", "button", { tabIndex: 2, disabled: true }),
+    def("middle", "button", { tabIndex: 3 }),
+    def("last", "button", { tabIndex: 4 }),
+  ]);
+  try {
+    const clicks = [];
+    const api = t.ui.forOwner(t.owner);
+    for (const id of ["first", "middle", "last"])
+      api.get(id).on("click", () => clicks.push(id));
+    t.ui.setActive(false);
+    t.window.emit("keydown", { code: "ArrowUp", key: "ArrowUp" });
+    t.window.emit("keydown", { code: "Enter", key: "Enter" });
+    assert.deepEqual(clicks, ["last"]);
+    t.window.emit("keydown", { code: "Tab", key: "Tab", shiftKey: true });
+    t.window.emit("keydown", { code: "Enter", key: "Enter" });
+    assert.deepEqual(clicks, ["last", "middle"]);
+    t.window.emit("keydown", { code: "Tab", key: "Tab", shiftKey: true });
+    t.window.emit("keydown", { code: "Enter", key: "Enter" });
+    assert.deepEqual(clicks, ["last", "middle", "first"]);
+    t.window.emit("keydown", { code: "Tab", key: "Tab", shiftKey: true });
+    t.window.emit("keydown", { code: "Enter", key: "Enter" });
+    assert.deepEqual(clicks, ["last", "middle", "first", "last"]);
+  } finally {
+    t.done();
+  }
+});
