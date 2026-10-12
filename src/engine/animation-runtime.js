@@ -23,7 +23,7 @@
         : options.getGroups(entity.id) || [];
     }
     function play(entity, name, params = {}, owner) {
-      advanced?.remove(entity.id);
+      if (owner && !owner.record.active) throw Error("动画脚本已销毁");
       const group = groups(entity).find((g) => g.name === name);
       if (!group) throw new Error("动画不存在: " + name);
       const speed = params.speed ?? 1,
@@ -37,6 +37,7 @@
         fade > 60
       )
         throw new Error("无效动画速度/混合时间");
+      advanced?.remove(entity.id);
       const previous = live.get(entity.id);
       let oldGroup = null;
       if (previous) {
@@ -105,6 +106,7 @@
           list: (e) => groups(e).map((g) => g.name),
           play: (e, n, p) => play(e, n, p, owner),
           stop: (e) => {
+            if (owner && !owner.record.active) throw Error("动画脚本已销毁");
             groups(e);
             live.get(e.id)?.release();
             advanced?.remove(e.id);

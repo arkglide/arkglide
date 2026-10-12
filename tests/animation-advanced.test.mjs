@@ -292,3 +292,31 @@ test("cross-frame event catch-up is bounded to 128 and skipped events are counte
     s.done();
   }
 });
+
+test("rejected legacy animation playback preserves the active controller", () => {
+  const s = setup();
+  try {
+    const { entity } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    const { api } = s.api();
+    const controller = api.createController(entity, "locomotion");
+    assert.throws(() => api.play(entity, "missing"), /动画不存在/);
+    assert.equal(controller.state, "Idle");
+    assert.throws(() => api.play(entity, "Move", { speed: NaN }), /无效动画/);
+    assert.equal(controller.state, "Idle");
+    const stopped = s.api();
+    stopped.owner.abort();
+    assert.throws(() => stopped.api.stop(entity), /已销毁/);
+    assert.equal(controller.state, "Idle");
+    assert.throws(() => stopped.api.play(entity, "Move"), /已销毁/);
+    assert.equal(controller.state, "Idle");
+    const playback = api.play(entity, "Move");
+    assert.throws(() => controller.state, /已销毁/);
+    assert.equal(playback.playing, true);
+    playback.stop();
+    assert.equal(playback.playing, false);
+  } finally {
+    s.done();
+  }
+});
