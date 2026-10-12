@@ -152,6 +152,7 @@
         typeof c.lockRotation !== "boolean"
       )
         throw new Error("无效刚体配置");
+      const objectLayer = tools ? tools.layer(c) : c.motion === "static" ? 0 : 1;
       const p = worldPose(object),
         s = p.scale;
       if ([s.x, s.y, s.z].some((v) => v <= 0 || !Number.isFinite(v)))
@@ -202,7 +203,7 @@
           pos,
           rot,
           motion,
-          tools ? tools.layer(c) : c.motion === "static" ? 0 : 1,
+          objectLayer,
         );
       cs.mFriction = c.friction;
       cs.mRestitution = c.restitution;

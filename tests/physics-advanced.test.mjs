@@ -529,3 +529,28 @@ test("invalid joint anchors are rejected before allocating native settings or ve
     s.done();
   }
 });
+
+test("unknown collision groups fail before allocating native body shapes", () => {
+  const s = setup();
+  const Original = J.BoxShape;
+  const allocated = [];
+  try {
+    const e = s.entity("invalid");
+    J.BoxShape = function (...args) {
+      const shape = new Original(...args);
+      allocated.push(shape);
+      return shape;
+    };
+    assert.throws(() => s.api.add(e, {
+      motion: "dynamic", shape: "box", group: "missing",
+      size: { x: 1, y: 1, z: 1 }, mass: 1,
+      friction: 0.5, restitution: 0, sensor: false, lockRotation: true,
+    }), /分组/);
+    assert.equal(allocated.length, 0);
+    assert.equal(s.api.has(e), false);
+  } finally {
+    J.BoxShape = Original;
+    for (const shape of allocated) shape.Release();
+    s.done();
+  }
+});
