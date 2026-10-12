@@ -10,6 +10,7 @@ let server,
   selection,
   readModelAsset,
   modelImport,
+  audioImport,
   recovery,
   normalize;
 function request(r) {
@@ -46,6 +47,7 @@ before(async () => {
     "/src/engine/modelImport.ts",
   ));
   modelImport = await server.ssrLoadModule("/src/utils/modelImport.ts");
+  audioImport = await server.ssrLoadModule("/src/utils/audioImport.ts");
 });
 after(async () => {
   await server?.close();
@@ -778,4 +780,37 @@ test("delayed model relink rejects deleted nodes and playback without writing by
     assert.equal(store.getState().modelBuffers.has(id), false);
     store.getState().stop();
   }
+});
+
+test("delayed audio import cannot write resources into a replacement document", async () => {
+  store.getState().newProject();
+  let release;
+  const reading = new Promise(resolve => { release = resolve; });
+  const pending = audioImport.importAudioFile({ name: "tone.wav", size: 4, arrayBuffer: () => reading });
+  const rejected = assert.rejects(pending, /项目已切换/);
+  store.getState().newProject();
+  const current = store.getState();
+  release(new ArrayBuffer(4));
+  await rejected;
+  assert.equal(store.getState().content, current.content);
+  assert.equal(store.getState().audioBuffers, current.audioBuffers);
+});
+
+test("audio import and replacement preserve IDs and reject resources deleted during reading", async () => {
+  store.getState().newProject();
+  await audioImport.importAudioFile(new File([new Uint8Array([1, 2])], "tone.wav"));
+  const id = store.getState().content.audio[0].id;
+  await audioImport.importAudioFile(new File([new Uint8Array([3, 4, 5])], "next.wav"), id);
+  assert.equal(store.getState().content.audio.length, 1);
+  assert.equal(store.getState().content.audio[0].id, id);
+  assert.deepEqual(new Uint8Array(store.getState().audioBuffers.get(id)), new Uint8Array([3, 4, 5]));
+  let release;
+  const reading = new Promise(resolve => { release = resolve; });
+  const pending = audioImport.importAudioFile({ name: "late.wav", size: 4, arrayBuffer: () => reading }, id);
+  const rejected = assert.rejects(pending, /音频已删除/);
+  store.getState().deleteAudio(id);
+  release(new ArrayBuffer(4));
+  await rejected;
+  assert.equal(store.getState().audioBuffers.has(id), false);
+  assert.equal(store.getState().content.audio.length, 0);
 });
