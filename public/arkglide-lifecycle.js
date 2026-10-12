@@ -140,7 +140,11 @@
         emit(name, payload) {
           if (!allowed()) return;
           for (const item of [...subscriptions])
-            if (item.name === name && item.record.active) {
+            if (
+              subscriptions.has(item) &&
+              item.name === name &&
+              item.record.active
+            ) {
               if (item.once) item.cancel();
               if (
                 call(item.record, "event:" + name, item.callback, [payload]) ===

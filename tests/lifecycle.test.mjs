@@ -67,3 +67,16 @@ test('one bad subscriber does not cancel other same-name subscriptions and once 
  owner.events.emit('score');owner.events.emit('score');target.dispatchEvent(new Event('once'));target.dispatchEvent(new Event('once'));
  assert.equal(events,2);assert.equal(errors.length,1);assert.equal(native,1);assert.equal(session.stats().listeners,0);session.stop();
 });
+
+test('canceled event subscriptions do not fire later in the same dispatch or nested once dispatch',()=>{
+ const session=create(),owner=session.owner({id:'one'},'one.js');owner.attach({});session.start();
+ let cancelLater,called=0;
+ owner.events.on('cancel',()=>cancelLater());
+ cancelLater=owner.events.on('cancel',()=>called++);
+ owner.events.emit('cancel');assert.equal(called,0);
+ let nested=false,once=0;
+ owner.events.on('nested',()=>{if(!nested){nested=true;owner.events.emit('nested');}});
+ owner.events.once('nested',()=>once++);
+ owner.events.emit('nested');assert.equal(once,1);
+ session.stop();
+});
