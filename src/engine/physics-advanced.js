@@ -854,11 +854,14 @@
         },
         character(e) {
           const c = requireCharacter(e);
+          const guard = () => {
+            if (!owner.record.active) throw Error("脚本已销毁");
+            if (requireCharacter(e) !== c) throw Error("角色不存在");
+          };
           return Object.freeze({
             move(direction) {
-              requireCharacter(e);
+              guard();
               if (c.rootMotion) throw Error("根运动正在控制角色移动");
-              if (!owner.record.active) throw Error("脚本已销毁");
               finite(direction);
               const length = Math.max(1, Math.hypot(direction.x, direction.z));
               c.move = {
@@ -868,24 +871,23 @@
               };
             },
             jump() {
-              requireCharacter(e);
-              if (!owner.record.active) throw Error("脚本已销毁");
+              guard();
               c.jump = true;
             },
             get grounded() {
-              requireCharacter(e);
+              guard();
               return c.ch.GetGroundState() === J.EGroundState_OnGround;
             },
             get velocity() {
-              requireCharacter(e);
+              guard();
               return v(c.ch.GetLinearVelocity());
             },
             get groundNormal() {
-              requireCharacter(e);
+              guard();
               return v(c.ch.GetGroundNormal());
             },
             teleport(position) {
-              requireCharacter(e);
+              guard();
               const p = vector(position, J.RVec3);
               try {
                 c.ch.SetPosition(p);
@@ -913,7 +915,10 @@
           )
             throw Error("角色实体无效或已有运动组件");
           character({ id: e.id, character: c });
-          owner.track(() => remove(e.id));
+          const created = chars.get(e.id);
+          owner.track(() => {
+            if (chars.get(e.id) === created) remove(e.id);
+          });
           return this.character(e);
         },
       });

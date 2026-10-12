@@ -57,6 +57,8 @@ function setup(config) {
   return {
     physics,
     api,
+    session,
+    owner,
     body,
     entity,
     objects,
@@ -449,5 +451,51 @@ test("virtual character peer collisions obey the same mutual group masks as nati
     } finally {
       s.done();
     }
+  }
+});
+
+test("removed character handles cannot control a replacement on the same entity", () => {
+  const s = setup();
+  try {
+    const { e, c: old } = player(s, { x: 0, y: 3, z: 0 });
+    s.api.removeCharacter(e);
+    const replacement = s.api.addCharacter(e, {
+      radius: 0.3, height: 1.8, stepHeight: 0.3,
+      maxSlope: 45, speed: 2, jumpSpeed: 5,
+    });
+    assert.throws(() => old.move({ x: 1, y: 0, z: 0 }), /角色不存在/);
+    assert.throws(() => old.jump(), /角色不存在/);
+    assert.throws(() => old.teleport({ x: 9, y: 3, z: 0 }), /角色不存在/);
+    for (const key of ["grounded", "velocity", "groundNormal"])
+      assert.throws(() => old[key], /角色不存在/);
+    replacement.move({ x: 1, y: 0, z: 0 });
+    s.physics.step(1 / 60);
+    assert.ok(Number.isFinite(replacement.velocity.x));
+    assert.ok(s.objects.get(e.id).position.x < 1);
+  } finally {
+    s.done();
+  }
+});
+
+test("aborting an old character owner leaves another owner's replacement alive", () => {
+  const s = setup();
+  try {
+    const { e } = player(s, { x: 0, y: 3, z: 0 });
+    s.api.removeCharacter(e);
+    const owner = s.session.owner(null, "replacement");
+    owner.attach({});
+    s.session.startRecords([owner.record]);
+    const replacement = s.physics.forOwner(owner).addCharacter(e, {
+      radius: 0.3, height: 1.8, stepHeight: 0.3,
+      maxSlope: 45, speed: 2, jumpSpeed: 5,
+    });
+    s.owner.abort();
+    assert.doesNotThrow(() => replacement.move({ x: 1, y: 0, z: 0 }));
+    assert.doesNotThrow(() => replacement.teleport({ x: 2, y: 3, z: 0 }));
+    assert.equal(s.objects.get(e.id).position.x, 2);
+    owner.abort();
+    assert.throws(() => replacement.teleport({ x: 0, y: 0, z: 0 }), /已销毁|角色不存在/);
+  } finally {
+    s.done();
   }
 });
