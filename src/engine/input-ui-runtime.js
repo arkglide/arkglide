@@ -748,6 +748,8 @@
               codes.clear();
               keys.clear();
               keyCodes.clear();
+              mouseDown = mousePressed = mouseReleased = false;
+              dx = dy = 0;
             });
           if (def.kind === "button" && def.action && allow())
             mutate(() =>

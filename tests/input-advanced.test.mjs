@@ -458,3 +458,20 @@ test("keyboard reset clears physical-key associations while action mappings reta
     t.done();
   }
 });
+
+test("blocking HUD interaction releases mouse state and pending mouse movement", () => {
+  const t = fixture([def("menu", "button", { blockInput: true })]);
+  try {
+    t.canvas.emit("pointerdown", { pointerId: 1, clientX: 0, clientY: 0 });
+    t.canvas.emit("pointermove", { pointerId: 1, clientX: 10, clientY: 5 });
+    assert.equal(t.ui.input.isMouseDown(), true);
+    t.layer.children[0].emit("pointerdown", { pointerId: 2 });
+    assert.equal(t.ui.input.isMouseDown(), false);
+    assert.equal(t.ui.input.wasMousePressed(), false);
+    assert.deepEqual(t.ui.input.getMouseDelta(), { x: 0, y: 0 });
+    t.layer.children[0].emit("pointerup", { pointerId: 2 });
+    assert.equal(t.ui.input.isMouseDown(), false);
+  } finally {
+    t.done();
+  }
+});
