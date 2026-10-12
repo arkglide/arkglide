@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { Warning, Close } from "@mui/icons-material";
 import { useEditorStore, type SceneNode } from "../../store/useEditorStore";
+import { relinkModelFile } from "../../utils/modelImport";
 
 const RAD2DEG = 180 / Math.PI;
 const DEG2RAD = Math.PI / 180;
@@ -80,7 +81,6 @@ export default function Inspector() {
   const beginTransform = useEditorStore((s) => s.beginTransform);
   // 资源丢失标记 + 重新链接方法
   const missingModelIds = useEditorStore((s) => s.missingModelIds);
-  const relinkModel = useEditorStore((s) => s.relinkModel);
   // 脚本组件：所有脚本文件 + 挂载/卸载方法
   const scripts = useEditorStore((s) => s.scripts);
   const attachScript = useEditorStore((s) => s.attachScript);
@@ -291,12 +291,15 @@ export default function Inspector() {
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (file) {
-                const buffer = await file.arrayBuffer();
-                relinkModel(currentNode.id, buffer);
-                // 同时更新 modelUrl 为新文件名
-                updateTransform(currentNode.id, { modelUrl: file.name });
-                // 重置 input value 以便相同文件可再次选择
-                e.target.value = "";
+                try {
+                  await relinkModelFile(currentNode.id, file);
+                } catch (error) {
+                  useEditorStore
+                    .getState()
+                    .addConsoleLog("error", "模型重新链接失败: " + String(error));
+                } finally {
+                  e.target.value = "";
+                }
               }
             }}
           />

@@ -24,7 +24,7 @@ import {
   createSceneAdapter,
   type SceneAdapter,
 } from "../../engine/sceneAdapter";
-import { readModelAsset } from "../../engine/modelImport";
+import { importModelAsset } from "../../utils/modelImport";
 import {
   applySelectionDelta,
   selectionRoots,
@@ -575,14 +575,7 @@ export default function Viewport() {
           }
 
           try {
-            const buffer = await readModelAsset(asset, assets);
-            const store = useEditorStore.getState();
-            const nodeId = store.addNode(
-              "model",
-              info.name.replace(/\.(glb|gltf)$/i, ""),
-            );
-            store.updateTransform(nodeId, { modelUrl: info.name }, false);
-            store.setModelBuffer(nodeId, buffer);
+            await importModelAsset(asset, assets);
           } catch (error) {
             useEditorStore
               .getState()

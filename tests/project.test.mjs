@@ -9,6 +9,7 @@ let server,
   validate,
   selection,
   readModelAsset,
+  modelImport,
   recovery,
   normalize;
 function request(r) {
@@ -44,6 +45,7 @@ before(async () => {
   ({ readModelAsset } = await server.ssrLoadModule(
     "/src/engine/modelImport.ts",
   ));
+  modelImport = await server.ssrLoadModule("/src/utils/modelImport.ts");
 });
 after(async () => {
   await server?.close();
@@ -724,4 +726,56 @@ test("a delayed file import cannot overwrite a document opened while reading", a
   assert.equal(store.getState().documentId, current.documentId);
   assert.equal(store.getState().nodes, current.nodes);
   assert.equal(store.getState().nodes.find(n => n.id === "cube").name, "keep this document");
+});
+
+test("delayed model import and relink cannot modify a replacement document", async () => {
+  for (const relink of [false, true]) {
+    store.getState().newProject();
+    const id = store.getState().addNode("model", "existing");
+    const project = recovery.captureEditorProject(store.getState());
+    let release;
+    const reading = new Promise(resolve => { release = resolve; });
+    const file = { name: "new.glb", arrayBuffer: () => reading };
+    const asset = { id: "asset", name: file.name, path: file.name, type: "model", file };
+    const pending = relink ? modelImport.relinkModelFile(id, file) : modelImport.importModelAsset(asset, [asset]);
+    const rejected = assert.rejects(pending, /项目已切换/);
+    store.getState().replaceProject(project, new Map(), new Set([id]));
+    const current = store.getState();
+    release(new ArrayBuffer(8));
+    await rejected;
+    assert.equal(store.getState().nodes, current.nodes);
+    assert.equal(store.getState().modelBuffers, current.modelBuffers);
+    assert.ok(store.getState().missingModelIds.has(id));
+  }
+});
+
+test("normal model import and relink retain bytes, names and missing-resource cleanup", async () => {
+  store.getState().newProject();
+  const file = new File([new Uint8Array([1, 2, 3])], "normal.glb");
+  const asset = { id: "asset", name: file.name, path: file.name, type: "model", file };
+  const id = await modelImport.importModelAsset(asset, [asset]);
+  assert.equal(store.getState().nodes.find(n => n.id === id).name, "normal");
+  assert.deepEqual(new Uint8Array(store.getState().modelBuffers.get(id)), new Uint8Array([1, 2, 3]));
+  store.setState({ missingModelIds: new Set([id]) });
+  await modelImport.relinkModelFile(id, new File([new Uint8Array([4, 5])], "replacement.glb"));
+  assert.equal(store.getState().nodes.find(n => n.id === id).modelUrl, "replacement.glb");
+  assert.deepEqual(new Uint8Array(store.getState().modelBuffers.get(id)), new Uint8Array([4, 5]));
+  assert.equal(store.getState().missingModelIds.has(id), false);
+});
+
+test("delayed model relink rejects deleted nodes and playback without writing bytes", async () => {
+  for (const playing of [false, true]) {
+    store.getState().newProject();
+    const id = store.getState().addNode("model", "existing");
+    let release;
+    const reading = new Promise(resolve => { release = resolve; });
+    const pending = modelImport.relinkModelFile(id, { name: "new.glb", arrayBuffer: () => reading });
+    const rejected = assert.rejects(pending, playing ? /停止运行/ : /已删除/);
+    if (playing) store.getState().play();
+    else store.getState().removeNode(id);
+    release(new ArrayBuffer(8));
+    await rejected;
+    assert.equal(store.getState().modelBuffers.has(id), false);
+    store.getState().stop();
+  }
 });
