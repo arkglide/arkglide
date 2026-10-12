@@ -1701,13 +1701,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const textures = new Map<string, ArrayBuffer>();
     for (const texture of data.content?.textures || []) {
       const b = await loadTextureBlob(texture.id, projectId);
-      if (b) textures.set(texture.id, b);
+      if (b) {
+        if (!(b instanceof ArrayBuffer) || b.byteLength !== texture.byteLength)
+          throw new Error("贴图大小不一致: " + texture.name);
+        textures.set(texture.id, b);
+      }
     }
     if (epoch !== projectEpoch) return;
     const audio = new Map<string, ArrayBuffer>();
     for (const a of data.content?.audio || []) {
       const b = await loadAudioBlob(a.id, projectId);
-      if (b) audio.set(a.id, b);
+      if (b) {
+        if (!(b instanceof ArrayBuffer) || b.byteLength !== a.byteLength)
+          throw new Error("音频大小不一致: " + a.name);
+        audio.set(a.id, b);
+      }
     }
     if (epoch !== projectEpoch) return;
     get().replaceProject(

@@ -865,3 +865,25 @@ test("recovery rejects truncated texture binaries before replacing the current d
     await storage.deleteRecovery(id);
   }
 });
+
+test("stored projects with truncated texture or audio data fail before document replacement", async () => {
+  for (const audio of [false, true]) {
+    store.getState().newProject();
+    const asset = { id: "binary", name: audio ? "tone.wav" : "image.png", mime: audio ? "audio/wav" : "image/png", byteLength: 3 };
+    if (audio) store.getState().importAudio(asset, new ArrayBuffer(3));
+    else store.getState().importTexture(asset, new ArrayBuffer(3));
+    const project = recovery.captureEditorProject(store.getState());
+    project.projectId = "truncated-" + crypto.randomUUID();
+    const broken = new Map([[asset.id, new ArrayBuffer(1)]]);
+    await storage.saveProjectSnapshot(project, new Map(), audio ? new Map() : broken, audio ? broken : new Map());
+    store.getState().newProject();
+    const current = store.getState();
+    try {
+      await assert.rejects(store.getState().loadProjectById(project.projectId), /大小不一致/);
+      assert.equal(store.getState().documentId, current.documentId);
+      assert.equal(store.getState().nodes, current.nodes);
+    } finally {
+      await storage.deleteProject(project.projectId);
+    }
+  }
+});
