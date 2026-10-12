@@ -1,4 +1,12 @@
-import { useEditorStore } from "../store/useEditorStore";
+import { useEditorStore, type AssetEntry } from "../store/useEditorStore";
+export async function importTextureAsset(asset: AssetEntry): Promise<string> {
+  const documentId = useEditorStore.getState().documentId;
+  const file = asset.fileHandle ? await asset.fileHandle.getFile() : asset.file;
+  if (useEditorStore.getState().documentId !== documentId)
+    throw new Error("项目已切换，请重新导入贴图");
+  if (!file) throw new Error("无法读取贴图");
+  return importTextureFile(file);
+}
 /** Decode before mutating the document; replacement retains the texture ID and all references. */
 export async function importTextureFile(
   file: File,

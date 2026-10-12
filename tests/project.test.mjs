@@ -12,6 +12,7 @@ let server,
   modelImport,
   audioImport,
   scriptImport,
+  textureImport,
   recovery,
   normalize;
 function request(r) {
@@ -50,6 +51,7 @@ before(async () => {
   modelImport = await server.ssrLoadModule("/src/utils/modelImport.ts");
   audioImport = await server.ssrLoadModule("/src/utils/audioImport.ts");
   scriptImport = await server.ssrLoadModule("/src/utils/scriptImport.ts");
+  textureImport = await server.ssrLoadModule("/src/utils/textureImport.ts");
 });
 after(async () => {
   await server?.close();
@@ -886,4 +888,19 @@ test("stored projects with truncated texture or audio data fail before document 
       await storage.deleteProject(project.projectId);
     }
   }
+});
+
+test("texture file handle reads retain the document identity from the initial click", async () => {
+  store.getState().newProject();
+  let release;
+  const reading = new Promise(resolve => { release = resolve; });
+  let bytesRead = false;
+  const file = { name: "late.png", size: 4, arrayBuffer() { bytesRead = true; throw Error("must not read"); } };
+  const pending = textureImport.importTextureAsset({ id: "asset", name: "late.png", path: "late.png", type: "texture", fileHandle: { getFile: () => reading } });
+  const rejected = assert.rejects(pending, /项目已切换/);
+  store.getState().newProject();
+  release(file);
+  await rejected;
+  assert.equal(bytesRead, false);
+  assert.equal(store.getState().content.textures.length, 0);
 });

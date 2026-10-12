@@ -1,4 +1,4 @@
-import { importTextureFile } from "../../utils/textureImport";
+import { importTextureAsset } from "../../utils/textureImport";
 import { importScriptAsset } from "../../utils/scriptImport";
 import { useState, useMemo, useRef } from "react";
 import {
@@ -340,11 +340,7 @@ export default function AssetBrowser() {
                     setSelectedAsset(a.id);
                   } else if (a.type === "texture") {
                     try {
-                      const file = a.fileHandle
-                        ? await a.fileHandle.getFile()
-                        : a.file;
-                      if (!file) throw new Error("无法读取贴图");
-                      await importTextureFile(file);
+                      await importTextureAsset(a);
                     } catch (error) {
                       setError(String(error));
                     }
