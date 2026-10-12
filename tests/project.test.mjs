@@ -11,6 +11,7 @@ let server,
   readModelAsset,
   modelImport,
   audioImport,
+  scriptImport,
   recovery,
   normalize;
 function request(r) {
@@ -48,6 +49,7 @@ before(async () => {
   ));
   modelImport = await server.ssrLoadModule("/src/utils/modelImport.ts");
   audioImport = await server.ssrLoadModule("/src/utils/audioImport.ts");
+  scriptImport = await server.ssrLoadModule("/src/utils/scriptImport.ts");
 });
 after(async () => {
   await server?.close();
@@ -813,4 +815,35 @@ test("audio import and replacement preserve IDs and reject resources deleted dur
   await rejected;
   assert.equal(store.getState().audioBuffers.has(id), false);
   assert.equal(store.getState().content.audio.length, 0);
+});
+
+test("delayed script import rejects document switches and preserves concurrently created scripts", async () => {
+  for (const switching of [true, false]) {
+    store.getState().newProject();
+    let release;
+    const reading = new Promise(resolve => { release = resolve; });
+    const asset = { id: "script", name: "late.js", path: "late.js", type: "script", file: { text: () => reading } };
+    const pending = scriptImport.importScriptAsset(asset);
+    const result = switching ? assert.rejects(pending, /项目已切换/) : pending;
+    if (switching) store.getState().newProject();
+    else {
+      store.getState().createScript(asset.name);
+      store.getState().updateScript(asset.name, "keep edits");
+    }
+    release("imported code");
+    await result;
+    if (switching) assert.equal(Object.hasOwn(store.getState().scripts, asset.name), false);
+    else assert.equal(store.getState().scripts[asset.name], "keep edits");
+  }
+});
+
+test("normal script imports load contents and existing scripts open without rereading", async () => {
+  store.getState().newProject();
+  const asset = { id: "script", name: "normal.js", path: "normal.js", type: "script", file: new File(["return {};"], "normal.js") };
+  await scriptImport.importScriptAsset(asset);
+  assert.equal(store.getState().scripts[asset.name], "return {};");
+  store.getState().updateScript(asset.name, "edited");
+  await scriptImport.importScriptAsset({ ...asset, file: { text() { throw Error("should not read"); } } });
+  assert.equal(store.getState().scripts[asset.name], "edited");
+  assert.equal(store.getState().activeFileId, asset.name);
 });

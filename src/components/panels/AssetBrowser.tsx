@@ -1,4 +1,5 @@
 import { importTextureFile } from "../../utils/textureImport";
+import { importScriptAsset } from "../../utils/scriptImport";
 import { useState, useMemo, useRef } from "react";
 import {
   Box,
@@ -332,16 +333,7 @@ export default function AssetBrowser() {
                   } else if (a.type === "script") {
                     // 文件系统中的 .js 文件：若已在 scripts 中则切换 activeFileId
                     try {
-                      if (!Object.hasOwn(scripts, a.name)) {
-                        const file = a.fileHandle
-                          ? await a.fileHandle.getFile()
-                          : a.file;
-                        if (!file) throw new Error("无法读取脚本");
-                        const code = await file.text();
-                        createScript(a.name);
-                        useEditorStore.getState().updateScript(a.name, code);
-                      }
-                      setActiveFile(a.name);
+                      await importScriptAsset(a);
                     } catch (error) {
                       setError(String(error));
                     }
