@@ -390,7 +390,7 @@
           };
         },
         destroy() {
-          remove(entity.id);
+          if (live.get(entity.id) === c) remove(entity.id);
         },
       });
       events(c, getState(c, c.state), -1e-9, 0);

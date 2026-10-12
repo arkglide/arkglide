@@ -353,3 +353,26 @@ test("invalid replacement controllers preserve the previous controller and bind 
     s.done();
   }
 });
+
+test("destroying an obsolete controller handle leaves its replacement running", () => {
+  const s = setup();
+  try {
+    const { entity } = s.model("player");
+    s.clip(entity.id, "Idle", B.Vector3.Zero(), B.Vector3.Zero());
+    s.clip(entity.id, "Move", B.Vector3.Zero(), new B.Vector3(2, 0, 0));
+    const { api } = s.api();
+    const old = api.createController(entity, "locomotion");
+    const current = api.createController(entity, "locomotion");
+    old.destroy();
+    old.destroy();
+    assert.equal(current.state, "Idle");
+    current.setState("Move");
+    s.runtime.fixedUpdate(0.25);
+    assert.equal(current.state, "Move");
+    current.destroy();
+    assert.throws(() => current.state, /已销毁/);
+    assert.doesNotThrow(() => current.destroy());
+  } finally {
+    s.done();
+  }
+});
