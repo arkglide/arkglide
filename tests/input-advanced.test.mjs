@@ -266,3 +266,36 @@ test("floating joystick follows the touch origin, hiding a parent releases desce
     t.done();
   }
 });
+
+test("window blur clears menu blockers and unfocused gamepad polling cannot activate menus", () => {
+  const t = fixture([def("menu")]);
+  try {
+    let hasFocus = true;
+    t.document.hasFocus = () => hasFocus;
+    let clicks = 0;
+    t.ui.forOwner(t.owner).get("menu").on("click", () => clicks++);
+    t.layer.children[0].focus();
+    hasFocus = false;
+    t.window.emit("blur");
+    t.ui.setActive(false);
+    t.pads.push({ index: 0, id: "stub", axes: [], buttons: [
+      { value: 1, pressed: true },
+      ...Array.from({ length: 11 }, () => ({ value: 0, pressed: false })),
+      { value: 1, pressed: true },
+    ] });
+    t.ui.beginFrame();
+    t.pads[0].buttons[0] = { value: 0, pressed: false };
+    t.ui.beginFrame();
+    t.pads[0].buttons[0] = { value: 1, pressed: true };
+    t.ui.beginFrame();
+    assert.equal(clicks, 0);
+    t.pads.length = 0;
+    hasFocus = true;
+    t.ui.setActive(true);
+    t.window.emit("keydown", { key: "d", code: "KeyD" });
+    assert.equal(t.ui.input.getAction("moveX"), 1);
+    assert.equal(t.layer.children[0].style.outline, "");
+  } finally {
+    t.done();
+  }
+});

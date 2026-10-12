@@ -341,8 +341,9 @@
       my = e.clientY;
     });
     listen(win, "blur", () => {
-      reset();
+      if (focused) focused.el.style.outline = "";
       focused = null;
+      reset();
       padButtons.clear();
       binding?.finish(null);
     });
@@ -379,7 +380,11 @@
         for (let i = 0; i < p.buttons.length; i++)
           if (p.buttons[i]?.pressed || p.buttons[i]?.value > 0.5)
             nextButtons.add(p.index + ":" + i);
-      if (!binding && (focused || !active || !simulation)) {
+      if (
+        (doc.hasFocus?.() ?? true) &&
+        !binding &&
+        (focused || !active || !simulation)
+      ) {
         for (const key of nextButtons)
           if (!padButtons.has(key)) {
             const i = Number(key.split(":")[1]);
