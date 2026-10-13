@@ -63,26 +63,32 @@
           texture: null,
         };
         slots.set(key, item);
-        item.texture = new B.Texture(
-          url,
-          scene,
-          false,
-          true,
-          B.Texture.TRILINEAR_SAMPLINGMODE,
-          finish,
-          (message, error) => {
-            if (slots.get(key) === item)
-              options.onError?.(
-                { id: textureId, name: asset.name, type: "texture" },
-                error || new Error(message || "贴图解码失败"),
-              );
-            finish();
-          },
-          undefined,
-          false,
-          undefined,
-          asset.mime,
-        );
+        try {
+          item.texture = new B.Texture(
+            url,
+            scene,
+            false,
+            true,
+            B.Texture.TRILINEAR_SAMPLINGMODE,
+            finish,
+            (message, error) => {
+              if (slots.get(key) === item)
+                options.onError?.(
+                  { id: textureId, name: asset.name, type: "texture" },
+                  error || new Error(message || "贴图解码失败"),
+                );
+              finish();
+            },
+            undefined,
+            false,
+            undefined,
+            asset.mime,
+          );
+        } catch (error) {
+          if (slots.get(key) === item) slots.delete(key);
+          release(item);
+          throw error;
+        }
         item.texture.name = "arkglide:texture:" + key;
         item.texture.gammaSpace = role === "albedo";
         old = item;

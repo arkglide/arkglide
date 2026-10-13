@@ -3,7 +3,10 @@ import type { AssetEntry } from '../store/useEditorStore';
 function normalizePath(path: string): string {
   const parts: string[] = [];
   for (const part of path.replaceAll('\\', '/').split('/')) {
-    if (part === '..') parts.pop();
+    if (part === '..') {
+      if (!parts.length) throw new Error('glTF 关联资源路径不能越过资源根目录: ' + path);
+      parts.pop();
+    }
     else if (part && part !== '.') parts.push(part);
   }
   return parts.join('/');

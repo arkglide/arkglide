@@ -12,6 +12,7 @@ export async function importScriptAsset(asset: AssetEntry) {
   const state = useEditorStore.getState();
   if (state.documentId !== initial.documentId)
     throw new Error("项目已切换，请重新导入脚本");
+  if (state.playState !== "stopped") throw new Error("请先停止运行，再导入脚本");
   if (!Object.hasOwn(state.scripts, asset.name)) {
     state.createScript(asset.name);
     state.updateScript(asset.name, code);

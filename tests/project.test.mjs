@@ -116,6 +116,19 @@ test("IndexedDB migrates old schema and isolates models shared by node ID across
     [2],
   );
 });
+
+test("synchronous binary clone failures roll back the whole project snapshot",async()=>{
+ store.getState().newProject();const id=store.getState().addNode("model","model"),second=store.getState().addNode("model","second");
+ const project=recovery.captureEditorProject(store.getState());project.projectId="atomic-clone-"+crypto.randomUUID();
+ await storage.saveProjectSnapshot(project,new Map([[id,new Uint8Array([1]).buffer],[second,new Uint8Array([2]).buffer]]));
+ const detached=new ArrayBuffer(4);structuredClone(detached,{transfer:[detached]});
+ try {
+  await assert.rejects(storage.saveProjectSnapshot({...project,name:"invalid update"},new Map([[id,new Uint8Array([7]).buffer],[second,detached]])),/clone|detached/i);
+  assert.equal((await storage.loadProject(project.projectId)).name,project.name);
+  assert.deepEqual(new Uint8Array(await storage.loadModelBlob(id,project.projectId)),new Uint8Array([1]));
+  assert.deepEqual(new Uint8Array(await storage.loadModelBlob(second,project.projectId)),new Uint8Array([2]));
+ } finally {await storage.deleteProject(project.projectId);}
+});
 test("model copy/paste, duplicate, deletion and undo preserve binary assets and descendants", () => {
   store.getState().newProject();
   const s = store.getState();
@@ -275,6 +288,12 @@ test("glTF sidecars are embedded before storing and missing resources fail expli
   assert.match(packed.buffers[0].uri, /^data:/);
   assert.match(packed.images[0].uri, /^data:/);
   await assert.rejects(readModelAsset(model, [model]), /缺少关联资源/);
+});
+
+test("glTF sidecars cannot resolve above the mounted asset root", async () => {
+ const model={name:"scene.gltf",path:"scene.gltf",file:new File([JSON.stringify({asset:{version:"2.0"},buffers:[{uri:"../mesh.bin",byteLength:3}]})],"scene.gltf")};
+ const bin={path:"mesh.bin",file:new File([new Uint8Array([1,2,3])],"mesh.bin")};
+ await assert.rejects(readModelAsset(model,[model,bin]),/根目录/);
 });
 
 test("ZIP keeps a missing model missing when another model has the same filename", async () => {
@@ -850,6 +869,16 @@ test("normal script imports load contents and existing scripts open without rere
   assert.equal(store.getState().activeFileId, asset.name);
 });
 
+test("script imports finishing after playback starts preserve the editor script snapshot",async()=>{
+ store.getState().newProject();let release;
+ const reading=new Promise(resolve=>{release=resolve;});
+ const asset={id:"script",name:"late.js",path:"late.js",type:"script",file:{text:()=>reading}};
+ const pending=scriptImport.importScriptAsset(asset),rejected=assert.rejects(pending,/停止运行/);
+ store.getState().play();const current=store.getState();release("return {};");
+ try {await rejected;assert.equal(store.getState().scripts,current.scripts);assert.equal(store.getState().past,current.past);}
+ finally {store.getState().stop();}
+});
+
 test("recovery rejects truncated texture binaries before replacing the current document", async () => {
   store.getState().newProject();
   store.getState().importTexture({ id: "texture", name: "image.png", mime: "image/png", byteLength: 3 }, new Uint8Array([1, 2, 3]).buffer);
@@ -888,6 +917,17 @@ test("stored projects with truncated texture or audio data fail before document 
       await storage.deleteProject(project.projectId);
     }
   }
+});
+
+test("stored projects with invalid model binary types preserve the current document",async()=>{
+ store.getState().newProject();const id=store.getState().addNode("model","model");
+ const project=recovery.captureEditorProject(store.getState());project.projectId="invalid-model-"+crypto.randomUUID();
+ await storage.saveProjectSnapshot(project,new Map([[id,"broken binary"]]));
+ store.getState().newProject();const current=store.getState();
+ try {
+  await assert.rejects(store.getState().loadProjectById(project.projectId),/模型资源损坏/);
+  assert.equal(store.getState().documentId,current.documentId);assert.equal(store.getState().nodes,current.nodes);
+ } finally {await storage.deleteProject(project.projectId);}
 });
 
 test("texture file handle reads retain the document identity from the initial click", async () => {

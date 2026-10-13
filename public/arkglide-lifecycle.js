@@ -156,6 +156,10 @@
         listen(target, name, callback, options) {
           if (!target?.addEventListener || typeof callback !== "function")
             throw new TypeError("Expected an EventTarget and a function");
+          const capture =
+            typeof options === "boolean" ? options : Boolean(options?.capture);
+          const once = Boolean(typeof options === "object" && options?.once);
+          const signal = typeof options === "object" ? options?.signal : null;
           let dispose;
           const wrapped = (event) => {
             if (
@@ -164,12 +168,17 @@
               call(record, "listener:" + name, callback, [event]) === false
             )
               dispose();
-            if (typeof options === "object" && options?.once) dispose();
+            if (once) dispose();
           };
           if (allowed()) target.addEventListener(name, wrapped, options);
-          dispose = track(() =>
-            target.removeEventListener(name, wrapped, options),
-          );
+          dispose = track(() => {
+            target.removeEventListener(name, wrapped, { capture });
+            if (dispose) signal?.removeEventListener("abort", dispose);
+          });
+          if (signal && allowed()) {
+            if (signal.aborted) dispose();
+            else signal.addEventListener("abort", dispose, { once: true });
+          }
           return dispose;
         },
       };

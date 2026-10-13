@@ -111,70 +111,76 @@ export async function saveProjectSnapshot(
     "readwrite",
   );
   const finished = complete(tx);
-  tx.objectStore("projects").put(data, data.projectId);
-  for (const ref of data.modelRefs) {
-    const buffer = buffers.get(ref.assetId);
-    if (buffer)
-      tx.objectStore("models").put(
-        buffer,
-        modelKey(data.projectId, ref.assetId),
-      );
-    else tx.objectStore("models").delete(modelKey(data.projectId, ref.assetId));
+  try {
+    tx.objectStore("projects").put(data, data.projectId);
+    for (const ref of data.modelRefs) {
+      const buffer = buffers.get(ref.assetId);
+      if (buffer)
+        tx.objectStore("models").put(
+          buffer,
+          modelKey(data.projectId, ref.assetId),
+        );
+      else tx.objectStore("models").delete(modelKey(data.projectId, ref.assetId));
+    }
+    const liveKeys = new Set(
+      data.modelRefs.map((ref) => modelKey(data.projectId, ref.assetId)),
+    );
+    const cursor = tx.objectStore("models").openKeyCursor();
+    cursor.onsuccess = () => {
+      const entry = cursor.result;
+      if (!entry) return;
+      if (
+        String(entry.key).startsWith(data.projectId + "/") &&
+        !liveKeys.has(String(entry.key))
+      )
+        tx.objectStore("models").delete(entry.key);
+      entry.continue();
+    };
+    const textureKeys = new Set(
+      (data.content?.textures || []).map((t) => modelKey(data.projectId, t.id)),
+    );
+    for (const t of data.content?.textures || []) {
+      const b = textures.get(t.id),
+        key = modelKey(data.projectId, t.id);
+      if (b) tx.objectStore("textures").put(b, key);
+      else tx.objectStore("textures").delete(key);
+    }
+    const textureCursor = tx.objectStore("textures").openKeyCursor();
+    textureCursor.onsuccess = () => {
+      const e = textureCursor.result;
+      if (!e) return;
+      if (
+        String(e.key).startsWith(data.projectId + "/") &&
+        !textureKeys.has(String(e.key))
+      )
+        tx.objectStore("textures").delete(e.key);
+      e.continue();
+    };
+    const audioKeys = new Set(
+      (data.content?.audio || []).map((a) => modelKey(data.projectId, a.id)),
+    );
+    for (const a of data.content?.audio || []) {
+      const b = audio.get(a.id),
+        k = modelKey(data.projectId, a.id);
+      if (b) tx.objectStore("audio").put(b, k);
+      else tx.objectStore("audio").delete(k);
+    }
+    const ac = tx.objectStore("audio").openKeyCursor();
+    ac.onsuccess = () => {
+      const e = ac.result;
+      if (!e) return;
+      if (
+        String(e.key).startsWith(data.projectId + "/") &&
+        !audioKeys.has(String(e.key))
+      )
+        tx.objectStore("audio").delete(e.key);
+      e.continue();
+    };
+  } catch (error) {
+    tx.abort();
+    await finished.catch(() => {});
+    throw error;
   }
-  const liveKeys = new Set(
-    data.modelRefs.map((ref) => modelKey(data.projectId, ref.assetId)),
-  );
-  const cursor = tx.objectStore("models").openKeyCursor();
-  cursor.onsuccess = () => {
-    const entry = cursor.result;
-    if (!entry) return;
-    if (
-      String(entry.key).startsWith(data.projectId + "/") &&
-      !liveKeys.has(String(entry.key))
-    )
-      tx.objectStore("models").delete(entry.key);
-    entry.continue();
-  };
-  const textureKeys = new Set(
-    (data.content?.textures || []).map((t) => modelKey(data.projectId, t.id)),
-  );
-  for (const t of data.content?.textures || []) {
-    const b = textures.get(t.id),
-      key = modelKey(data.projectId, t.id);
-    if (b) tx.objectStore("textures").put(b, key);
-    else tx.objectStore("textures").delete(key);
-  }
-  const textureCursor = tx.objectStore("textures").openKeyCursor();
-  textureCursor.onsuccess = () => {
-    const e = textureCursor.result;
-    if (!e) return;
-    if (
-      String(e.key).startsWith(data.projectId + "/") &&
-      !textureKeys.has(String(e.key))
-    )
-      tx.objectStore("textures").delete(e.key);
-    e.continue();
-  };
-  const audioKeys = new Set(
-    (data.content?.audio || []).map((a) => modelKey(data.projectId, a.id)),
-  );
-  for (const a of data.content?.audio || []) {
-    const b = audio.get(a.id),
-      k = modelKey(data.projectId, a.id);
-    if (b) tx.objectStore("audio").put(b, k);
-    else tx.objectStore("audio").delete(k);
-  }
-  const ac = tx.objectStore("audio").openKeyCursor();
-  ac.onsuccess = () => {
-    const e = ac.result;
-    if (!e) return;
-    if (
-      String(e.key).startsWith(data.projectId + "/") &&
-      !audioKeys.has(String(e.key))
-    )
-      tx.objectStore("audio").delete(e.key);
-    e.continue();
-  };
   await finished;
 }
 export function loadAudioBlob(

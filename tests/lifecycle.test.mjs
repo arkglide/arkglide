@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {getEventListeners} from 'node:events';
 import '../src/engine/lifecycle-runtime.js';
 const create=options=>globalThis.ArkGlideLifecycle.createSession(options);
 
@@ -79,4 +80,21 @@ test('canceled event subscriptions do not fire later in the same dispatch or nes
  owner.events.once('nested',()=>once++);
  owner.events.emit('nested');assert.equal(once,1);
  session.stop();
+});
+
+test('listener cleanup uses the capture mode from registration',()=>{
+ const session=create(),owner=session.owner({id:'one'},'one.js'),target=new EventTarget(),options={capture:false};let calls=0;
+ owner.attach({});owner.events.listen(target,'ping',()=>calls++,options);session.start();
+ options.capture=true;session.destroyEntity('one');
+ session.resume();target.dispatchEvent(new Event('ping'));
+ assert.equal(calls,0);
+ assert.equal(getEventListeners(target,'ping').length,0);session.stop();
+});
+test('aborted native listeners release their owned cleanup records',()=>{
+ const session=create(),owner=session.owner({id:'one'},'one.js'),target=new EventTarget(),controller=new AbortController();
+ owner.attach({});session.start();owner.events.listen(target,'ping',()=>{}, {signal:controller.signal});
+ assert.equal(session.stats().listeners,1);controller.abort();
+ assert.equal(getEventListeners(target,'ping').length,0);assert.equal(session.stats().listeners,0);
+ owner.events.listen(target,'ping',()=>{}, {signal:controller.signal});
+ assert.equal(session.stats().listeners,0);session.stop();
 });

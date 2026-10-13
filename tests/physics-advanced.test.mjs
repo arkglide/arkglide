@@ -130,6 +130,16 @@ test("real Jolt model hull and static mesh shapes build, cache and release; dyna
     s.done();
   }
 });
+test("model collision geometry accepts index counts within the documented limit",()=>{
+ const s=setup();
+ try {
+  s.entity("large");const mesh=s.objects.get("large"),base=mesh.getIndices();
+  mesh.setIndices(Uint32Array.from({length:180000},(_,i)=>base[i%base.length]));
+  assert.doesNotThrow(()=>s.physics.add({id:"large",physics:{motion:"static",shape:"convex",mass:1,size:{x:1,y:1,z:1},friction:0.5,restitution:0,sensor:false,lockRotation:true}}));
+  assert.equal(s.physics.stats().physicsBodies,1);
+  assert.equal(s.api.raycast({x:0,y:3,z:0},{x:0,y:-5,z:0}).entity,s.entities.get("large"));
+ } finally {s.done();}
+});
 test("native capsule controller walks, grounds, jumps and releases on owner disposal", () => {
   const s = setup();
   try {

@@ -51,4 +51,4 @@ F11 已接入 Jolt WASM 进阶物理；F13 已支持独立静态游戏导出。F
 
 停止运行后打开「菜单 → 导出独立游戏…」，下载可部署在根路径或子目录的游戏 ZIP。已导出的示例位于 `examples/fourth-static-game/`，可使用 `node scripts/serve-static.mjs examples/fourth-static-game 8080` 启动普通静态服务器。
 
-CLI：`npm run export:game -- examples/fourth-static.arkglide 空输出目录`。资源规则、使用方法、中文变更和实际验收见 [第四批交付说明](FOURTH_BATCH_README.md)。`npm run test:static` 验证无编辑器运行；`npm run verify:fourth` 串行执行单测、静态部署、生产构建和编辑器回归。真实手柄与实体目标设备人工验收仍待完成。
+CLI：`npm run export:game -- examples/fourth-static.arkglide 空输出目录`。资源规则和使用方法见 [第四批交付说明](docs/fourth-batch.md)，[变更记录](docs/fourth-batch-changes.md)与[验收记录](docs/fourth-batch-verification.md)提供交付详情。`npm run test:static` 验证无编辑器运行；`npm run verify:fourth` 串行执行单测、静态部署、生产构建和编辑器回归。真实手柄与实体目标设备人工验收仍待完成。

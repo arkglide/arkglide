@@ -1694,7 +1694,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       missing = new Set<string>();
     for (const ref of data.modelRefs) {
       const blob = await loadModelBlob(ref.assetId, projectId);
-      if (blob) buffers.set(ref.assetId, blob);
+      if (blob) {
+        if (!(blob instanceof ArrayBuffer))
+          throw new Error("模型资源损坏: " + ref.fileName);
+        buffers.set(ref.assetId, blob);
+      }
       else missing.add(ref.assetId);
     }
     if (epoch !== projectEpoch) return;

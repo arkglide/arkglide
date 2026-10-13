@@ -187,6 +187,7 @@
       return found;
     }
     function rebind(name, map, acceptConflicts = false) {
+      if (disposed) throw Error("输入会话已停止");
       const a = action(name),
         next = { ...a, ...structuredClone(map) };
       if (
@@ -458,6 +459,7 @@
       bindings: () => structuredClone(config.actions),
       rebind,
       resetBindings(name) {
+        if (disposed) throw Error("输入会话已停止");
         reset();
         for (const a of config.actions) {
           if (name && a.name !== name) continue;
@@ -471,6 +473,7 @@
         options.onBindingsChange?.(structuredClone(config.actions));
       },
       captureBinding(name, direction = "positive") {
+        if (disposed) throw Error("输入会话已停止");
         action(name);
         if (!["positive", "negative"].includes(direction) || binding)
           throw Error("重绑捕获正在进行或方向无效");

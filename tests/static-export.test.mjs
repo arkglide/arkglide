@@ -51,6 +51,25 @@ test('compressed decoder dependencies are rejected explicitly',()=>{
 test('malformed GLB data does not pass export validation',()=>{
  const models=new Map(maps.models);models.set(project.modelRefs[0].assetId,new ArrayBuffer(20));assert.throws(()=>build(project,{...maps,models}),/有效 GLB/);
 });
+test('GLB binary chunks must be complete and satisfy embedded buffer lengths',()=>{
+ const json=new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{byteLength:4}]}));
+ const size=Math.ceil(json.length/4)*4;
+ function glb(binarySize,declaredSize=binarySize){
+  const raw=new Uint8Array(20+size+(binarySize===null?0:8+binarySize)),view=new DataView(raw.buffer);
+  view.setUint32(0,0x46546c67,true);view.setUint32(4,2,true);view.setUint32(8,raw.length,true);
+  view.setUint32(12,size,true);view.setUint32(16,0x4e4f534a,true);raw.fill(32,20,20+size);raw.set(json,20);
+  if(binarySize!==null){view.setUint32(20+size,declaredSize,true);view.setUint32(24+size,0x004e4942,true);}
+  return raw;
+ }
+ const shortHeader=glb(4).slice(0,20+size+4);
+ new DataView(shortHeader.buffer).setUint32(8,shortHeader.length,true);
+ for(const raw of [glb(null),glb(0),glb(3),glb(8),glb(4,8),shortHeader]){
+  const models=new Map(maps.models);models.set(project.modelRefs[0].assetId,raw);
+  assert.throws(()=>build(project,{...maps,models}),/有效 GLB/);
+ }
+ const models=new Map(maps.models);models.set(project.modelRefs[0].assetId,glb(4));
+ assert.ok(build(project,{...maps,models}).files['project.json']);
+});
 test('self-contained glTF with data URIs can be packaged',()=>{
  const models=new Map(maps.models);models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'data:application/octet-stream;base64,AAAA',byteLength:3}]})).buffer);
  assert.ok(build(project,{...maps,models}).files['project.json']);
@@ -60,9 +79,12 @@ test('literal import(), static imports and reexports all appear in the graph',()
  assert.deepEqual(graph.graph['main.js'],['bridge.js','later.js']);assert.deepEqual(graph.graph['bridge.js'],['tools.js']);
 });
 test('missing, remote, npm, variable imports, top-level await and cycles fail export preflight',()=>{
- for(const source of ["import './missing.js'","import 'pkg'","import 'https://example.com/a.js'","const p='./a.js';import(p)",'await Promise.resolve()',"import './cycle.js'"]){
+ for(const source of ["import './missing.js'","import 'pkg'","import 'https://example.com/a.js'","const p='./a.js';import(p)",'await Promise.resolve()','for await (const item of []) {}',"import './cycle.js'"]){
  const scripts={'main.js':source,'cycle.js':"import './main.js';export const x=1"};assert.throws(()=>validateScriptGraph(scripts,[{scripts:['main.js']}]));
  }
+});
+test('top-level async iteration is rejected by export preflight',()=>{
+ assert.throws(()=>validateScriptGraph({'main.js':'for await (const item of []) {} export default function(){return {};}'} ,[{scripts:['main.js']}]),/顶层 await/);
 });
 test('script traversal, non-JS, missing bindings and old-style script imports are rejected',()=>{
  for(const name of ['../evil.js','a\\b.js','a.ts','/a.js'])assert.throws(()=>validateScriptGraph({[name]:''},[]),/项目内 .js/);

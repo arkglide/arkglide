@@ -7,7 +7,7 @@
   const stage = $('stage'), cover = $('cover'), status = $('status'), progress = $('progress');
   let generation = 0, controller = null, frame = null, token = '', state = 'idle';
   let manifest = null, payload = null, timer = null, cleanupTimer = null, lastStats = null;
-  let hiddenPause = false, stopResolve = null;
+  let hiddenPause = false, stopResolve = null, stopPromise = null;
   function setState(next, message) {
     state = next; document.body.dataset.state = next;
     if (message) status.textContent = message;
@@ -118,20 +118,21 @@
     } catch (error) { if (id === generation && error.name !== 'AbortError') fail(error); }
   }
   function stop() {
-    if (['idle', 'stopped', 'stopping'].includes(state)) return Promise.resolve();
+    if (state === 'stopping') return stopPromise;
+    if (['idle', 'stopped'].includes(state)) return Promise.resolve();
     controller?.abort(); controller = null; clearTimeout(timer); timer = null;
     payload = null; hiddenPause = false;
     if (!frame) { ++generation; setState('stopped', '已停止，可重新开始'); return Promise.resolve(); }
     setState('stopping', '正在停止并释放资源…');
-    const promise = new Promise(resolve => { stopResolve = resolve; });
+    stopPromise = new Promise(resolve => { stopResolve = resolve; });
     post({type:'stop'});
     cleanupTimer = setTimeout(finishStop, 1000);
-    return promise;
+    return stopPromise;
   }
   function finishStop() {
     ++generation; removeFrame();
     setState('stopped', '已停止，可重新开始'); progress.value = 0;
-    stopResolve?.(); stopResolve = null;
+    stopResolve?.(); stopResolve = null; stopPromise = null;
   }
   function pause() {
     if (state === 'playing') { post({type:'pause'}); setState('pausing', '正在暂停…'); }
@@ -156,7 +157,10 @@
     } else if (msg.type === 'telemetry') {
       lastStats = msg.stats;
       if (state === 'pausing' && msg.stats.state === 'paused') setState('paused', '已暂停');
-      if (state === 'resuming' && msg.stats.state === 'playing') setState('playing', '游戏运行中');
+      if (state === 'resuming' && msg.stats.state === 'playing') {
+        setState('playing', '游戏运行中');
+        if (document.hidden) { pause(); hiddenPause = true; }
+      }
       if (state === 'stopping' && msg.stats.state === 'stopped') finishStop();
     }
   });

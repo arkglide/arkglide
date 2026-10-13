@@ -103,6 +103,10 @@ test("invalid graphs report actionable file diagnostics without breaking unrelat
       /顶层 await/,
     ],
     [
+      "for await (const item of []) {} export default function(){return {};}",
+      /顶层 await/,
+    ],
+    [
       "import {unknown} from './utils.js'; return {};",
       /export named 'unknown'|export named|does not provide/,
     ],
@@ -131,6 +135,13 @@ test("invalid graphs report actionable file diagnostics without breaking unrelat
   await cycle.prepare();
   assert.throws(() => cycle.get("main.js"), /循环模块依赖.*a.js.*b.js.*a.js/);
   cycle.dispose();
+});
+
+test("async iteration inside a script factory remains supported", async () => {
+  const l = loader({"main.js":"export default function(){return {async run(){let sum=0;for await (const item of [1,2]) sum+=item;return sum;}};}"}, ["main.js"]);
+  await l.prepare();
+  assert.equal(await l.get("main.js").factory().run(), 3);
+  l.dispose();
 });
 
 test("native module errors map rewritten import paths and factory headers to original line and column", async () => {
@@ -180,6 +191,15 @@ test("cancellation revokes blobs and never retains late module factories", async
   assert.throws(() => l.get("main.js"), /取消/);
 });
 
+test("preparing a disposed loader does not create or import modules", async () => {
+  let imports=0;
+  const l=loader({"main.js":"export default function(){return {}; }"},["main.js"],{
+    importModule:async()=>{imports++;return {default:()=>({})};},
+  });
+  l.dispose();await l.prepare();
+  assert.equal(imports,0);assert.equal(l.codes.length,0);assert.equal(l.stats().modules,0);
+});
+
 test("renaming modules rewrites static imports, reexports, literal dynamic imports and moved relative dependencies", () => {
   const sources = {
     "utils.js": "export const speed=3;",
@@ -205,6 +225,19 @@ test("renaming modules rewrites static imports, reexports, literal dynamic impor
     "math.js",
   );
   assert.match(incomplete["main.js"], /\.\/math.js/);
+});
+
+test("renaming modules retains dynamic imports and reexports while code is incomplete", () => {
+ const moved=M.rewriteRename({
+   "utils.js":"export const value=1;",
+   "main.js":"const load=()=>import('./utils.js');\nentity.",
+   "barrel.js":"export {value} from './utils.js';\nconst unfinished =",
+ },"utils.js","lib/math.js");
+ assert.match(moved["main.js"],/import\("\.\/lib\/math.js"\)/);
+ assert.match(moved["barrel.js"],/from "\.\/lib\/math.js"/);
+ const incomplete="// import('./utils.js')\nconst text=\"import('./utils.js')\"; const pattern=/import\('utils'\)/;\nobject.import('./utils.js'); object?.import('./utils.js');\nconst load=()=>import('./utils.js');\nentity.";
+ const result=M.rewriteRename({"utils.js":"export const value=1;","main.js":incomplete},"utils.js","math.js");
+ assert.equal(result["main.js"],incomplete.replace("const load=()=>import('./utils.js')",'const load=()=>import("./math.js")'));
 });
 
 test("parser ignores imports in comments, strings and regexes; diagnostics preserve original module line", async () => {

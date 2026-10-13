@@ -471,3 +471,21 @@ test("removing a material does not release texture slots of IDs sharing its pref
     adapter.dispose();engine.dispose();
   }
 });
+
+test("texture construction failures release pending resources and allow retry",async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let attempts=0,loading=0;
+ class Texture {
+  static TRILINEAR_SAMPLINGMODE=1;
+  constructor(url,scene,a,b,mode,ready){if(++attempts===1)throw Error("texture allocation failed");ready();}
+  dispose(){}
+ }
+ const adapter=ArkGlideScene.createSceneAdapter({...B,Texture},scene,{onLoading:n=>{loading+=n;}});
+ const material={id:"m",name:"m",baseColor:"#FFFFFF",emissiveColor:"#000000",metallic:0,roughness:1,alpha:1,doubleSided:false,uvScale:{u:1,v:1},albedoTextureId:"tex"};
+ const content={materials:{m:material},textures:[{id:"tex",name:"image.png",mime:"image/png"}]},buffers=new Map([["tex",new ArrayBuffer(4)]]);
+ try {
+  assert.throws(()=>adapter.sync([],new Map(),content,buffers),/allocation failed/);
+  assert.equal(loading,0);
+  await adapter.sync([],new Map(),content,buffers);
+  assert.equal(attempts,2);assert.equal(adapter.materials.get("m").albedoTexture.uScale,1);assert.equal(loading,0);
+ } finally {adapter.dispose();engine.dispose();}
+});

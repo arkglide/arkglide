@@ -68,8 +68,26 @@ function validateModel(raw, label) {
       if (view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== raw.length || raw.length < 20 || view.getUint32(16, true) !== 0x4e4f534a)
         throw Error('无效 GLB 头部');
       const size = view.getUint32(12, true);
-      if (20 + size > raw.length) throw Error('GLB JSON 越界');
+      if (size % 4 || 20 + size > raw.length) throw Error('GLB JSON 越界或未对齐');
       gltf = JSON.parse(new TextDecoder().decode(raw.subarray(20, 20 + size)));
+      let offset = 20 + size, binarySize = null;
+      while (offset < raw.length) {
+        if (offset + 8 > raw.length) throw Error('GLB 块头不完整');
+        const chunkSize = view.getUint32(offset, true), type = view.getUint32(offset + 4, true);
+        if (chunkSize % 4 || offset + 8 + chunkSize > raw.length) throw Error('GLB 块越界或未对齐');
+        if (type === 0x4e4f534a) throw Error('GLB JSON 块重复');
+        if (type === 0x004e4942) {
+          if (binarySize !== null || offset !== 20 + size) throw Error('GLB BIN 块顺序无效');
+          binarySize = chunkSize;
+        }
+        offset += 8 + chunkSize;
+      }
+      for (const [index, buffer] of (gltf.buffers || []).entries()) {
+        if (buffer.uri !== undefined) continue;
+        if (index !== 0 || binarySize === null || !Number.isInteger(buffer.byteLength) || buffer.byteLength <= 0 ||
+            binarySize < buffer.byteLength || binarySize > buffer.byteLength + 3)
+          throw Error('GLB BIN 数据与缓冲区声明不一致');
+      }
     } else gltf = JSON.parse(new TextDecoder().decode(raw));
   } catch (error) { throw Error('模型不是有效 GLB/glTF: ' + label + '；' + error.message); }
   if (gltf.asset?.version !== '2.0') throw Error('仅支持 glTF 2.0: ' + label);

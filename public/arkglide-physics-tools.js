@@ -57,13 +57,9 @@
           );
           vertices.push(p.x * scale.x, p.y * scale.y, p.z * scale.z);
         }
-        indices.push(
-          ...Array.from(
-            idx?.length
-              ? idx
-              : Array.from({ length: data.length / 3 }, (_, i) => i),
-          ).map((i) => i + offset),
-        );
+        const count = idx?.length || data.length / 3;
+        for (let i = 0; i < count; i++)
+          indices.push((idx?.length ? idx[i] : i) + offset);
       }
       if (
         !vertices.length ||

@@ -350,6 +350,19 @@ test("invalid captured bindings reject promptly without escaping the keyboard ha
   }
 });
 
+test("disposed input sessions reject binding mutations and new captures",async()=>{
+ const t=fixture();
+ try {
+  const pending=t.ui.input.captureBinding("moveX");t.ui.dispose();
+  assert.equal((await pending).cancelled,true);
+  const before=t.ui.input.bindings();
+  assert.throws(()=>t.ui.input.captureBinding("moveX"),/已停止/);
+  assert.throws(()=>t.ui.input.rebind("moveX",{positive:["KeyL"]}),/已停止/);
+  assert.throws(()=>t.ui.input.resetBindings(),/已停止/);
+  assert.deepEqual(t.ui.input.bindings(),before);assert.equal(t.ui.stats().inputCaptures,0);
+ } finally {t.done();}
+});
+
 test("UI subscriptions canceled inside a callback do not fire in the same dispatch", () => {
   const t = fixture([def("button")]);
   try {
