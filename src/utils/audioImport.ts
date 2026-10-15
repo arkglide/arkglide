@@ -1,4 +1,5 @@
 import { useEditorStore } from "../store/useEditorStore";
+const replacements = new Map<string, object>();
 export async function importAudioFile(file: File, id?: string) {
   const documentId = useEditorStore.getState().documentId;
   const ext = file.name.split(".").pop()?.toLowerCase(),
@@ -13,19 +14,27 @@ export async function importAudioFile(file: File, id?: string) {
     )[ext || ""];
   if (!mime || !file.size || file.size > 32 * 1024 * 1024)
     throw new Error("请导入不超过32 MiB的WAV、MP3、OGG、M4A或WebM音频");
-  const bytes = await file.arrayBuffer();
-  const state = useEditorStore.getState();
-  if (state.documentId !== documentId)
-    throw new Error("项目已切换，请重新导入音频");
-  if (id && !state.content.audio?.some((a) => a.id === id))
-    throw new Error("要替换的音频已删除");
-  state.importAudio(
-      {
-        id: id || crypto.randomUUID(),
-        name: file.name,
-        mime,
-        byteLength: bytes.byteLength,
-      },
-      bytes,
-    );
+  const key = id ? JSON.stringify([documentId, id]) : null, token = {};
+  if (key) replacements.set(key, token);
+  try {
+    const bytes = await file.arrayBuffer();
+    const state = useEditorStore.getState();
+    if (key && replacements.get(key) !== token)
+      throw new Error("音频替换已取消：已有更新的替换请求");
+    if (state.documentId !== documentId)
+      throw new Error("项目已切换，请重新导入音频");
+    if (id && !state.content.audio?.some((a) => a.id === id))
+      throw new Error("要替换的音频已删除");
+    state.importAudio(
+        {
+          id: id || crypto.randomUUID(),
+          name: file.name,
+          mime,
+          byteLength: bytes.byteLength,
+        },
+        bytes,
+      );
+  } finally {
+    if (key && replacements.get(key) === token) replacements.delete(key);
+  }
 }

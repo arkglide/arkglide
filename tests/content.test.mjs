@@ -7,7 +7,7 @@ let server, store, archive, recovery, storage, validate, prefabMath;
 before(async () => {
   globalThis.indexedDB = indexedDB;
   server = await createServer({
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });

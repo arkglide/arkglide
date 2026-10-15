@@ -28,7 +28,7 @@ before(async () => {
   old.onupgradeneeded = () => old.result.createObjectStore("projects");
   (await request(old)).close();
   server = await createServer({
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
@@ -217,6 +217,29 @@ test("invalid hierarchy is rejected before project replacement; new node IDs nev
     () => validate({ scene: { nodes }, scripts: { "main.js": "" } }),
     /循环/,
   );
+});
+
+test("project validation rejects unsafe or non-JavaScript script paths before loading",()=>{
+ for(const name of ["../evil.js","a\\b.js","a.ts","/root.js","__proto__"])
+  assert.throws(()=>validate({scene:{nodes:[]},scripts:{"main.js":"",[name]:""}}),/脚本文件路径/);
+});
+test("script creation and renaming preserve saveable project paths",()=>{
+ store.getState().newProject();store.getState().createScript('tools.js');
+ for(const name of ['../bad.js','bad.ts','/bad.js','a//bad.js']){
+  const before=store.getState();
+  assert.throws(()=>store.getState().createScript(name),/脚本文件路径/);
+  assert.equal(store.getState().scripts,before.scripts);assert.equal(store.getState().past,before.past);
+  assert.throws(()=>store.getState().renameScript('tools.js',name),/脚本文件路径/);
+  assert.equal(store.getState().scripts,before.scripts);assert.equal(store.getState().past,before.past);
+ }
+});
+test("project validation rejects model paths that cannot be loaded as GLB or glTF",()=>{
+ for(const modelUrl of ["model.txt","../model.glb","/model.gltf","model\\x.glb"])
+  assert.throws(()=>validate({scene:{nodes:[{id:'model',name:'model',type:'model',modelUrl,transform:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1},visible:true,parentId:null}]},scripts:{"main.js":""}}),/模型文件路径/);
+});
+test("project normalization rejects model references with non-model filenames",()=>{
+ const scene={nodes:[{id:'model',name:'model',type:'model',transform:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1},visible:true,parentId:null}]};
+ assert.throws(()=>normalize({...scene,scene,scripts:{"main.js":""},modelRefs:[{assetId:'model',fileName:'model.txt'}]}),/重复的模型引用/);
 });
 test("multi-selection applies rotation/scale around pivot and skips selected descendants", async () => {
   const B = await import("@babylonjs/core");
@@ -787,6 +810,28 @@ test("normal model import and relink retain bytes, names and missing-resource cl
   assert.deepEqual(new Uint8Array(store.getState().modelBuffers.get(id)), new Uint8Array([4, 5]));
   assert.equal(store.getState().missingModelIds.has(id), false);
 });
+test("one undo restores the filename and binary from before model relinking",async()=>{
+ store.getState().newProject();
+ const file=new File([new Uint8Array([1,2,3])],'old.glb');
+ const id=await modelImport.importModelAsset({id:'asset',name:file.name,path:file.name,type:'model',file},[]);
+ const before=store.getState();
+ await modelImport.relinkModelFile(id,new File([new Uint8Array([4,5])],'new.glb'));
+ assert.equal(store.getState().past.length,before.past.length+1);
+ store.getState().undo();
+ assert.equal(store.getState().nodes.find(n=>n.id===id).modelUrl,'old.glb');
+ assert.deepEqual(new Uint8Array(store.getState().modelBuffers.get(id)),new Uint8Array([1,2,3]));
+ store.getState().redo();
+ assert.equal(store.getState().nodes.find(n=>n.id===id).modelUrl,'new.glb');
+ assert.deepEqual(new Uint8Array(store.getState().modelBuffers.get(id)),new Uint8Array([4,5]));
+});
+test("invalid model filenames are rejected before import or relink changes the document",async()=>{
+ store.getState().newProject();const id=store.getState().addNode('model','existing');
+ const before=store.getState(),file=new File([new Uint8Array([1,2])],'invalid.txt');
+ await assert.rejects(modelImport.importModelAsset({id:'asset',name:file.name,path:file.name,type:'model',file},[]),/模型文件路径/);
+ await assert.rejects(modelImport.relinkModelFile(id,file),/模型文件路径/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+ assert.equal(store.getState().modelBuffers,before.modelBuffers);
+});
 
 test("delayed model relink rejects deleted nodes and playback without writing bytes", async () => {
   for (const playing of [false, true]) {
@@ -868,6 +913,13 @@ test("normal script imports load contents and existing scripts open without rere
   assert.equal(store.getState().scripts[asset.name], "edited");
   assert.equal(store.getState().activeFileId, asset.name);
 });
+test('script import is one complete undo and redo operation',async()=>{
+ store.getState().newProject();const before=store.getState();
+ await scriptImport.importScriptAsset({id:'import',name:'imported.js',path:'imported.js',type:'script',file:new File(['return {onStart(){}};'],'imported.js')});
+ assert.equal(store.getState().past.length,before.past.length+1);
+ store.getState().undo();assert.equal(Object.hasOwn(store.getState().scripts,'imported.js'),false);
+ store.getState().redo();assert.equal(store.getState().scripts['imported.js'],'return {onStart(){}};');
+});
 
 test("script imports finishing after playback starts preserve the editor script snapshot",async()=>{
  store.getState().newProject();let release;
@@ -895,6 +947,25 @@ test("recovery rejects truncated texture binaries before replacing the current d
   } finally {
     await storage.deleteRecovery(id);
   }
+});
+test("recovery rejects present resources with invalid binary types atomically",async()=>{
+ for(const kind of ['model','texture','audio']){
+  store.getState().newProject();let assetId='binary';
+  if(kind==='model')assetId=store.getState().addNode('model','model');
+  else {
+   const asset={id:assetId,name:kind,mime:kind==='texture'?'image/png':'audio/wav',byteLength:3};
+   if(kind==='texture')store.getState().importTexture(asset,new ArrayBuffer(3));
+   else store.getState().importAudio(asset,new ArrayBuffer(3));
+  }
+  const project=recovery.captureEditorProject(store.getState()),id='invalid-recovery-'+crypto.randomUUID();
+  const record={recoveryId:id,project,buffers:new Map(),updatedAt:Date.now()};
+  record[kind==='model'?'buffers':kind==='texture'?'textureBuffers':'audioBuffers']=new Map([[assetId,'broken']]);
+  await storage.saveRecovery(record);store.getState().newProject();const current=store.getState();
+  try {
+   await assert.rejects(recovery.restoreRecovery(id),/资源损坏/);
+   assert.equal(store.getState().documentId,current.documentId);assert.equal(store.getState().nodes,current.nodes);
+  } finally {await storage.deleteRecovery(id);}
+ }
 });
 
 test("stored projects with truncated texture or audio data fail before document replacement", async () => {
@@ -943,4 +1014,607 @@ test("texture file handle reads retain the document identity from the initial cl
   await rejected;
   assert.equal(bytesRead, false);
   assert.equal(store.getState().content.textures.length, 0);
+});
+
+test('relinking glTF with unavailable sidecars preserves the existing model',async()=>{
+ store.getState().newProject();const id=store.getState().addNode('model','existing');
+ store.getState().setModelBuffer(id,new Uint8Array([1,2,3]).buffer);
+ const before=store.getState();
+ const file=new File([JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'missing.bin',byteLength:4}]})],'replacement.gltf');
+ await assert.rejects(modelImport.relinkModelFile(id,file),/缺少关联资源/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().modelBuffers,before.modelBuffers);
+ assert.equal(store.getState().past,before.past);
+});
+
+test('relinking self-contained glTF preserves its embedded model data',async()=>{
+ store.getState().newProject();const id=store.getState().addNode('model','existing');
+ const model={asset:{version:'2.0'},buffers:[{uri:'data:application/octet-stream;base64,AQID',byteLength:3}]};
+ await modelImport.relinkModelFile(id,new File([JSON.stringify(model)],'replacement.gltf'));
+ assert.deepEqual(JSON.parse(new TextDecoder().decode(store.getState().modelBuffers.get(id))),model);
+ assert.equal(store.getState().nodes.find(n=>n.id===id).modelUrl,'replacement.gltf');
+});
+
+test('truncated glTF sidecar buffers fail before model import mutates the scene',async()=>{
+ store.getState().newProject();const before=store.getState();
+ const model={id:'model',name:'scene.gltf',path:'scene.gltf',type:'model',file:new File([JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'mesh.bin',byteLength:4}]})],'scene.gltf')};
+ const bin={path:'mesh.bin',file:new File([new Uint8Array([1,2])],'mesh.bin')};
+ await assert.rejects(modelImport.importModelAsset(model,[model,bin]),/缓冲区.*不足/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().modelBuffers,before.modelBuffers);
+ assert.equal(store.getState().past,before.past);
+});
+
+test('script imports preserve directory paths and distinct same-name modules',async()=>{
+ store.getState().newProject();
+ for(const dir of ['first','second']){
+  await scriptImport.importScriptAsset({id:dir,name:'utils.js',path:dir+'/utils.js',type:'script',file:new File(['export const name="'+dir+'";'],'utils.js')});
+ }
+ assert.equal(store.getState().scripts['first/utils.js'],'export const name="first";');
+ assert.equal(store.getState().scripts['second/utils.js'],'export const name="second";');
+ assert.equal(store.getState().activeFileId,'second/utils.js');
+ await scriptImport.importScriptAsset({id:'entry',name:'entry.js',path:'first/entry.js',type:'script',file:new File(["export {name} from './utils.js';"],'entry.js')});
+ assert.equal(globalThis.ArkGlideModules.resolve('first/entry.js','./utils.js',store.getState().scripts),'first/utils.js');
+ const expected={...store.getState().scripts},zip=archive.createProjectArchive();
+ store.getState().newProject();await archive.importProject(new File([zip],'modules.arkglide'));
+ assert.deepEqual({...store.getState().scripts},expected);
+});
+
+test('glTF local sidecar URI queries do not become part of the mounted filename',async()=>{
+ const model={name:'scene.gltf',path:'models/scene.gltf',file:new File([JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'mesh.bin?v=1#buffer',byteLength:3}]})],'scene.gltf')};
+ const bin={path:'models/mesh.bin',file:new File([new Uint8Array([1,2,3])],'mesh.bin')};
+ const packed=JSON.parse(new TextDecoder().decode(await readModelAsset(model,[model,bin])));
+ assert.equal(packed.buffers[0].uri,'data:application/octet-stream;base64,AQID');
+});
+
+test('encoded URI delimiters remain part of local glTF sidecar filenames',async()=>{
+ const model={name:'scene.gltf',path:'scene.gltf',file:new File([JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'mesh%23v%3F.bin?cache=1',byteLength:3}]})],'scene.gltf')};
+ const bin={path:'mesh#v?.bin',file:new File([new Uint8Array([1,2,3])],'mesh#v?.bin')};
+ const packed=JSON.parse(new TextDecoder().decode(await readModelAsset(model,[model,bin])));
+ assert.equal(packed.buffers[0].uri,'data:application/octet-stream;base64,AQID');
+});
+
+test('script mutations during playback and pause preserve the project and history',()=>{
+ for(const paused of [false,true]){
+  store.getState().newProject();store.getState().createScript('tools.js');store.getState().attachScript('cube','tools.js');
+  store.getState().play();if(paused)store.getState().pause();const before=store.getState();
+  try {
+   for(const mutate of [
+    ()=>store.getState().createScript('late.js'),()=>store.getState().deleteScript('tools.js'),
+    ()=>store.getState().renameScript('tools.js','renamed.js'),()=>store.getState().updateScript('tools.js','changed'),
+    ()=>store.getState().setScript('changed'),()=>store.getState().detachScript('cube','tools.js'),
+    ()=>store.getState().attachScript('cube','main.js'),
+   ])assert.throws(mutate,/停止运行/);
+   assert.equal(store.getState().scripts,before.scripts);assert.equal(store.getState().nodes,before.nodes);
+   assert.equal(store.getState().past,before.past);
+  } finally {store.getState().stop();}
+ }
+});
+
+test('project validation rejects non-string parent references instead of treating them as roots',()=>{
+ store.getState().newProject();
+ for(const parentId of [0,false,{},[]]){
+  const project=recovery.captureEditorProject(store.getState());project.scene.nodes=structuredClone(project.scene.nodes);
+  project.scene.nodes[0].parentId=parentId;
+  assert.throws(()=>validate(project),/父节点/);
+ }
+});
+
+test('deep scene subtree deletion avoids recursive stack overflow and remains undoable',()=>{
+ store.getState().newProject();const sample=store.getState().nodes.find(n=>n.id==='cube');
+ const nodes=Array.from({length:3000},(_,i)=>({...structuredClone(sample),id:'deep-'+i,parentId:i?'deep-'+(i-1):null}));
+ store.setState({nodes,selectedNodeId:'deep-0',selectedNodeIds:['deep-0'],past:[],future:[]});
+ assert.doesNotThrow(()=>store.getState().removeNode('deep-0'));
+ assert.equal(store.getState().nodes.length,0);store.getState().undo();
+ assert.equal(store.getState().nodes.length,3000);assert.equal(store.getState().nodes.at(-1).parentId,'deep-2998');
+});
+
+test('deep scene subtree duplication preserves hierarchy without recursive stack overflow',()=>{
+ store.getState().newProject();const sample=store.getState().nodes.find(n=>n.id==='cube');
+ const nodes=Array.from({length:3000},(_,i)=>({...structuredClone(sample),id:'deep-'+i,parentId:i?'deep-'+(i-1):null}));
+ store.setState({nodes,selectedNodeId:'deep-0',selectedNodeIds:['deep-0'],past:[],future:[]});
+ assert.doesNotThrow(()=>store.getState().duplicateNode('deep-0'));
+ const copies=store.getState().nodes.slice(3000);
+ assert.equal(copies.length,3000);assert.equal(copies[0].parentId,null);
+ for(let i=1;i<copies.length;i++)assert.equal(copies[i].parentId,copies[i-1].id);
+ store.getState().undo();assert.equal(store.getState().nodes.length,3000);
+});
+
+test('late audio file replacement cannot overwrite a newer completed replacement',async()=>{
+ store.getState().newProject();await audioImport.importAudioFile(new File([new Uint8Array([1])],'original.wav'));
+ const id=store.getState().content.audio[0].id;let release;
+ const reading=new Promise(resolve=>{release=resolve;});
+ const old=audioImport.importAudioFile({name:'old.wav',size:1,arrayBuffer:()=>reading},id);
+ const rejected=assert.rejects(old,/替换.*取消/);
+ await audioImport.importAudioFile(new File([new Uint8Array([3])],'latest.wav'),id);
+ release(new Uint8Array([2]).buffer);await rejected;
+ assert.equal(store.getState().content.audio[0].name,'latest.wav');
+ assert.deepEqual(new Uint8Array(store.getState().audioBuffers.get(id)),new Uint8Array([3]));
+});
+
+test('late texture replacement preserves the newest file and closes decoded bitmaps',async()=>{
+ const original=globalThis.createImageBitmap;let closed=0,release;
+ globalThis.createImageBitmap=async()=>({close(){closed++;}});
+ try {
+  store.getState().newProject();const bytes=new Uint8Array([137,80,78,71,1]);
+  const id=await textureImport.importTextureFile(new File([bytes],'original.png'));
+  const reading=new Promise(resolve=>{release=resolve;});
+  const old=textureImport.importTextureFile({name:'old.png',size:5,arrayBuffer:()=>reading},id);
+  const rejected=assert.rejects(old,/替换.*取消/);
+  const latest=new Uint8Array([137,80,78,71,3]);
+  await textureImport.importTextureFile(new File([latest],'latest.png'),id);
+  release(bytes.buffer);await rejected;
+  assert.equal(store.getState().content.textures[0].name,'latest.png');
+  assert.deepEqual(new Uint8Array(store.getState().textureBuffers.get(id)),latest);
+  assert.equal(closed,3);
+ } finally {if(original===undefined)delete globalThis.createImageBitmap;else globalThis.createImageBitmap=original;}
+});
+
+test('late model relinking cannot overwrite a newer completed replacement',async()=>{
+ store.getState().newProject();const id=store.getState().addNode('model','existing');let release;
+ const reading=new Promise(resolve=>{release=resolve;});
+ const old=modelImport.relinkModelFile(id,{name:'old.glb',size:1,arrayBuffer:()=>reading});
+ const rejected=assert.rejects(old,/替换.*取消/);
+ await modelImport.relinkModelFile(id,new File([new Uint8Array([3])],'latest.glb'));
+ release(new Uint8Array([2]).buffer);await rejected;
+ assert.equal(store.getState().nodes.find(n=>n.id===id).modelUrl,'latest.glb');
+ assert.deepEqual(new Uint8Array(store.getState().modelBuffers.get(id)),new Uint8Array([3]));
+});
+
+test('model filenames rejected by persistence are also rejected before import',async()=>{
+ store.getState().newProject();const before=store.getState();
+ const file=new File([new Uint8Array([1])],'revision:one.glb');
+ await assert.rejects(modelImport.importModelAsset({id:'colon',name:file.name,path:file.name,type:'model',file},[]),/模型文件路径/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+});
+
+test('undo and redo retain all currently selected nodes that still exist',()=>{
+ store.getState().newProject();const ids=store.getState().nodes.slice(0,2).map(n=>n.id);
+ store.getState().selectNodes(ids);store.getState().updateSettings({backgroundColor:'#123456'});
+ store.getState().undo();assert.deepEqual(store.getState().selectedNodeIds,ids);
+ assert.equal(store.getState().selectedNodeId,ids[0]);
+ store.getState().redo();assert.deepEqual(store.getState().selectedNodeIds,ids);
+});
+
+test('deleting absent scene nodes preserves undo and redo history',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','renamed');store.getState().undo();
+ const before=store.getState();
+ store.getState().removeNodes([]);store.getState().removeNode('missing');
+ assert.equal(store.getState().past,before.past);assert.equal(store.getState().future,before.future);
+ assert.equal(store.getState().nodes,before.nodes);
+ store.getState().redo();assert.equal(store.getState().nodes.find(n=>n.id==='cube').name,'renamed');
+});
+
+test('unchanged node renames preserve pending redo operations',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState(),name=before.nodes.find(n=>n.id==='cube').name;
+ store.getState().renameNode('cube',name);store.getState().renameNode('missing','unused');
+ assert.equal(store.getState().past,before.past);assert.equal(store.getState().future,before.future);
+ assert.equal(store.getState().nodes,before.nodes);
+ store.getState().redo();assert.equal(store.getState().nodes.find(n=>n.id==='cube').name,'changed');
+});
+
+test('reparenting to the current parent preserves pending redo history',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState(),node=before.nodes.find(n=>n.id==='cube');
+ store.getState().setParent(node.id,node.parentId);
+ assert.equal(store.getState().past,before.past);assert.equal(store.getState().future,before.future);
+ assert.equal(store.getState().nodes,before.nodes);
+ store.getState().redo();assert.equal(store.getState().nodes.find(n=>n.id==='cube').name,'changed');
+});
+
+test('absent script binding operations preserve redo history',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState();
+ store.getState().detachScript('cube','missing.js');store.getState().detachScript('missing','main.js');
+ store.getState().attachScript('missing','main.js');
+ assert.equal(store.getState().past,before.past);assert.equal(store.getState().future,before.future);
+ assert.equal(store.getState().nodes,before.nodes);store.getState().redo();
+ assert.equal(store.getState().nodes.find(n=>n.id==='cube').name,'changed');
+});
+
+test('synchronizing unchanged script contents preserves redo history',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState();store.getState().updateScript(before.activeFileId,before.scripts[before.activeFileId]);
+ assert.equal(store.getState().past,before.past);assert.equal(store.getState().future,before.future);
+ assert.equal(store.getState().scripts,before.scripts);store.getState().redo();
+ assert.equal(store.getState().nodes.find(n=>n.id==='cube').name,'changed');
+});
+
+test('transform updates targeting missing nodes preserve the running camera and history',()=>{
+ store.getState().newProject();const camera=store.getState().nodes.find(n=>n.type==='camera');
+ store.getState().updateTransform(camera.id,{activeCamera:true});
+ store.getState().renameNode('cube','changed');store.getState().undo();const before=store.getState();
+ store.getState().updateTransform('deleted-camera',{activeCamera:true});
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+ assert.equal(store.getState().future,before.future);
+ assert.equal(store.getState().nodes.find(n=>n.id===camera.id).activeCamera,true);
+});
+
+test('camera activation rejects non-camera targets without changing scene or history',()=>{
+ store.getState().newProject();const before=store.getState();
+ assert.throws(()=>store.getState().updateTransform('cube',{activeCamera:true}),/相机/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+});
+
+test('pasting into a missing parent preserves scene and redo history',()=>{
+ store.getState().newProject();store.getState().selectNode('cube');store.getState().copyToClipboard();
+ store.getState().renameNode('cube','changed');store.getState().undo();const before=store.getState();
+ assert.throws(()=>store.getState().pasteFromClipboard('missing-parent'),/父节点/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+ assert.equal(store.getState().future,before.future);
+});
+
+test('duplicating or pasting the running camera preserves its exclusive activation',()=>{
+ for(const paste of [false,true]){
+  store.getState().newProject();const camera=store.getState().nodes.find(n=>n.type==='camera');
+  store.getState().updateTransform(camera.id,{activeCamera:true});
+  if(paste){store.getState().selectNode(camera.id);store.getState().copyToClipboard();store.getState().pasteFromClipboard();}
+  else store.getState().duplicateNode(camera.id);
+  assert.deepEqual(store.getState().nodes.filter(n=>n.type==='camera'&&n.activeCamera).map(n=>n.id),[camera.id]);
+ }
+});
+
+test('instantiating a camera prefab preserves the existing running camera',()=>{
+ store.getState().newProject();const camera=store.getState().nodes.find(n=>n.type==='camera');
+ store.getState().updateTransform(camera.id,{activeCamera:true});
+ const prefab=store.getState().createPrefab(camera.id,'Camera');
+ store.getState().instantiatePrefab(prefab);
+ assert.deepEqual(store.getState().nodes.filter(n=>n.type==='camera'&&n.activeCamera).map(n=>n.id),[camera.id]);
+});
+
+test('unchanged material assignments preserve pending redo history',()=>{
+ store.getState().newProject();const material=store.getState().createMaterial('material');
+ store.getState().setNodeMaterial('cube',material);store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState();store.getState().setNodeMaterial('cube',material);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+ assert.equal(store.getState().future,before.future);
+});
+
+test('material assignment rejects non-renderable nodes before changing history',()=>{
+ store.getState().newProject();const material=store.getState().createMaterial('material'),before=store.getState();
+ const camera=before.nodes.find(n=>n.type==='camera');
+ assert.throws(()=>store.getState().setNodeMaterial(camera.id,material),/网格或模型/);
+ store.getState().setNodeMaterial('missing',material);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+});
+
+test('empty material identifiers are rejected while undefined clears an assignment',()=>{
+ store.getState().newProject();const material=store.getState().createMaterial('material');
+ store.getState().setNodeMaterial('cube',material);const before=store.getState();
+ assert.throws(()=>store.getState().setNodeMaterial('cube',''),/材质不存在/);
+ assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+ store.getState().setNodeMaterial('cube',undefined);
+ assert.equal(store.getState().nodes.find(n=>n.id==='cube').materialId,undefined);
+ validate(recovery.captureEditorProject(store.getState()));
+});
+
+test('unchanged model material slot assignments preserve redo history',()=>{
+ for(const assigned of ['material',null,undefined]){
+  store.getState().newProject();const material=store.getState().createMaterial('material'),id=store.getState().addNode('model','model');
+  const value=assigned==='material'?material:assigned;
+  if(value!==undefined)store.getState().setModelSlotMaterial(id,'mesh:0/slot:0',value);
+  store.getState().renameNode('cube','changed');store.getState().undo();const before=store.getState();
+  store.getState().setModelSlotMaterial(id,'mesh:0/slot:0',value);
+  assert.equal(store.getState().nodes,before.nodes);assert.equal(store.getState().past,before.past);
+  assert.equal(store.getState().future,before.future);
+ }
+});
+
+test('applying unchanged project settings preserves redo history',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState();
+ store.getState().updateSettings(structuredClone(before.settings));store.getState().updateSettings({});
+ assert.equal(store.getState().settings,before.settings);assert.equal(store.getState().past,before.past);
+ assert.equal(store.getState().future,before.future);store.getState().redo();
+ assert.equal(store.getState().nodes.find(n=>n.id==='cube').name,'changed');
+});
+
+test('resetting a camera prefab preserves the scene running camera',()=>{
+ store.getState().newProject();const camera=store.getState().nodes.find(n=>n.type==='camera');
+ const prefab=store.getState().createPrefab(camera.id,'Camera');
+ const root=store.getState().instantiatePrefab(prefab);
+ const instance=Object.values(store.getState().content.prefabInstances).find(i=>i.rootId===root);
+ store.getState().resetPrefabInstance(instance.id);
+ assert.deepEqual(store.getState().nodes.filter(n=>n.type==='camera'&&n.activeCamera).map(n=>n.id),[camera.id]);
+});
+
+test('camera prefab reset and updates retain an explicitly selected instance camera',()=>{
+ const s=()=>store.getState();s().newProject();
+ const camera=s().nodes.find(n=>n.type==='camera');
+ const prefab=s().createPrefab(camera.id,'Camera'),root=s().instantiatePrefab(prefab);
+ const instance=Object.values(s().content.prefabInstances).find(i=>i.rootId===root);
+ s().updateTransform(root,{activeCamera:true});
+ s().resetPrefabInstance(instance.id);
+ const active=()=>s().nodes.filter(n=>n.type==='camera'&&n.activeCamera).map(n=>n.id);
+ assert.deepEqual(active(),[root]);s().undo();assert.deepEqual(active(),[root]);
+ s().redo();assert.deepEqual(active(),[root]);
+ s().updatePrefabFromInstance(instance.id);assert.deepEqual(active(),[root]);
+});
+
+test('unchanged transform and scalar edits preserve redo history',()=>{
+ store.getState().newProject();store.getState().renameNode('cube','changed');store.getState().undo();
+ const before=store.getState(),cube=before.nodes.find(n=>n.id==='cube');
+ for(const patch of [{},{transform:{...cube.transform}},{rotation:{...cube.rotation}},{scale:{...cube.scale}},{visible:cube.visible}]){
+  store.getState().updateTransform('cube',patch);
+  assert.equal(store.getState().nodes,before.nodes);
+  assert.equal(store.getState().past,before.past);assert.equal(store.getState().future,before.future);
+ }
+});
+
+test('unchanged material edits retain redo including cloned UV values',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().createMaterial('Material');
+ s().renameNode('cube','changed');s().undo();const before=s(),material=before.content.materials[id];
+ for(const patch of [{},{roughness:material.roughness},{uvScale:{...material.uvScale}},{...structuredClone(material)}]){
+  s().updateMaterial(id,patch);
+  assert.equal(s().content,before.content);assert.equal(s().past,before.past);assert.equal(s().future,before.future);
+ }
+});
+
+test('material edits own nested UV data independently of caller objects',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().createMaterial('Material'),uvScale={u:2,v:3};
+ s().updateMaterial(id,{uvScale});s().renameNode('cube','changed');
+ uvScale.u=99;
+ assert.deepEqual(s().content.materials[id].uvScale,{u:2,v:3});
+ s().undo();assert.deepEqual(s().content.materials[id].uvScale,{u:2,v:3});
+});
+
+test('transform edits own vector and component data independently of caller objects',()=>{
+ const s=()=>store.getState();s().newProject();
+ const transform={x:2,y:3,z:4},physics={motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false};
+ s().updateTransform('cube',{transform,physics});transform.x=99;physics.size.x=99;
+ const cube=s().nodes.find(n=>n.id==='cube');
+ assert.equal(cube.transform.x,2);assert.equal(cube.physics.size.x,1);
+});
+
+test('project settings own gravity values independently of caller objects',()=>{
+ const s=()=>store.getState();s().newProject();const gravity={x:1,y:-8,z:2};
+ s().updateSettings({gravity});gravity.y=99;
+ assert.equal(s().settings.gravity.y,-8);
+});
+
+test('imported audio and textures own metadata and bytes independently of caller objects',()=>{
+ const s=()=>store.getState();
+ for(const kind of ['audio','texture']){
+  s().newProject();const asset={id:'asset',name:kind==='audio'?'tone.wav':'image.png',mime:kind==='audio'?'audio/wav':'image/png',byteLength:3},bytes=new Uint8Array([1,2,3]);
+  if(kind==='audio')s().importAudio(asset,bytes.buffer);else s().importTexture(asset,bytes.buffer);
+  asset.name='changed';bytes[0]=99;
+  const saved=kind==='audio'?s().content.audio[0]:s().content.textures[0];
+  assert.notEqual(saved.name,'changed');
+  const buffer=(kind==='audio'?s().audioBuffers:s().textureBuffers).get('asset');
+  assert.deepEqual([...new Uint8Array(buffer)],[1,2,3]);
+ }
+});
+
+test('model buffers own imported bytes independently of caller memory',()=>{
+ const s=()=>store.getState();s().newProject();const bytes=new Uint8Array([1,2,3]);
+ s().setModelBuffer('model',bytes.buffer);bytes[0]=99;
+ assert.deepEqual([...new Uint8Array(s().modelBuffers.get('model'))],[1,2,3]);
+});
+
+test('project replacement owns resource maps, missing IDs and binary data',()=>{
+ const s=()=>store.getState();s().newProject();
+ const data={...s(),version:'0.6',projectId:'loaded',name:'Loaded',updatedAt:1,scene:{nodes:s().nodes},modelRefs:[]};
+ const bytes=new Uint8Array([1,2,3]),models=new Map([['model',bytes.buffer]]),textures=new Map([['texture',bytes.buffer]]),audio=new Map([['audio',bytes.buffer]]),missing=new Set(['absent']);
+ s().replaceProject(data,models,missing,false,undefined,textures,audio);
+ models.clear();textures.clear();audio.clear();missing.clear();bytes[0]=99;
+ for(const [map,id] of [[s().modelBuffers,'model'],[s().textureBuffers,'texture'],[s().audioBuffers,'audio']])
+  assert.deepEqual([...new Uint8Array(map.get(id))],[1,2,3]);
+ assert.deepEqual([...s().missingModelIds],['absent']);
+});
+
+test('project replacement rejects detached resources before changing the current document',()=>{
+ const s=()=>store.getState();s().newProject();s().renameNode('cube','Keep');
+ const before=s(),data={...before,version:'0.6',projectId:'loaded',name:'Loaded',updatedAt:1,scene:{nodes:before.nodes},modelRefs:[]};
+ const bytes=new ArrayBuffer(3);structuredClone(bytes,{transfer:[bytes]});
+ assert.throws(()=>s().replaceProject(data,new Map([['model',bytes]]),new Set()));
+ assert.equal(s(),before);
+});
+
+test('playback project and restore snapshot isolate nested scene components and settings',()=>{
+ const s=()=>store.getState();s().newProject();
+ s().updateTransform('cube',{physics:{motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false}});
+ s().play();const runtime=s().project,original=s().nodes.find(n=>n.id==='cube');
+ runtime.scene.nodes.find(n=>n.id==='cube').physics.size.x=99;
+ runtime.settings.gravity.y=99;runtime.scripts['main.js']='changed';
+ assert.equal(original.physics.size.x,1);assert.notEqual(s().settings.gravity.y,99);
+ assert.notEqual(s().scripts['main.js'],'changed');
+ original.physics.size.x=42;s().stop();
+ assert.equal(s().nodes.find(n=>n.id==='cube').physics.size.x,1);
+});
+
+test('model relinking owns its bytes and rejects detached input before history changes',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().addNode('model','Model'),bytes=new Uint8Array([1,2,3]);
+ s().relinkModel(id,bytes.buffer,'model.glb');bytes[0]=99;
+ assert.deepEqual([...new Uint8Array(s().modelBuffers.get(id))],[1,2,3]);
+ const detached=new ArrayBuffer(3);structuredClone(detached,{transfer:[detached]});
+ const before=s();assert.throws(()=>s().relinkModel(id,detached,'other.glb'));
+ assert.equal(s(),before);
+});
+
+test('normalized projects isolate node components and bindings from input documents',()=>{
+ const s=()=>store.getState();s().newProject();
+ s().updateTransform('cube',{physics:{motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false}});
+ const input={...s(),version:'0.6',projectId:'load',name:'Load',updatedAt:1,scene:{nodes:structuredClone(s().nodes)},modelRefs:[]};
+ const normalized=normalize(input);
+ input.scene.nodes[0].physics.size.x=99;input.scene.nodes[0].scripts.push('other.js');
+ assert.equal(normalized.scene.nodes[0].physics.size.x,1);
+ assert.deepEqual(normalized.scene.nodes[0].scripts,['main.js']);
+});
+
+test('deep hierarchy validation reuses ancestor paths and still rejects distant cycles and missing parents',()=>{
+ const nodes=Array.from({length:20000},(_,i)=>({id:String(i),name:'Node',type:'empty',parentId:i?String(i-1):null}));
+ const project={scene:{nodes},scripts:{'main.js':''}};
+ assert.equal(validate(project).nodes.length,nodes.length);
+ nodes.reverse();assert.equal(validate(project).nodes.length,nodes.length);
+ nodes.at(-1).parentId='19999';assert.throws(()=>validate(project),/层级/);
+ nodes.at(-1).parentId='missing';assert.throws(()=>validate(project),/层级/);
+});
+
+test('failed paste of a deleted external joint reference preserves scene and redo history',()=>{
+ const s=()=>store.getState();s().newProject();
+ const physics={motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false};
+ s().updateTransform('sphere',{physics});
+ s().updateTransform('cube',{physics,joints:[{id:'joint',kind:'fixed',targetId:'sphere',anchor:{x:0,y:0,z:0},anchor2:{x:0,y:0,z:0},axis:{x:1,y:0,z:0},min:0,max:0}]});
+ s().selectNode('cube');s().copyToClipboard();s().removeNode('sphere');
+ s().renameNode('cube','changed');s().undo();const before=s();
+ assert.throws(()=>s().pasteFromClipboard(),/关节/);
+ assert.equal(s(),before);
+});
+
+test('copying deep reverse-stored subtrees includes overlapping selections once in source order',()=>{
+ const s=()=>store.getState();s().newProject();const base=s().nodes[0];
+ const chain=Array.from({length:20000},(_,i)=>({...structuredClone(base),id:String(i),parentId:i?String(i-1):null})).reverse();
+ const extra={...structuredClone(base),id:'extra',parentId:null};
+ store.setState({nodes:[extra,...chain],selectedNodeIds:['0','100','extra'],selectedNodeId:'0'});
+ s().copyToClipboard();assert.deepEqual(s().clipboard.map(n=>n.id),['extra',...chain.map(n=>n.id)]);
+ s().clipboard[1].transform.x=99;assert.equal(s().nodes[1].transform.x,base.transform.x);
+});
+
+test('duplicated missing models retain resource warnings through undo and redo',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().addNode('model','Missing');
+ s().updateTransform(id,{modelUrl:'missing.glb'});store.setState({missingModelIds:new Set([id])});
+ s().duplicateNode(id);const copy=s().selectedNodeId;
+ assert.equal(s().modelBuffers.has(copy),false);assert.ok(s().missingModelIds.has(copy));
+ s().undo();assert.deepEqual([...s().missingModelIds],[id]);
+ s().redo();assert.ok(s().missingModelIds.has(copy));
+ s().relinkModel(copy,new Uint8Array([1,2,3]).buffer,'restored.glb');
+ assert.equal(s().missingModelIds.has(copy),false);assert.ok(s().missingModelIds.has(id));
+});
+
+test('creating a prefab accounts for missing template model resources until replacement',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().addNode('model','Missing');
+ s().updateTransform(id,{modelUrl:'missing.glb'});store.setState({missingModelIds:new Set([id])});
+ const prefab=s().createPrefab(id,'Missing template'),key=Object.values(s().content.prefabs[prefab].modelKeys)[0];
+ assert.ok(s().missingModelIds.has(key));assert.ok(s().missingModelIds.has(id));
+ s().undo();assert.deepEqual([...s().missingModelIds],[id]);s().redo();assert.ok(s().missingModelIds.has(key));
+ s().relinkModel(id,new Uint8Array([1,2,3]).buffer,'restored.glb');
+ assert.ok(s().missingModelIds.has(key));
+ const instance=Object.values(s().content.prefabInstances).find(i=>i.rootId===id);
+ s().updatePrefabFromInstance(instance.id);assert.equal(s().missingModelIds.size,0);
+});
+
+test('scene drag ancestry checks handle deep chains, unrelated roots and malformed loops',async()=>{
+ const {isSceneDescendant}=await server.ssrLoadModule('/src/utils/sceneHierarchy.ts');
+ const parents=new Map(Array.from({length:20000},(_,i)=>[String(i),i?String(i-1):null]));
+ assert.equal(isSceneDescendant(parents,'19999','0'),true);
+ assert.equal(isSceneDescendant(parents,'0','19999'),false);
+ assert.equal(isSceneDescendant(parents,'19999','unrelated'),false);
+ assert.equal(isSceneDescendant(parents,'missing','0'),false);
+ parents.set('0','19999');assert.equal(isSceneDescendant(parents,'19999','unrelated'),false);
+});
+
+test('copy with no scene selection preserves the existing clipboard',()=>{
+ const s=()=>store.getState();s().newProject();s().selectNode('cube');s().copyToClipboard();
+ s().clearSelection();const before=s();s().copyToClipboard();
+ assert.equal(s().clipboard,before.clipboard);assert.equal(s().clipboardContent,before.clipboardContent);
+ s().pasteFromClipboard();assert.ok(s().nodes.some(n=>n.name==='Cube_copy'));
+});
+
+test('cleared model catalogs release node entries after model disposal',()=>{
+ const s=()=>store.getState();s().newProject();
+ for(let i=0;i<100;i++){
+  const id=s().addNode('model',`Model ${i}`);
+  s().setModelAnimations(id,['Idle']);s().setModelParts(id,[{key:'mesh:0/slot:0',name:'Body'}]);
+  assert.deepEqual(s().modelAnimations[id],['Idle']);assert.equal(s().modelParts[id].length,1);
+  s().setModelAnimations(id,[]);s().setModelParts(id,[]);
+ }
+ assert.deepEqual(s().modelAnimations,{});assert.deepEqual(s().modelParts,{});
+});
+
+test('late model catalog callbacks do not recreate entries for deleted nodes',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().addNode('model','Model');
+ s().removeNode(id);
+ s().setModelAnimations(id,['Idle']);s().setModelParts(id,[{key:'mesh:0/slot:0',name:'Body'}]);
+ assert.equal(Object.hasOwn(s().modelAnimations,id),false);
+ assert.equal(Object.hasOwn(s().modelParts,id),false);
+});
+
+test('deleting a model subtree immediately clears its catalogs while retaining other models',()=>{
+ const s=()=>store.getState();s().newProject();const root=s().addNode('empty','Root'),child=s().addNode('model','Child'),other=s().addNode('model','Other');
+ s().setParent(child,root);
+ for(const id of [child,other]){s().setModelAnimations(id,['Idle']);s().setModelParts(id,[{key:'mesh:0/slot:0',name:'Body'}]);}
+ s().removeNode(root);
+ assert.equal(Object.hasOwn(s().modelAnimations,child),false);assert.equal(Object.hasOwn(s().modelParts,child),false);
+ assert.deepEqual(s().modelAnimations[other],['Idle']);assert.equal(s().modelParts[other].length,1);
+});
+
+test('relinking a model clears catalogs belonging to its previous binary',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().addNode('model','Model');
+ s().setModelAnimations(id,['Old clip']);s().setModelParts(id,[{key:'mesh:0/slot:0',name:'Old part'}]);
+ s().relinkModel(id,new Uint8Array([1,2,3]).buffer,'replacement.glb');
+ assert.equal(Object.hasOwn(s().modelAnimations,id),false);assert.equal(Object.hasOwn(s().modelParts,id),false);
+});
+
+test('visibility changes for missing nodes preserve pending redo',()=>{
+ const s=()=>store.getState();s().newProject();s().renameNode('cube','Changed');s().undo();
+ const before=s();s().toggleVisibility('deleted');
+ assert.equal(s(),before);
+ s().toggleVisibility('cube');assert.equal(s().nodes.find(n=>n.id==='cube').visible,false);
+ s().undo();assert.equal(s().nodes.find(n=>n.id==='cube').visible,true);
+});
+
+test('deleting absent resources preserves scene history and pending redo',()=>{
+ const s=()=>store.getState();s().newProject();s().renameNode('cube','Changed');s().undo();const before=s();
+ for(const action of ['deleteAudio','deleteTexture','deleteMaterial','deletePrefab']){
+  s()[action]('absent');assert.equal(s(),before,action);
+ }
+});
+
+test('unchanged prefab names preserve pending redo after trimming',()=>{
+ const s=()=>store.getState();s().newProject();const id=s().createPrefab('cube','Template');
+ s().renameNode('sphere','Changed');s().undo();const before=s();
+ s().renamePrefab(id,'  Template  ');assert.equal(s(),before);
+});
+
+test('unchanged advanced and gameplay configurations retain pending redo',()=>{
+ const s=()=>store.getState();s().newProject();s().renameNode('cube','Changed');s().undo();const before=s();
+ s().updateAdvancedContent({});assert.equal(s(),before);
+ s().updateAdvancedContent({mixer:structuredClone(before.content.mixer),physics:structuredClone(before.content.physics)});assert.equal(s(),before);
+ s().updateGameplay(structuredClone(before.content.gameplay));assert.equal(s(),before);
+});
+
+test('configuration comparisons ignore object key order and retain ordered array changes',()=>{
+ const s=()=>store.getState();s().newProject();s().renameNode('cube','Changed');s().undo();const before=s();
+ const physics=before.content.physics;
+ s().updateAdvancedContent({physics:{debug:physics.debug,groups:physics.groups.map(({name,mask})=>({mask,name}))}});
+ assert.equal(s(),before);
+ const gameplay=structuredClone(before.content.gameplay);gameplay.actions.reverse();s().updateGameplay(gameplay);
+ assert.deepEqual(s().content.gameplay.actions,gameplay.actions);assert.equal(s().past.length,before.past.length+1);
+ s().undo();assert.deepEqual(s().content.gameplay.actions,before.content.gameplay.actions);
+});
+
+test('unchanged nested node components preserve pending redo',()=>{
+ const s=()=>store.getState();s().newProject();
+ const physics={motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false};
+ s().updateTransform('cube',{physics});s().renameNode('sphere','Changed');s().undo();const before=s();
+ s().updateTransform('cube',{physics:structuredClone(physics)});assert.equal(s(),before);
+ const changed=structuredClone(physics);changed.size.x=2;s().updateTransform('cube',{physics:changed});
+ assert.equal(s().nodes.find(n=>n.id==='cube').physics.size.x,2);s().undo();assert.equal(s().nodes.find(n=>n.id==='cube').physics.size.x,1);
+});
+
+test('storage saves capture metadata before asynchronous database access',async()=>{
+ store.getState().newProject();const data=recovery.captureEditorProject(store.getState());data.projectId='captured-save';data.name='Original';
+ const pending=storage.saveProjectSnapshot(data,new Map());
+ data.name='Mutated';data.scene.nodes[0].name='Mutated node';
+ await pending;const saved=await storage.loadProject('captured-save');
+ assert.equal(saved.name,'Original');assert.equal(saved.scene.nodes[0].name,'Cube');
+});
+
+test('recovery storage captures metadata and binary resources before awaiting the database',async()=>{
+ store.getState().newProject();const project=structuredClone(recovery.captureEditorProject(store.getState()));project.name='Original recovery';
+ const bytes=new Uint8Array([1,2,3]),record={recoveryId:'captured-recovery',project,buffers:new Map([['model',bytes.buffer]]),updatedAt:Date.now()};
+ const pending=storage.saveRecovery(record);project.name='Mutated';bytes[0]=99;record.buffers.clear();
+ await pending;const saved=await storage.loadRecovery('captured-recovery');
+ assert.equal(saved.project.name,'Original recovery');assert.deepEqual([...new Uint8Array(saved.buffers.get('model'))],[1,2,3]);
+});
+
+test('stale file selection preserves the active script and its derived text',()=>{
+ const s=()=>store.getState();s().newProject();s().createScript('other.js','Other');s().setActiveFile('other.js');
+ s().deleteScript('other.js');const before=s();s().setActiveFile('other.js');assert.equal(s(),before);
+ assert.equal(s().script,s().scripts[s().activeFileId]);
+});
+
+test('late script edits do not resurrect deleted files or consume redo history',()=>{
+ const s=()=>store.getState();s().newProject();s().createScript('old.js','Original');s().deleteScript('old.js');
+ s().renameNode('cube','Changed');s().undo();const before=s();
+ s().updateScript('old.js','Late editor event');assert.equal(s(),before);assert.equal(Object.hasOwn(s().scripts,'old.js'),false);
 });

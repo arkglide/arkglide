@@ -105,6 +105,7 @@ export async function saveProjectSnapshot(
   textures: Map<string, ArrayBuffer> = new Map(),
   audio: Map<string, ArrayBuffer> = new Map(),
 ): Promise<void> {
+  ({ data, buffers, textures, audio } = structuredClone({ data, buffers, textures, audio }));
   const db = await openDatabase();
   const tx = db.transaction(
     ["projects", "models", "textures", "audio"],
@@ -275,6 +276,7 @@ export interface RecoveryRecord extends RecoverySummary {
 const recoveryStore = store("recoveries"),
   recoveryInfoStore = store("recoveryInfo");
 export async function saveRecovery(record: RecoveryRecord): Promise<void> {
+  record = structuredClone(record);
   // A single structured-clone record atomically stores metadata and its model binaries.
   const db = await openDatabase(),
     tx = db.transaction(["recoveries", "recoveryInfo"], "readwrite"),

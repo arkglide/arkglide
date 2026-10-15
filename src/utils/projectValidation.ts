@@ -11,6 +11,20 @@ import { collectModelRefs } from "./contentResources";
 export const PROJECT_VERSION = "0.6";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 
+export function assertScriptPath(name: string): void {
+  if (!name || !name.endsWith(".js") || /[\\\u0000?#:]/.test(name) ||
+      name.startsWith("/") ||
+      name.split("/").some((part) => !part || part === "." || part === ".."))
+    throw new Error("无效脚本文件路径");
+}
+
+export function assertModelPath(name: string): void {
+  if (typeof name !== "string" || !name || !/\.(?:glb|gltf)$/i.test(name) ||
+      name.includes("\\") || name.includes(":") || name.startsWith("/") ||
+      name.split("/").some((part) => !part || part === "." || part === ".."))
+    throw new Error("无效模型文件路径");
+}
+
 export function validateProject(data: any): {
   nodes: SceneNode[];
   scripts: Record<string, string>;
@@ -53,6 +67,8 @@ export function validateProject(data: any): {
     )
       throw new Error("项目中包含无效或重复节点");
     ids.add(n.id);
+    if (n.parentId !== undefined && n.parentId !== null && typeof n.parentId !== "string")
+      throw new Error("无效父节点引用");
     validateComponents(n);
     if (
       n.scripts &&
@@ -60,6 +76,8 @@ export function validateProject(data: any): {
         n.scripts.some((name: unknown) => typeof name !== "string"))
     )
       throw new Error("无效脚本绑定");
+    if (n.type === "model" && n.modelUrl !== undefined)
+      assertModelPath(n.modelUrl);
     if (
       n.primitive &&
       !["box", "sphere", "plane", "cylinder", "capsule", "torus"].includes(
@@ -99,19 +117,22 @@ export function validateProject(data: any): {
   const byId = new Map<string, SceneNode>(
     nodes.map((n: SceneNode) => [n.id, n]),
   );
+  const checked = new Set<string>();
   for (const node of nodes) {
-    const seen = new Set([node.id]);
-    let parent = node.parentId;
-    while (parent) {
-      if (seen.has(parent) || !byId.has(parent))
+    const seen = new Set<string>();
+    let current: string | null | undefined = node.id;
+    while (current && !checked.has(current)) {
+      if (seen.has(current) || !byId.has(current))
         throw new Error("项目层级包含循环或缺失的父节点");
-      seen.add(parent);
-      parent = byId.get(parent)?.parentId;
+      seen.add(current);
+      current = byId.get(current)?.parentId;
     }
+    for (const id of seen) checked.add(id);
   }
   const scripts: Record<string, string> = Object.create(null);
   for (const [name, code] of Object.entries(data.scripts)) {
-    if (!name || typeof code !== "string") throw new Error("无效脚本文件");
+    assertScriptPath(name);
+    if (typeof code !== "string") throw new Error("无效脚本文件内容");
     scripts[name] = code;
   }
   if (!Object.hasOwn(scripts, "main.js")) scripts["main.js"] = "";
@@ -168,6 +189,7 @@ export function normalizeProject(data: any): StoredProject {
       seen.has(ref.assetId) ||
       typeof ref.fileName !== "string" ||
       !ref.fileName ||
+      !/\.(?:glb|gltf)$/i.test(ref.fileName) ||
       ref.fileName.includes("\\") ||
       ref.fileName.startsWith("/") ||
       ref.fileName.includes(":") ||
@@ -187,7 +209,7 @@ export function normalizeProject(data: any): StoredProject {
         : "未命名项目",
     version: PROJECT_VERSION,
     updatedAt: Number.isFinite(data.updatedAt) ? data.updatedAt : Date.now(),
-    scene: { nodes: valid.nodes },
+    scene: { nodes: structuredClone(valid.nodes) },
     scripts: valid.scripts,
     activeFileId: valid.activeFileId,
     modelRefs,

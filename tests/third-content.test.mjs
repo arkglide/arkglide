@@ -8,7 +8,7 @@ let server, store, archive, recovery, normalize;
 before(async () => {
   globalThis.indexedDB = indexedDB;
   server = await createServer({
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
@@ -252,4 +252,18 @@ test("clipboard restores deleted advanced resources and remaps entity references
   assert.ok(s().content.mixer.buses.some((b) => b.id === "Custom"));
   assert.ok(s().content.physics.groups[0].mask & 2);
   assert.equal(node(s().selectedNodeId).physics.group, "Trigger");
+});
+
+test('template deletion clears external animation retarget references and undo restores them',async()=>{
+ await fixture();const group=s().addNode('empty','Actors');s().setParent('Player',group);
+ const prefab=s().createPrefab(group,'Actors'),root=s().instantiatePrefab(prefab);
+ const source=Object.values(s().content.prefabInstances).find(i=>i.rootId===group);
+ const copy=Object.values(s().content.prefabInstances).find(i=>i.rootId===root);
+ const player=s().nodes.find(n=>n.parentId===root&&n.name==='Player');
+ s().updateTransform('Mirror',{animation:{...node('Mirror').animation,retarget:{...node('Mirror').animation.retarget,sourceId:player.id}}});
+ s().removeNode('Player');s().updatePrefabFromInstance(source.id);
+ assert.equal(node('Mirror').animation.retarget,undefined);
+ assert.equal(node(player.id),undefined);
+ s().undo();assert.equal(node('Mirror').animation.retarget.sourceId,player.id);
+ assert.ok(node(copy.rootId));
 });

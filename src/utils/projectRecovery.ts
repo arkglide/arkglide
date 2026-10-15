@@ -309,6 +309,8 @@ export async function restoreRecovery(id: string): Promise<void> {
     missing = new Set<string>();
   for (const ref of project.modelRefs) {
     const b = record.buffers.get(ref.assetId);
+    if (record.buffers.has(ref.assetId) && !(b instanceof ArrayBuffer))
+      throw new Error("恢复记录模型资源损坏: " + ref.fileName);
     if (b instanceof ArrayBuffer) buffers.set(ref.assetId, b);
     else missing.add(ref.assetId);
   }
@@ -320,6 +322,8 @@ export async function restoreRecovery(id: string): Promise<void> {
     throw new Error("恢复记录音频损坏");
   for (const a of project.content?.audio || []) {
     const b = record.audioBuffers?.get(a.id);
+    if (record.audioBuffers?.has(a.id) && !(b instanceof ArrayBuffer))
+      throw new Error("恢复记录音频资源损坏: " + a.name);
     if (b instanceof ArrayBuffer) {
       if (b.byteLength !== a.byteLength)
         throw new Error("恢复记录音频大小不一致");
@@ -334,6 +338,8 @@ export async function restoreRecovery(id: string): Promise<void> {
     throw new Error("恢复记录贴图损坏");
   for (const t of project.content?.textures || []) {
     const b = record.textureBuffers?.get(t.id);
+    if (record.textureBuffers?.has(t.id) && !(b instanceof ArrayBuffer))
+      throw new Error("恢复记录贴图资源损坏: " + t.name);
     if (b instanceof ArrayBuffer) {
       if (b.byteLength !== t.byteLength)
         throw new Error("恢复记录贴图大小不一致: " + t.name);

@@ -1,4 +1,5 @@
 import { useEditorStore, type AssetEntry } from "../store/useEditorStore";
+const replacements = new Map<string, object>();
 export async function importTextureAsset(asset: AssetEntry): Promise<string> {
   const documentId = useEditorStore.getState().documentId;
   const file = asset.fileHandle ? await asset.fileHandle.getFile() : asset.file;
@@ -15,29 +16,37 @@ export async function importTextureFile(
   const documentId = useEditorStore.getState().documentId;
   if (file.size <= 0 || file.size > 64 * 1024 * 1024)
     throw new Error("贴图大小需在 0～64 MiB 之间");
-  const bytes = await file.arrayBuffer(),
-    b = new Uint8Array(bytes);
-  const mime =
-    b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71
-      ? "image/png"
-      : b[0] === 255 && b[1] === 216
-        ? "image/jpeg"
-        : new TextDecoder().decode(b.slice(0, 4)) === "RIFF" &&
-            new TextDecoder().decode(b.slice(8, 12)) === "WEBP"
-          ? "image/webp"
-          : null;
-  if (!mime) throw new Error("请选择 PNG、JPEG 或 WebP 贴图");
-  const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
-  bitmap.close();
-  const state = useEditorStore.getState();
-  if (state.documentId !== documentId)
-    throw new Error("项目已切换，请重新导入贴图");
-  if (replaceId && !state.content.textures.some((t) => t.id === replaceId))
-    throw new Error("要替换的贴图已删除");
-  const id = replaceId || crypto.randomUUID();
-  state.importTexture(
-    { id, name: file.name, mime, byteLength: bytes.byteLength },
-    bytes,
-  );
-  return id;
+  const key = replaceId ? JSON.stringify([documentId, replaceId]) : null, token = {};
+  if (key) replacements.set(key, token);
+  try {
+    const bytes = await file.arrayBuffer(),
+      b = new Uint8Array(bytes);
+    const mime =
+      b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71
+        ? "image/png"
+        : b[0] === 255 && b[1] === 216
+          ? "image/jpeg"
+          : new TextDecoder().decode(b.slice(0, 4)) === "RIFF" &&
+              new TextDecoder().decode(b.slice(8, 12)) === "WEBP"
+            ? "image/webp"
+            : null;
+    if (!mime) throw new Error("请选择 PNG、JPEG 或 WebP 贴图");
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
+    bitmap.close();
+    const state = useEditorStore.getState();
+    if (key && replacements.get(key) !== token)
+      throw new Error("贴图替换已取消：已有更新的替换请求");
+    if (state.documentId !== documentId)
+      throw new Error("项目已切换，请重新导入贴图");
+    if (replaceId && !state.content.textures.some((t) => t.id === replaceId))
+      throw new Error("要替换的贴图已删除");
+    const id = replaceId || crypto.randomUUID();
+    state.importTexture(
+      { id, name: file.name, mime, byteLength: bytes.byteLength },
+      bytes,
+    );
+    return id;
+  } finally {
+    if (key && replacements.get(key) === token) replacements.delete(key);
+  }
 }

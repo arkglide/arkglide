@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { indexedDB } from "fake-indexeddb";
 import { unzipSync, strFromU8, zipSync, strToU8 } from "fflate";
-let server, store, validate, archive;
+let server, store, validate, archive, subtree;
 before(async () => {
   globalThis.indexedDB = indexedDB;
   server = await createServer({
-    server: { middlewareMode: true, hmr: false },
+    server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
@@ -18,6 +18,7 @@ before(async () => {
     "/src/utils/projectValidation.ts",
   ));
   archive = await server.ssrLoadModule("/src/utils/projectExport.ts");
+  ({subtree}=await server.ssrLoadModule('/src/engine/prefabs.ts'));
 });
 after(async () => {
   await server?.close();
@@ -351,4 +352,53 @@ test("applying a scene-only nested child first to the outer template and then th
     ).length,
     1,
   );
+});
+
+test('resetting an enclosing prefab preserves unpacked nested mounts in undo history',()=>{
+ const f=fixture(),grand=s().addNode('empty','Team');
+ s().setParent(f.outerRoot,grand);
+ const template=s().createPrefab(grand),copy=s().instantiatePrefab(template);
+ const soldier=s().nodes.find(n=>n.parentId===copy&&n.name==='Soldier');
+ const weapon=s().nodes.find(n=>n.parentId===soldier.id&&n.name==='Weapon');
+ s().unpackPrefabInstance(inst(weapon.id).id);
+ const before=structuredClone(s().content.prefabInstances),old=s().content.prefabInstances;
+ s().resetPrefabInstance(inst(copy).id);
+ assert.deepEqual(old,before);
+ s().undo();assert.deepEqual(s().content.prefabInstances,before);check();
+});
+
+test('template propagation removes deleted nodes from the current selection',()=>{
+ const f=fixture();s().selectNodes([f.otherPart,f.other]);
+ s().removeNode(f.part);
+ s().updatePrefabFromInstance(inst(f.innerRoot).id);
+ assert.equal(node(f.otherPart),undefined);
+ assert.deepEqual(s().selectedNodeIds,[f.other]);
+ assert.equal(s().selectedNodeId,f.other);
+});
+
+test('template propagation clears selection when every selected node is removed',()=>{
+ const f=fixture();s().selectNode(f.otherPart);s().removeNode(f.part);
+ s().updatePrefabFromInstance(inst(f.innerRoot).id);
+ assert.deepEqual(s().selectedNodeIds,[]);assert.equal(s().selectedNodeId,null);
+ s().undo();check();assert.ok(node(f.otherPart));
+ assert.deepEqual(s().selectedNodeIds,[]);
+});
+
+test('template node deletion clears scene joints targeting removed instance bodies',()=>{
+ const f=fixture(),physics={motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false};
+ s().updateTransform(f.part,{physics});s().updatePrefabFromInstance(inst(f.innerRoot).id);
+ s().updateTransform('cube',{physics,joints:[{id:'joint',kind:'fixed',targetId:f.otherPart,anchor:{x:0,y:0,z:0},anchor2:{x:0,y:0,z:0},axis:{x:1,y:0,z:0},min:0,max:0}]});
+ check();s().removeNode(f.part);
+ assert.doesNotThrow(()=>s().updatePrefabFromInstance(inst(f.innerRoot).id));
+ assert.deepEqual(node('cube').joints,[]);check();
+ s().undo();assert.equal(node('cube').joints[0].targetId,f.otherPart);check();
+});
+
+test('prefab subtree traversal handles deep reverse storage and preserves source order',()=>{
+ const chain=Array.from({length:20000},(_,i)=>({id:String(i),parentId:i?String(i-1):null})).reverse();
+ const nodes=[{id:'unrelated',parentId:null},...chain,{id:'branch',parentId:'5'}];
+ assert.deepEqual(subtree(nodes,'0'),[...chain,nodes.at(-1)]);
+ assert.deepEqual(subtree(nodes,'19999'),[chain[0]]);
+ assert.deepEqual(subtree(nodes,'absent'),[]);
+ assert.deepEqual(subtree([{id:'a',parentId:'b'},{id:'b',parentId:'a'}],'a').map(n=>n.id),['a','b']);
 });

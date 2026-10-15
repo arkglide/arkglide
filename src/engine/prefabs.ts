@@ -5,15 +5,19 @@ const clone = <T>(value: T): T => structuredClone(value);
 const equal = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
 export function subtree(nodes: SceneNode[], rootId: string): SceneNode[] {
-  const ids = new Set([rootId]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const node of nodes)
-      if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
-        ids.add(node.id);
-        changed = true;
-      }
+  const children = new Map<string, string[]>();
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    const siblings = children.get(node.parentId) || [];
+    siblings.push(node.id);
+    children.set(node.parentId, siblings);
+  }
+  const ids = new Set<string>(), pending = [rootId];
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (ids.has(id)) continue;
+    ids.add(id);
+    for (const child of children.get(id) || []) pending.push(child);
   }
   return nodes.filter((n) => ids.has(n.id));
 }
@@ -188,6 +192,7 @@ export function applyPrefab(
       n[key] = ["transform", "rotation", "scale", "materialSlots"].includes(key)
         ? { ...n[key], ...value }
         : value;
+    if (n.type === "camera") n.activeCamera = current?.activeCamera ?? false;
     if (n.materialSlots)
       for (const key of Object.keys(n.materialSlots))
         if (n.materialSlots[key] === undefined) delete n.materialSlots[key];
@@ -226,8 +231,16 @@ export function applyPrefab(
         : n,
     );
   for (const id of Object.keys(map)) if (!nextIds.has(id)) delete map[id];
+  const removedIds = new Set([...inherited].filter((id) => !present.has(id)));
   return {
-    nodes: [...others, ...result],
+    nodes: [...others, ...result].map((node) => ({
+      ...node,
+      joints: node.joints?.filter((joint) => !removedIds.has(joint.targetId)),
+      animation:
+        node.animation?.retarget && removedIds.has(node.animation.retarget.sourceId)
+          ? { ...node.animation, retarget: undefined }
+          : node.animation,
+    })),
     instance: {
       ...instance,
       nodeMap: map,
@@ -305,18 +318,23 @@ export function inferInstanceParents(
 }
 export function assertPrefabGraph(prefabs: Record<string, PrefabAsset>) {
   const done = new Set<string>(),
-    visiting = new Set<string>();
-  function visit(id: string, depth = 0) {
+    visiting = new Set<string>(),
+    heights = new Map<string, number>();
+  function visit(id: string, depth = 0): number {
     if (depth > 64) throw new Error("预制体嵌套超过 64 层");
     if (visiting.has(id)) throw new Error("预制体嵌套依赖包含循环");
-    if (done.has(id)) return;
+    if (done.has(id)) return heights.get(id)!;
     const p = prefabs[id];
     if (!p) throw new Error("嵌套预制体不存在");
     visiting.add(id);
+    let height = 0;
     for (const i of Object.values(p.nestedInstances || {}))
-      visit(i.prefabId, depth + 1);
+      height = Math.max(height, 1 + visit(i.prefabId, depth + 1));
+    if (height > 64) throw new Error("预制体嵌套超过 64 层");
     visiting.delete(id);
     done.add(id);
+    heights.set(id, height);
+    return height;
   }
   Object.keys(prefabs).forEach((id) => visit(id));
 }

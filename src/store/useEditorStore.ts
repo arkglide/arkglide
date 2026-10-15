@@ -35,6 +35,7 @@ import {
 import { collectModelRefs } from "../utils/contentResources";
 import type { ProjectJSON, ProjectSettings } from "../types/project";
 import {
+  assertScriptPath,
   validateProject,
   normalizeProject,
   PROJECT_VERSION,
@@ -364,7 +365,7 @@ export interface EditorState {
   attachScript: (nodeId: string, scriptFile: string) => void; // 给节点挂载脚本
   detachScript: (nodeId: string, scriptFile: string) => void; // 从节点卸载脚本
   // 多脚本 CRUD
-  createScript: (fileName: string) => void; // 新建脚本（避免重名）
+  createScript: (fileName: string, content?: string) => void; // 新建脚本（避免重名）
   deleteScript: (fileName: string) => void; // 删除脚本（不允许删除 main.js）
   renameScript: (oldName: string, newName: string) => void; // 重命名脚本
   updateScript: (fileName: string, content: string) => void; // 更新脚本内容
@@ -386,7 +387,7 @@ export interface EditorState {
   // SceneTree 显示红色警告图标，Inspector 显示重新链接按钮
   missingModelIds: Set<string>;
   // 重新链接模型：用户选择本地文件后，用其 ArrayBuffer 替换丢失的模型
-  relinkModel: (nodeId: string, buffer: ArrayBuffer) => void;
+  relinkModel: (nodeId: string, buffer: ArrayBuffer, fileName?: string) => void;
   // 持久化方法：保存/加载/新建项目
   saveCurrentProject: (name?: string) => Promise<void>;
   loadProjectById: (projectId: string) => Promise<void>;
@@ -474,6 +475,17 @@ type EditorSet = (
 // 深拷贝 SceneNode（含嵌套 transform/rotation/scale/scripts）
 function deepCloneNodes(nodes: SceneNode[]): SceneNode[] {
   return structuredClone(nodes);
+}
+
+function sameConfiguration(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const left = a as Record<string, unknown>, right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) =>
+    Object.hasOwn(right, key) && sameConfiguration(left[key], right[key]),
+  );
 }
 
 // 深拷贝 scripts（Record<string, string>，string 不可变只需浅拷贝对象）
@@ -768,12 +780,20 @@ function restoreClipboardResources(
 export const useEditorStore = create<EditorState>((set, get) => ({
   modelAnimations: {},
   setModelAnimations: (id, names) =>
-    set((s) => ({ modelAnimations: { ...s.modelAnimations, [id]: names } })),
+    set((s) => {
+      const modelAnimations = { ...s.modelAnimations };
+      if (names.length && s.nodes.some((n) => n.id === id && n.type === "model"))
+        modelAnimations[id] = [...names];
+      else delete modelAnimations[id];
+      return { modelAnimations };
+    }),
   importAudio: (asset, bytes) => {
     const s = get();
     assertEditing(s);
     if (bytes.byteLength !== asset.byteLength)
       throw new Error("音频大小不一致");
+    asset = structuredClone(asset);
+    bytes = bytes.slice(0);
     const content = {
       ...s.content,
       audio: [
@@ -791,6 +811,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deleteAudio: (id) => {
     const s = get();
     assertEditing(s);
+    if (!s.content.audio?.some((asset) => asset.id === id)) return;
     const all = [
       ...s.nodes,
       ...Object.values(s.content.prefabs).flatMap((p) => [
@@ -817,6 +838,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     assertEditing(s);
     const content = { ...s.content, ...structuredClone(patch) };
     validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    if (sameConfiguration(content, s.content)) return;
     pushHistory(get, set);
     set({ content });
   },
@@ -825,20 +847,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     assertEditing(s);
     const content = { ...s.content, gameplay: structuredClone(value) };
     validateProject({ ...s, scene: { nodes: s.nodes }, content });
+    if (sameConfiguration(content.gameplay, s.content.gameplay)) return;
     pushHistory(get, set);
     set({ content });
   },
   modelParts: {},
   setModelParts: (id, parts) =>
-    set((s) => ({ modelParts: { ...s.modelParts, [id]: parts } })),
+    set((s) => {
+      const modelParts = { ...s.modelParts };
+      if (parts.length && s.nodes.some((n) => n.id === id && n.type === "model"))
+        modelParts[id] = structuredClone(parts);
+      else delete modelParts[id];
+      return { modelParts };
+    }),
   setModelSlotMaterial: (nodeId, key, materialId) => {
     const s = get();
     assertEditing(s);
     const node = s.nodes.find((n) => n.id === nodeId);
     if (node?.type !== "model" || !/^mesh:\d+\/slot:\d+$/.test(key))
       throw new Error("无效模型材质槽");
-    if (materialId && !s.content.materials[materialId])
+    if (materialId != null && !Object.hasOwn(s.content.materials, materialId))
       throw new Error("材质不存在");
+    if (node.materialSlots?.[key] === materialId) return;
     const slots = { ...node.materialSlots };
     if (materialId === undefined) delete slots[key];
     else slots[key] = materialId;
@@ -913,30 +943,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         playState: "playing",
         // 保存播放前场景快照（深拷贝每个节点含嵌套 transform/rotation/scale）
-        prePlaySnapshot: state.nodes.map((n) => ({
-          ...n,
-          transform: { ...n.transform },
-          rotation: { ...n.rotation },
-          scale: { ...n.scale },
-          scripts: n.scripts ? [...n.scripts] : undefined,
-        })),
+        prePlaySnapshot: deepCloneNodes(state.nodes),
         project: {
           content: structuredClone(state.content),
           version: PROJECT_VERSION,
           scene: {
-            nodes: state.nodes.map((n) => ({
-              ...n,
-              transform: { ...n.transform },
-              rotation: { ...n.rotation },
-              scale: { ...n.scale },
-              scripts: n.scripts ? [...n.scripts] : undefined,
-            })),
+            nodes: deepCloneNodes(state.nodes),
           }, // 深拷贝
           assets: [],
           script: state.script,
-          scripts: state.scripts,
+          scripts: deepCloneScripts(state.scripts),
           activeFileId: state.activeFileId,
-          settings: state.settings,
+          settings: structuredClone(state.settings),
         },
       };
     }),
@@ -986,16 +1004,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 复制选中节点到内部剪贴板（深拷贝 transform/rotation/scale/scripts，不入栈）
   copyToClipboard: () => {
     const state = get();
-    const ids = new Set(state.selectedNodeIds);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      state.nodes.forEach((node) => {
-        if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
-          ids.add(node.id);
-          changed = true;
-        }
-      });
+    const selected = new Set(state.selectedNodeIds);
+    if (!state.nodes.some((node) => selected.has(node.id))) return;
+    const children = new Map<string, string[]>();
+    for (const node of state.nodes) {
+      if (!node.parentId) continue;
+      const siblings = children.get(node.parentId) || [];
+      siblings.push(node.id);
+      children.set(node.parentId, siblings);
+    }
+    const ids = new Set<string>(), pending = [...state.selectedNodeIds];
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (ids.has(id)) continue;
+      ids.add(id);
+      for (const child of children.get(id) || []) pending.push(child);
     }
     set({
       clipboardContent: structuredClone(state.content),
@@ -1010,7 +1033,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pasteFromClipboard: (parentId) => {
     const state = get();
     if (!state.clipboard || state.clipboard.length === 0) return;
-    pushHistory(get, set);
+    if (parentId !== undefined && parentId !== null &&
+        !state.nodes.some((node) => node.id === parentId))
+      throw new Error("粘贴目标父节点不存在");
 
     const newNodes: SceneNode[] = [];
     const idMap = new Map<string, string>(); // 旧ID → 新ID
@@ -1039,6 +1064,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               : null;
       newNodes.push({
         ...remapGameplayReferences(node, idMap),
+        ...(node.type === "camera" ? { activeCamera: false } : {}),
         id: newId,
         name: node.name + "_copy",
         parentId: newParentId,
@@ -1068,6 +1094,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     ]);
     const nodes = [...state.nodes, ...links.nodes];
     validateProject({ ...state, scene: { nodes }, content: restored.content });
+    pushHistory(get, set);
     set({
       content: restored.content,
       nodes,
@@ -1090,22 +1117,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const idMap = new Map<string, string>();
     const timestamp = Date.now().toString(36);
 
-    // 收集节点及其所有子节点（前序遍历，同时为新节点分配新 ID）
-    const collectSubtree = (nodeId: string): SceneNode[] => {
-      const n = state.nodes.find((x) => x.id === nodeId);
-      if (!n) return [];
-      const newId =
-        n.id +
-        "_copy_" +
-        timestamp +
-        "_" +
-        Math.random().toString(36).slice(2, 6);
-      idMap.set(n.id, newId);
-      const children = state.nodes.filter((x) => x.parentId === nodeId);
-      return [n, ...children.flatMap((c) => collectSubtree(c.id))];
-    };
+    const children = new Map<string, SceneNode[]>();
+    for (const item of state.nodes) {
+      if (!item.parentId) continue;
+      const siblings = children.get(item.parentId) || [];
+      siblings.push(item);
+      children.set(item.parentId, siblings);
+    }
+    const subtree: SceneNode[] = [], pending = [node], visited = new Set<string>();
+    while (pending.length) {
+      const current = pending.pop()!;
+      if (visited.has(current.id)) continue;
+      visited.add(current.id);
+      subtree.push(current);
+      idMap.set(current.id, current.id + "_copy_" + timestamp + "_" + Math.random().toString(36).slice(2, 6));
+      const descendants = children.get(current.id) || [];
+      for (let i = descendants.length - 1; i >= 0; i--) pending.push(descendants[i]);
+    }
 
-    const subtree = collectSubtree(id);
     const newNodes: SceneNode[] = subtree.map((n) => {
       const newId = idMap.get(n.id)!;
       const newParentId = n.parentId
@@ -1113,6 +1142,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : n.parentId;
       return {
         ...remapGameplayReferences(n, idMap),
+        ...(n.type === "camera" ? { activeCamera: false } : {}),
         id: newId,
         name: n.name + "_copy",
         // 根节点保持同级（沿用原 parentId），子节点映射到新父 ID
@@ -1129,30 +1159,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       state.content.prefabInstances,
       idMap,
     );
-    set((s) => ({
-      content: {
-        ...s.content,
-        prefabInstances: inferInstanceParents([...s.nodes, ...links.nodes], {
-          ...s.content.prefabInstances,
-          ...links.instances,
-        }),
-      },
-      nodes: [...s.nodes, ...links.nodes],
-      modelBuffers: new Map([
-        ...s.modelBuffers,
-        ...[...idMap].flatMap(([oldId, newId]) => {
-          const buffer = state.modelBuffers.get(oldId);
-          return buffer
-            ? [[newId, buffer.slice(0)] as [string, ArrayBuffer]]
-            : [];
-        }),
-      ]),
+    const nodes = [...state.nodes, ...links.nodes];
+    const content = {
+      ...state.content,
+      prefabInstances: inferInstanceParents(nodes, {
+        ...state.content.prefabInstances,
+        ...links.instances,
+      }),
+    };
+    const buffers = new Map([
+      ...state.modelBuffers,
+      ...[...idMap].flatMap(([oldId, newId]) => {
+        const buffer = state.modelBuffers.get(oldId);
+        return buffer ? [[newId, buffer.slice(0)] as [string, ArrayBuffer]] : [];
+      }),
+    ]);
+    set({
+      content,
+      nodes,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(nodes, content, buffers),
       selectedNodeIds: [newNodes[0].id],
       selectedNodeId: newNodes[0].id,
-    }));
+    });
   },
   // 可见性 toggle（入栈，可撤销）
   toggleVisibility: (id) => {
+    if (!get().nodes.some((node) => node.id === id)) return;
     pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
@@ -1169,12 +1202,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const previous = state.past[state.past.length - 1];
       const currentSnapshot = createSnapshot(state);
       currentSnapshot.scriptChange = previous.scriptChange;
-      // 同步 selectedNodeIds：快照不追踪选择状态，用 [selectedNodeId] 兜底
-      const restoredSelectedId = previous.nodes.some(
-        (n) => n.id === state.selectedNodeId,
-      )
-        ? state.selectedNodeId
-        : null;
+      const availableIds = new Set(previous.nodes.map((node) => node.id));
+      const restoredSelectedIds = state.selectedNodeIds.filter((id) => availableIds.has(id));
+      const restoredSelectedId = restoredSelectedIds[0] || null;
       return {
         ...restoreClipboardScripts(state, previous.scriptChange, true),
         content: previous.content,
@@ -1191,7 +1221,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: state.past.slice(0, -1),
         future: [currentSnapshot, ...state.future],
         selectedNodeId: restoredSelectedId,
-        selectedNodeIds: restoredSelectedId ? [restoredSelectedId] : [],
+        selectedNodeIds: restoredSelectedIds,
       };
     }),
   // 重做：从 future 弹出最近快照恢复，当前状态压入 past
@@ -1201,12 +1231,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const next = state.future[0];
       const currentSnapshot = createSnapshot(state);
       currentSnapshot.scriptChange = next.scriptChange;
-      // 同步 selectedNodeIds：快照不追踪选择状态，用 [selectedNodeId] 兜底
-      const restoredSelectedId = next.nodes.some(
-        (n) => n.id === state.selectedNodeId,
-      )
-        ? state.selectedNodeId
-        : null;
+      const availableIds = new Set(next.nodes.map((node) => node.id));
+      const restoredSelectedIds = state.selectedNodeIds.filter((id) => availableIds.has(id));
+      const restoredSelectedId = restoredSelectedIds[0] || null;
       return {
         ...restoreClipboardScripts(state, next.scriptChange, false),
         content: next.content,
@@ -1222,7 +1249,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [...state.past, currentSnapshot],
         future: state.future.slice(1),
         selectedNodeId: restoredSelectedId,
-        selectedNodeIds: restoredSelectedId ? [restoredSelectedId] : [],
+        selectedNodeIds: restoredSelectedIds,
       };
     }),
   // Gizmo 拖拽开始时调用：保存拖拽前快照到 past
@@ -1231,6 +1258,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     pushHistory(get, set);
   },
   updateTransform: (id, partial, recordHistory = true) => {
+    const target = get().nodes.find((node) => node.id === id);
+    if (!target) return;
+    if (partial.activeCamera === true && target.type !== "camera")
+      throw new Error("运行相机必须引用相机节点");
+    const unchanged = Object.entries(partial).every(([key, value]) => {
+      const current = target[key as keyof SceneNode];
+      if (["physics", "character", "joints", "animation", "audioSource"].includes(key))
+        return sameConfiguration(value, current);
+      if (["transform", "rotation", "scale"].includes(key) && value && current) {
+        const nextVector = value as Transform, currentVector = current as Transform;
+        return ["x", "y", "z"].every((axis) =>
+          Object.is(nextVector[axis as keyof Transform], currentVector[axis as keyof Transform]),
+        );
+      }
+      return Object.is(value, current);
+    });
+    if (unchanged && !(partial.activeCamera === true && get().nodes.some(
+      (node) => node.id !== id && node.type === "camera" && node.activeCamera,
+    ))) return;
+    partial = structuredClone(partial);
     if (
       ["physics", "character", "joints", "animation", "audioSource"].some((k) =>
         Object.hasOwn(partial, k),
@@ -1297,19 +1344,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
     return id;
   },
-  // 级联删除：递归收集所有子节点一并删除
+  // 级联删除：按父子索引收集目标节点及其后代
   removeNode: (id) => get().removeNodes([id]),
   removeNodes: (ids) => {
+    const targets = new Set(ids);
+    if (!get().nodes.some((node) => targets.has(node.id))) return;
     pushHistory(get, set);
     set((state) => {
       const toDelete = new Set<string>();
-      const collect = (nodeId: string) => {
-        toDelete.add(nodeId);
-        state.nodes.forEach((n) => {
-          if (n.parentId === nodeId) collect(n.id);
-        });
-      };
-      ids.forEach(collect);
+      const children = new Map<string, string[]>();
+      for (const node of state.nodes) {
+        if (!node.parentId) continue;
+        const siblings = children.get(node.parentId) || [];
+        siblings.push(node.id);
+        children.set(node.parentId, siblings);
+      }
+      const pending = [...ids];
+      while (pending.length) {
+        const id = pending.pop()!;
+        if (toDelete.has(id)) continue;
+        toDelete.add(id);
+        for (const child of children.get(id) || []) pending.push(child);
+      }
       // 同步多选：从 selectedNodeIds 中移除所有被删节点
       const newSelectedIds = state.selectedNodeIds.filter(
         (sid) => !toDelete.has(sid),
@@ -1340,6 +1396,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         missingModelIds: new Set(
           [...state.missingModelIds].filter((id) => !toDelete.has(id)),
         ),
+        modelAnimations: Object.fromEntries(
+          Object.entries(state.modelAnimations).filter(([id]) => !toDelete.has(id)),
+        ),
+        modelParts: Object.fromEntries(
+          Object.entries(state.modelParts).filter(([id]) => !toDelete.has(id)),
+        ),
         selectedNodeId: newSelectedIds[0] || null,
         selectedNodeIds: newSelectedIds,
       };
@@ -1347,6 +1409,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 重命名节点
   renameNode: (id, name) => {
+    const node = get().nodes.find((item) => item.id === id);
+    if (!node || node.name === name) return;
     pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
@@ -1366,6 +1430,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 设置父节点（拖拽层级）
   setParent: (id, parentId) => {
     const state = get();
+    const node = state.nodes.find((item) => item.id === id);
+    if (!node || (node.parentId ?? null) === (parentId ?? null)) return;
     const moved = Object.values(state.content.prefabInstances).find(
       (i) => i.rootId === id,
     );
@@ -1432,11 +1498,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 给节点挂载脚本（进入历史栈，可撤销）
   attachScript: (nodeId, scriptFile) => {
+    assertEditing(get());
+    const node = get().nodes.find((item) => item.id === nodeId);
     if (
+      !node ||
       !Object.hasOwn(get().scripts, scriptFile) ||
-      get()
-        .nodes.find((n) => n.id === nodeId)
-        ?.scripts?.includes(scriptFile)
+      node.scripts?.includes(scriptFile)
     )
       return;
     pushHistory(get, set);
@@ -1450,6 +1517,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 从节点卸载脚本（进入历史栈，可撤销）
   detachScript: (nodeId, scriptFile) => {
+    assertEditing(get());
+    if (!get().nodes.find((node) => node.id === nodeId)?.scripts?.includes(scriptFile)) return;
     pushHistory(get, set);
     set((state) => ({
       nodes: state.nodes.map((n) =>
@@ -1460,24 +1529,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
   // setScript：向后兼容别名，等价于 updateScript(activeFileId, code)
-  setScript: (code) =>
+  setScript: (code) => {
+    assertEditing(get());
     set((state) => ({
       scripts: { ...state.scripts, [state.activeFileId]: code },
       script: code,
-    })),
+    }));
+  },
   // 新建脚本：避免重名，创建后切换为活跃文件
-  createScript: (fileName) => {
+  createScript: (fileName, content = "") => {
+    assertEditing(get());
     if (!fileName.trim() || Object.hasOwn(get().scripts, fileName)) return;
+    assertScriptPath(fileName);
     pushHistory(get, set);
     set((state) => {
       if (Object.prototype.hasOwnProperty.call(state.scripts, fileName))
         return {}; // 重名则不操作
-      const newScripts = { ...state.scripts, [fileName]: "" };
-      return { scripts: newScripts, activeFileId: fileName, script: "" };
+      const newScripts = { ...state.scripts, [fileName]: content };
+      return { scripts: newScripts, activeFileId: fileName, script: content };
     });
   },
   // 删除脚本：不允许删除 main.js；若删除的是活跃文件则切回 main.js
   deleteScript: (fileName) => {
+    assertEditing(get());
     if (fileName === "main.js" || !Object.hasOwn(get().scripts, fileName))
       return;
     const clipboardBefore = clipboardScriptsSnapshot(get());
@@ -1517,6 +1591,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 重命名脚本：目标名已存在或源名不存在则不操作
   renameScript: (oldName, newName) => {
+    assertEditing(get());
     if (
       oldName === "main.js" ||
       !newName.trim() ||
@@ -1524,6 +1599,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       !Object.hasOwn(get().scripts, oldName)
     )
       return;
+    assertScriptPath(newName);
     const clipboardBefore = clipboardScriptsSnapshot(get());
     pushHistory(get, set);
     set((state) => {
@@ -1570,6 +1646,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 更新脚本内容：仅当更新的是活跃文件时同步派生 script 字段
   updateScript: (fileName, content) => {
+    assertEditing(get());
+    if (!Object.hasOwn(get().scripts, fileName)) return;
+    if (get().scripts[fileName] === content) return;
     pushHistory(get, set);
     set((state) => ({
       scripts: { ...state.scripts, [fileName]: content },
@@ -1577,11 +1656,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
   // 切换当前编辑的脚本：同步派生 script 字段
-  setActiveFile: (fileName) =>
+  setActiveFile: (fileName) => {
+    if (!Object.hasOwn(get().scripts, fileName) || get().activeFileId === fileName) return;
     set((state) => ({
       activeFileId: fileName,
       script: state.scripts[fileName] || "",
-    })),
+    }));
+  },
   addConsoleLog: (level, text, location) =>
     set((state) => ({
       consoleLogs: [
@@ -1595,7 +1676,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setModelBuffer: (id, buffer) =>
     set((state) => {
       const newMap = new Map(state.modelBuffers);
-      newMap.set(id, buffer);
+      newMap.set(id, buffer.slice(0));
       return {
         modelBuffers: newMap,
         missingModelIds: new Set(
@@ -1606,16 +1687,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 资源丢失标记初始为空集
   missingModelIds: new Set(),
   // 重新链接模型：写入 modelBuffers 缓存并从 missingModelIds 移除
-  relinkModel: (nodeId, buffer) => {
+  relinkModel: (nodeId, buffer, fileName) => {
+    buffer = buffer.slice(0);
     pushHistory(get, set);
     set((state) => {
       const newMap = new Map(state.modelBuffers);
       newMap.set(nodeId, buffer);
       const newMissing = new Set(state.missingModelIds);
       newMissing.delete(nodeId);
+      const modelAnimations = { ...state.modelAnimations };
+      const modelParts = { ...state.modelParts };
+      delete modelAnimations[nodeId];
+      delete modelParts[nodeId];
       return {
+        modelAnimations,
+        modelParts,
         nodes: state.nodes.map((n) =>
-          n.id === nodeId ? { ...n, modelRevision: crypto.randomUUID() } : n,
+          n.id === nodeId
+            ? { ...n, ...(fileName === undefined ? {} : { modelUrl: fileName }), modelRevision: crypto.randomUUID() }
+            : n,
         ),
         modelBuffers: newMap,
         missingModelIds: newMissing,
@@ -1743,6 +1833,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   ) => {
     const normalized = normalizeProject(data);
     const valid = validateProject(normalized);
+    ({ buffers, textures, audio, missing } = structuredClone({
+      buffers, textures, audio, missing,
+    }));
     ++projectEpoch;
     set({
       modelAnimations: {},
@@ -1813,6 +1906,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   // 项目设置和场景编辑共用撤销历史。
   updateSettings: (partial) => {
+    const current = get().settings;
+    const unchanged = (Object.keys(partial) as (keyof ProjectSettings)[]).every((key) =>
+      key === "gravity"
+        ? partial.gravity && (["x", "y", "z"] as const).every((axis) =>
+            Object.is(partial.gravity![axis], current.gravity[axis]))
+        : Object.is(partial[key], current[key]),
+    );
+    if (unchanged) return;
+    partial = structuredClone(partial);
     pushHistory(get, set);
     set((state) => ({
       settings: { ...state.settings, ...partial },
@@ -1825,16 +1927,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       modelAnimations: {},
       modelParts: {},
       setModelParts: (id, parts) =>
-        set((s) => ({ modelParts: { ...s.modelParts, [id]: parts } })),
+        set((s) => {
+          const modelParts = { ...s.modelParts };
+          if (parts.length && s.nodes.some((n) => n.id === id && n.type === "model"))
+            modelParts[id] = structuredClone(parts);
+          else delete modelParts[id];
+          return { modelParts };
+        }),
       setModelSlotMaterial: (nodeId, key, materialId) => {
         const s = get();
         assertEditing(s);
         const node = s.nodes.find((n) => n.id === nodeId);
         if (node?.type !== "model" || !/^mesh:\d+\/slot:\d+$/.test(key))
           throw new Error("无效模型材质槽");
-        if (materialId && !s.content.materials[materialId])
+        if (materialId != null && !Object.hasOwn(s.content.materials, materialId))
           throw new Error("材质不存在");
-        const slots = { ...node.materialSlots };
+        if (node.materialSlots?.[key] === materialId) return;
+    const slots = { ...node.materialSlots };
         if (materialId === undefined) delete slots[key];
         else slots[key] = materialId;
         pushHistory(get, set);
@@ -1903,11 +2012,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateMaterial: (id, patch) => {
     const s = get();
     if (s.playState !== "stopped" || !s.content.materials[id]) return;
+    const material = s.content.materials[id];
+    if (Object.entries(patch).every(([key, value]) => {
+      if (key === "id") return true;
+      if (key === "uvScale" && value) {
+        const uv = value as MaterialAsset["uvScale"];
+        return Object.is(uv.u, material.uvScale.u) && Object.is(uv.v, material.uvScale.v);
+      }
+      return Object.is(value, material[key as keyof MaterialAsset]);
+    })) return;
     const content = {
       ...s.content,
       materials: {
         ...s.content.materials,
-        [id]: { ...s.content.materials[id], ...patch, id },
+        [id]: { ...s.content.materials[id], ...structuredClone(patch), id },
       },
     };
     validateProject({ ...s, scene: { nodes: s.nodes }, content });
@@ -1917,6 +2035,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deleteMaterial: (id) => {
     const s = get();
     assertEditing(s);
+    if (!Object.hasOwn(s.content.materials, id)) return;
     if (
       [
         ...s.nodes,
@@ -1940,8 +2059,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setNodeMaterial: (nodeId, materialId) => {
     const s = get();
     assertEditing(s);
-    if (materialId && !s.content.materials[materialId])
+    const node = s.nodes.find((item) => item.id === nodeId);
+    if (!node) return;
+    if (!["mesh", "model"].includes(node.type)) throw new Error("材质只能分配给网格或模型节点");
+    if (materialId !== undefined && !Object.hasOwn(s.content.materials, materialId))
       throw new Error("材质不存在");
+    if (node.materialId === materialId) return;
     pushHistory(get, set);
     set({
       nodes: s.nodes.map((n) => (n.id === nodeId ? { ...n, materialId } : n)),
@@ -1952,6 +2075,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     assertEditing(s);
     if (asset.byteLength !== bytes.byteLength)
       throw new Error("贴图大小不一致");
+    asset = structuredClone(asset);
+    bytes = bytes.slice(0);
     const content = {
       ...s.content,
       textures: [...s.content.textures.filter((t) => t.id !== asset.id), asset],
@@ -1966,6 +2091,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deleteTexture: (id) => {
     const s = get();
     assertEditing(s);
+    if (!s.content.textures.some((asset) => asset.id === id)) return;
     if (
       Object.values(s.content.materials).some((m) =>
         [
@@ -2026,7 +2152,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     validateProject({ ...s, scene: { nodes: linked.nodes }, content });
     pushHistory(get, set);
-    set({ content, nodes: linked.nodes, modelBuffers: buffers });
+    set({
+      content,
+      nodes: linked.nodes,
+      modelBuffers: buffers,
+      missingModelIds: missingModels(linked.nodes, content, buffers),
+    });
     return id;
   },
   instantiatePrefab: (id) => {
@@ -2036,6 +2167,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!prefab) throw new Error("预制体不存在");
     const created = createInstance(prefab, s.nodes, { x: 0, y: 0.5, z: 0 }),
       buffers = new Map(s.modelBuffers);
+    for (const node of created.nodes)
+      if (node.type === "camera") node.activeCamera = false;
     for (const n of prefab.nodes)
       if (n.type === "model") {
         const b = buffers.get(prefab.modelKeys[n.id]);
@@ -2155,11 +2288,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     validateProject({ ...s, scene: { nodes }, content });
     pruneModels(nodes, content, buffers);
     pushHistory(get, set);
+    const availableIds = new Set(nodes.map((n) => n.id));
+    const selectedNodeIds = s.selectedNodeIds.filter((id) => availableIds.has(id));
     set({
       content,
       nodes,
       modelBuffers: buffers,
       missingModelIds: missingModels(nodes, content, buffers),
+      selectedNodeIds,
+      selectedNodeId: selectedNodeIds[0] || null,
     });
   },
   resetPrefabInstance: (instanceId) => {
@@ -2181,9 +2318,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (b) buffers.set(scene, b.slice(0));
       else buffers.delete(scene);
     }
+    const resetIds = new Set(subtree(next.nodes, i.rootId).map((n) => n.id));
     for (const child of Object.values(content.prefabInstances))
-      if (subtree(next.nodes, i.rootId).some((n) => n.id === child.rootId))
-        delete child.unpackedMounts;
+      if (resetIds.has(child.rootId)) {
+        const copy = { ...child };
+        delete copy.unpackedMounts;
+        content.prefabInstances[child.id] = copy;
+      }
     const linked = linkNestedInstances(
       next.nodes,
       content.prefabInstances,
@@ -2194,11 +2335,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     validateProject({ ...s, scene: { nodes: next.nodes }, content });
     pruneModels(next.nodes, content, buffers);
     pushHistory(get, set);
+    const availableIds = new Set(next.nodes.map((n) => n.id));
+    const selectedNodeIds = s.selectedNodeIds.filter((id) => availableIds.has(id));
     set({
       content,
       nodes: next.nodes,
       modelBuffers: buffers,
       missingModelIds: missingModels(next.nodes, content, buffers),
+      selectedNodeIds,
+      selectedNodeId: selectedNodeIds[0] || null,
     });
   },
   unpackPrefabInstance: (instanceId) => {
@@ -2237,6 +2382,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deletePrefab: (id) => {
     const s = get();
     assertEditing(s);
+    if (!Object.hasOwn(s.content.prefabs, id)) return;
     if (Object.values(s.content.prefabInstances).some((i) => i.prefabId === id))
       throw new Error("预制体仍有实例，请先删除实例或解除关联");
     if (
@@ -2260,7 +2406,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   renamePrefab: (id, name) => {
     const s = get();
     assertEditing(s);
-    if (!s.content.prefabs[id] || !name.trim()) return;
+    if (!s.content.prefabs[id] || !name.trim() || s.content.prefabs[id].name === name.trim()) return;
     pushHistory(get, set);
     set({
       content: {

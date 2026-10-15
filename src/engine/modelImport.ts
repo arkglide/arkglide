@@ -23,12 +23,19 @@ export async function readModelAsset(asset: AssetEntry, assets: AssetEntry[]): P
   const gltf = JSON.parse(new TextDecoder().decode(buffer));
   const base = asset.path.slice(0, asset.path.lastIndexOf('/') + 1);
   const entries = [...(gltf.buffers || []), ...(gltf.images || [])];
+  const buffers = new Set(gltf.buffers || []);
   for (const entry of entries) {
     if (!entry.uri || /^data:/i.test(entry.uri)) continue;
-    const path = normalizePath(base + decodeURIComponent(entry.uri));
+    const path = normalizePath(base + decodeURIComponent(entry.uri.split(/[?#]/, 1)[0]));
     const sidecar = assets.find(a => normalizePath(a.path) === path);
     if (!sidecar) throw new Error('glTF 缺少关联资源: ' + path + '，请选择包含资源的文件夹');
     const bytes = new Uint8Array(await read(sidecar));
+    if (buffers.has(entry)) {
+      if (!Number.isInteger(entry.byteLength) || entry.byteLength <= 0)
+        throw new Error('glTF 缓冲区声明大小无效: ' + path);
+      if (bytes.byteLength < entry.byteLength)
+        throw new Error('glTF 缓冲区数据不足: ' + path);
+    }
     let binary = '';
     for (let i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
     entry.uri = 'data:application/octet-stream;base64,' + btoa(binary);
