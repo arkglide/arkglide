@@ -577,3 +577,27 @@ test('input mutations from an owner being destroyed preserve existing action map
   assert.equal(t.ui.stats().inputCaptures,0);
  } finally {t.done();}
 });
+
+test('pointer lock consumes relative motion without dragging, tracks buttons and releases on pause',async()=>{
+ const f=fixture();try{const api=f.ui.inputForOwner(f.owner),changes=[];api.onPointerLockChange(value=>changes.push(value));
+  f.canvas.requestPointerLock=()=>{f.document.pointerLockElement=f.canvas;f.document.emit('pointerlockchange');};
+  f.document.exitPointerLock=()=>{f.document.pointerLockElement=null;f.document.emit('pointerlockchange');};
+  assert.equal(await api.requestPointerLock(),true);assert.equal(api.isPointerLocked(),true);
+  f.canvas.emit('pointermove',{clientX:1,clientY:1,movementX:7,movementY:-3});assert.deepEqual(api.getMouseDelta(),{x:7,y:-3});
+  f.canvas.emit('pointerdown',{button:2,clientX:1,clientY:1});assert.equal(api.wasMouseButtonPressed(2),true);assert.equal(api.isMouseButtonDown(2),true);
+  f.canvas.emit('pointerdown',{button:0,clientX:1,clientY:1});assert.equal(api.isMouseButtonDown(0),true);
+  f.canvas.emit('pointerdown',{pointerId:7,button:1,clientX:1,clientY:1});assert.equal(api.isMouseButtonDown(1),false);
+  f.window.emit('pointerup',{pointerId:7,button:2});assert.equal(api.isMouseButtonDown(2),true);
+  f.window.emit('pointerup',{button:2});assert.equal(api.wasMouseButtonReleased(2),true);f.ui.endFrame();assert.equal(api.wasMouseButtonPressed(2),false);assert.deepEqual(api.getMouseDelta(),{x:0,y:0});
+  assert.equal(api.isMouseButtonDown(0),true);assert.equal(api.isMouseDown(),true);
+  f.canvas.emit('lostpointercapture',{});assert.equal(api.isMouseDown(),false);assert.equal(api.wasMouseButtonReleased(0),true);
+  f.ui.setActive(false);assert.equal(api.isPointerLocked(),false);assert.deepEqual(changes,[true,false]);
+ }finally{f.done();}
+});
+test('denied and late pointer lock grants are canceled without orphaning a destroyed owner',async()=>{
+ const f=fixture();try{const api=f.ui.inputForOwner(f.owner);f.canvas.requestPointerLock=()=>{};f.document.exitPointerLock=()=>{f.document.pointerLockElement=null;f.document.emit('pointerlockchange');};
+  const denied=api.requestPointerLock();f.document.emit('pointerlockerror');assert.equal(await denied,false);
+  const pending=api.requestPointerLock();f.owner.abort();assert.equal(await pending,false);
+  f.document.pointerLockElement=f.canvas;f.document.emit('pointerlockchange');assert.equal(f.document.pointerLockElement,null);
+ }finally{f.done();}
+});

@@ -340,3 +340,45 @@ test('advanced third-batch APIs complete in JavaScript with original source diag
  const {worker,file}=setup({'advanced.js':code});assert.deepEqual(await diagnostics(worker,file('advanced.js')),[]);
  for(const [word,entries] of [['physics.',['raycast','shapeCast','overlap','character','createJoint']],['animation.',['createController','onEvent','retarget']],['audio.',['applySnapshot','setBusVolume']],['ui.',['create']],['input.',['captureBinding','gamepads','rebind']]]){const f=setup({'complete.js':word});const result=await f.worker.getCompletionsAtPosition(f.file('complete.js'),word.length);for(const name of entries)assert.ok(result.entries.some(e=>e.name===name),name);}
 });
+
+test('view, portal and interaction APIs provide typed legacy-script completions',async()=>{
+ for(const [api,member]of [['cameras','createRig'],['portals','watch'],['portals','watchAssembly'],['portals','onBlocked'],['physics','getConnectedBodies'],['interaction','grab']]){
+  const code='return {onStart(){'+api+'.\n}};',{worker,file}=setup({'view.js':code}),result=await worker.getCompletionsAtPosition(file('view.js'),code.indexOf(api+'.')+api.length+1,{});
+  assert.ok(result.entries.some(e=>e.name===member),api+' completion');
+ }
+});
+
+test('the portal lab ES-module factory has no semantic diagnostics with the published ScriptContext',async()=>{const code=fs.readFileSync(new URL('../examples/portal-lab-scripts/main.js',import.meta.url),'utf8'),{worker,file}=setup({'main.js':code});assert.deepEqual(await diagnostics(worker,file('main.js')),[]);});
+
+test('composition services complete in legacy scripts and the actual demo modules have no semantic diagnostics', async () => {
+  for (const [api, member] of [['signals', 'gate'], ['motion', 'create'], ['optics', 'trace']]) {
+    const code = `return {onStart(){${api}. }};`, { worker, file } = setup({ 'legacy.js': code });
+    const result = await worker.getCompletionsAtPosition(file('legacy.js'), code.indexOf(api + '.') + api.length + 1);
+    assert.ok(result.entries.some(entry => entry.name === member));
+  }
+  const sources = Object.fromEntries(['main.js', 'config.js'].map(name => [name,
+    fs.readFileSync(new URL('../examples/composition-lab-scripts/' + name, import.meta.url), 'utf8')]));
+  const { worker, file } = setup(sources);
+  assert.deepEqual(await diagnostics(worker, file('main.js')), []);
+  assert.deepEqual(await diagnostics(worker, file('config.js')), []);
+});
+
+test('foundation globals and ES-module context have complete JS completions and matching signatures',async()=>{
+ for(const [api,member]of [['visuals','createParticles'],['surfaces','covers'],['fields','create'],['triggers','create'],['triggers','setLimits'],['levels','load'],['storage','write'],['saves','register'],['physics','updateShape'],['portals','projectVolume']]){
+  const code=`return {onStart(){${api}. }};`,{worker,file}=setup({'foundations.js':code});const result=await worker.getCompletionsAtPosition(file('foundations.js'),code.indexOf(`${api}.`)+api.length+1);assert.ok(result.entries.some(e=>e.name===member),api+'.'+member);
+ }
+ const code=`export default ({visuals,surfaces,fields,triggers,levels,storage,saves,physics,portals})=>({onStart(){
+  const material=visuals.createMaterial({color:'#ffffff'});
+  const mesh=visuals.createMesh({positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2]},{material});
+  physics.updateShape(mesh.entity,{shape:'box',size:{x:1,y:1,z:1}});
+  fields.create({mode:'acceleration',vector:{x:0,y:1,z:0},volumes:[{shape:{kind:'sphere',radius:1},position:{x:0,y:0,z:0}}]});
+  const trigger=triggers.create({volumes:[{shape:{kind:'sphere',radius:1},position:{x:0,y:0,z:0}}],onEnter:e=>{console.log(e.entity.id,e.phase,e.trigger.contains(e.entity));}});
+  trigger.update({interval:.1,motions:['character'],filter:{sensors:false}});
+  triggers.setLimits({maxTriggers:128});
+  saves.register('plot',{version:1,capture:()=>({chapter:2}),restore:s=>{console.log(s.chapter);}});
+  storage.write('plot',{chapter:2});
+  levels.register('room',{prefabId:'room'});
+  portals.projectVolume({origin:{x:0,y:0,z:0},direction:{x:0,y:0,z:4},profile:[{x:0,y:0},{x:1,y:0},{x:0,y:1}],thickness:.1});
+ }});`;
+ const {worker,file}=setup({'module.js':code});assert.deepEqual(await diagnostics(worker,file('module.js')),[]);
+});

@@ -1,0 +1,742 @@
+{
+  "version": "0.6",
+  "name": "ArkGlide 视角与传送门验收场景",
+  "projectId": "",
+  "scene": {
+    "nodes": [
+      {
+        "id": "Floor",
+        "name": "Floor",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": -0.15,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 24,
+          "y": 0.3,
+          "z": 24
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#B1BBC8",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Front",
+        "name": "Front",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": 3,
+          "z": 10
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 24,
+          "y": 6,
+          "z": 0.3
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#D9E1E8",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Back",
+        "name": "Back",
+        "type": "mesh",
+        "transform": {
+          "x": 0,
+          "y": 3,
+          "z": -10
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 24,
+          "y": 6,
+          "z": 0.3
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#D9E1E8",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Left",
+        "name": "Left",
+        "type": "mesh",
+        "transform": {
+          "x": -12,
+          "y": 3,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.3,
+          "y": 6,
+          "z": 20
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#ABB9CD",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Right",
+        "name": "Right",
+        "type": "mesh",
+        "transform": {
+          "x": 12,
+          "y": 3,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.3,
+          "y": 6,
+          "z": 20
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#BBCDDB",
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "MovingPanel",
+        "name": "MovingPanel",
+        "type": "mesh",
+        "transform": {
+          "x": 4,
+          "y": 2,
+          "z": -2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 4,
+          "y": 4,
+          "z": 0.3
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#7E99B6",
+        "physics": {
+          "motion": "kinematic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Twin1",
+        "name": "Twin1",
+        "type": "mesh",
+        "transform": {
+          "x": 3,
+          "y": 0.4,
+          "z": 4
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.45,
+          "y": 0.45,
+          "z": 0.45
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#B295F7",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Twin2",
+        "name": "Twin2",
+        "type": "mesh",
+        "transform": {
+          "x": 3,
+          "y": 0.4,
+          "z": 3.2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.45,
+          "y": 0.45,
+          "z": 0.45
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#B295F7",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Player",
+        "name": "Player",
+        "type": "empty",
+        "transform": {
+          "x": 0,
+          "y": 2,
+          "z": -6
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "scripts": [
+          "main.js"
+        ],
+        "character": {
+          "radius": 0.3,
+          "height": 1.8,
+          "stepHeight": 0.3,
+          "maxSlope": 45,
+          "speed": 4,
+          "jumpSpeed": 5,
+          "movementMode": "inertial",
+          "groundAcceleration": 40,
+          "airAcceleration": 6,
+          "groundFriction": 8
+        }
+      },
+      {
+        "id": "Crate1",
+        "name": "Crate1",
+        "type": "mesh",
+        "transform": {
+          "x": 1,
+          "y": 0.4,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.7,
+          "y": 0.7,
+          "z": 0.7
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#F1A85F",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Crate2",
+        "name": "Crate2",
+        "type": "mesh",
+        "transform": {
+          "x": -1,
+          "y": 0.4,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.7,
+          "y": 0.7,
+          "z": 0.7
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "box",
+        "color": "#55C8B4",
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.5,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0,
+          "angularDamping": 0
+        }
+      },
+      {
+        "id": "Marker",
+        "name": "Marker",
+        "type": "mesh",
+        "transform": {
+          "x": 7,
+          "y": 2.3,
+          "z": 5
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "scripts": [],
+        "primitive": "sphere",
+        "color": "#CF3E60"
+      },
+      {
+        "id": "Observer",
+        "name": "Observer",
+        "type": "empty",
+        "transform": {
+          "x": -7,
+          "y": 5,
+          "z": -7
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "scripts": []
+      },
+      {
+        "id": "Light",
+        "name": "Light",
+        "type": "light",
+        "transform": {
+          "x": 0,
+          "y": 5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "visible": true,
+        "scripts": [],
+        "lightType": "point",
+        "intensity": 1.4,
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "scripts": {
+    "main.js": "/** @param {ScriptContext} context */\nexport default function ({\n  entity,\n  scene,\n  input,\n  cameras,\n  portals,\n  physics,\n  interaction,\n  events,\n  ui,\n  time,\n}) {\n  let rig,\n    controller,\n    blue,\n    orange,\n    grab = null,\n    mode = 0,\n    traversals = 0;\n  const findRequired = (id) => {\n    const result = scene.find(id);\n    if (!result) throw Error(\"Missing demo entity: \" + id);\n    return result;\n  };\n  const modes = [\"firstPerson\", \"thirdPerson\", \"observer\"];\n  function pair(floor = false) {\n    blue.unlink();\n    blue.place(\n      floor ? { x: 4, y: 5, z: 4 } : { x: 0, y: 1.6, z: 0 },\n      floor ? { x: 0, y: -20, z: 0 } : { x: 0, y: 0, z: 20 },\n    );\n    orange.place({ x: 0, y: 1.6, z: 4 }, { x: 20, y: 0, z: 0 });\n    blue.link(orange);\n  }\n  function reset() {\n    physics.setState(entity, {\n      position: { x: 0, y: 2, z: -6 },\n      velocity: { x: 0, y: 0, z: 0 },\n    });\n    rig.setRotation({ x: 0, y: 0, z: 0, w: 1 });\n  }\n  return {\n    onStart() {\n      controller = physics.character(entity);\n      for (const id of [\"Floor\", \"Front\", \"Back\", \"Left\", \"Right\", \"MovingPanel\"])\n        portals.addSurface(findRequired(id));\n      blue = portals.create({\n        id: \"blue\",\n        width: 2.2,\n        height: 3,\n        color: \"#2377FF\",\n      });\n      orange = portals.create({\n        id: \"orange\",\n        width: 2.2,\n        height: 3,\n        color: \"#FF8423\",\n      });\n      portals.watch(entity);\n      for (const id of [\"Crate1\", \"Crate2\"]) portals.watch(findRequired(id));\n      physics.createJoint(findRequired(\"Twin1\"), findRequired(\"Twin2\"), { kind: \"fixed\" });\n      portals.watchAssembly(findRequired(\"Twin1\"));\n      portals.onBlocked((event) => ui.get(\"status\")?.setText(\"穿越受阻：\" + event.reason));\n      rig = cameras.createRig({\n        id: \"player-view\",\n        target: entity,\n        viewpoint: findRequired(\"Observer\"),\n        mode: \"firstPerson\",\n        fov: 75,\n        near: 0.02,\n        far: 200,\n        sensitivity: 0.002,\n        uprightSpeed: 4,\n        offset: { x: 0, y: 0.7, z: 0 },\n      });\n      pair();\n      const canvas = document.getElementById(\"renderCanvas\");\n      if (!canvas) throw Error(\"Runtime canvas absent\");\n      events.listen(canvas, \"pointerdown\", () => {\n        if (!input.isPointerLocked()) input.requestPointerLock();\n      });\n      input.onPointerLockChange((locked) =>\n        ui\n          .get(\"lock\")\n          ?.setText(locked ? \"鼠标已锁定 · Esc 释放\" : \"点击画面锁定鼠标\"),\n      );\n      portals.onTraverse((event) => {\n        traversals++;\n        ui.get(\"status\")?.setText(\"穿越次数：\" + traversals);\n      });\n      ui.get(\"wallPair\")?.on(\"click\", () => pair(false));\n      ui.get(\"floorPair\")?.on(\"click\", () => pair(true));\n      ui.get(\"movingPair\")?.on(\"click\", () => {\n        blue.unlink();\n        const panel = findRequired(\"MovingPanel\").getWorldPosition();\n        blue.place({ x: panel.x, y: panel.y, z: panel.z - 4 }, { x: 0, y: 0, z: 8 });\n        orange.place({ x: 0, y: 1.6, z: 4 }, { x: 20, y: 0, z: 0 });\n        blue.link(orange);\n      });\n      ui.get(\"assembly\")?.on(\"click\", () => {\n        pair(false);\n        for (const [index, id] of [\"Twin1\", \"Twin2\"].entries()) {\n          physics.setState(findRequired(id), {\n            position: { x: 0, y: 1.6, z: 8.7 - index * 0.8 },\n            rotation: { x: 0, y: 0, z: 0, w: 1 },\n            velocity: { x: 0, y: 0, z: 6 },\n            angularVelocity: { x: 0, y: 0, z: 0 },\n          });\n        }\n      });\n      ui.get(\"launch\")?.on(\"click\", () => {\n        pair(true);\n        physics.setState(entity, {\n          position: { x: 4, y: 12, z: 4 },\n          velocity: { x: 0, y: 0, z: 0 },\n        });\n      });\n      // The verification harness calls these game-owned helpers; engine code has no demo dependency.\n      globalThis.portalDemo = {\n        blue,\n        orange,\n        player: entity,\n        rig,\n        physics,\n        portals,\n        pair,\n        reset,\n        get traversals() {\n          return traversals;\n        },\n      };\n    },\n    onFixedUpdate() {\n      findRequired(\"MovingPanel\").position.y = 2 + Math.sin(time.fixedTotalTime) * 0.6;\n      controller.move(\n        rig.direction(input.getAction(\"moveX\"), input.getAction(\"moveZ\")),\n      );\n      if (input.wasActionPressed(\"jump\")) controller.jump();\n      if (entity.getWorldPosition().y < -20) reset();\n    },\n    onUpdate() {\n      const delta = input.getMouseDelta();\n      if (input.isPointerLocked()) rig.look(delta.x, delta.y);\n      rig.update();\n      const ray = rig.camera.ray(0.5, 0.5, 100);\n      if (input.isPointerLocked()) {\n        if (input.wasMouseButtonPressed(0))\n          blue.place(ray.origin, ray.direction);\n        if (input.wasMouseButtonPressed(2))\n          orange.place(ray.origin, ray.direction);\n      }\n      if (input.wasActionPressed(\"interact\")) {\n        if (grab) {\n          grab.release();\n          grab = null;\n        } else {\n          const trace = portals.raycast(ray.origin, ray.direction, {\n            ignore: [entity],\n            sensors: false,\n          });\n          if (\n            trace.hit &&\n            physics.getState(trace.hit.entity).kind === \"dynamic\"\n          )\n            grab = interaction.grab(trace.hit.entity, {\n              position: trace.hit.point,\n              maxDistance: 15,\n            });\n        }\n      }\n      if (grab?.active) grab.setRay(ray.origin, ray.direction, 2.8);\n      if (input.wasActionPressed(\"camera\")) {\n        mode = (mode + 1) % modes.length;\n        rig.setMode(modes[mode]);\n        ui.get(\"mode\")?.setText(\"视角：\" + modes[mode]);\n      }\n      if (input.wasActionPressed(\"reset\")) reset();\n    },\n    onDestroy() {\n      grab?.release();\n      delete globalThis.portalDemo;\n    },\n  };\n}\n"
+  },
+  "activeFileId": "main.js",
+  "modelRefs": [],
+  "settings": {
+    "gravity": {
+      "x": 0,
+      "y": -9.8,
+      "z": 0
+    },
+    "backgroundColor": "#15202B",
+    "ambientIntensity": 0.65,
+    "ambientColor": "#FFFFFF",
+    "fpsCap": 60,
+    "fixedTimeStep": 0.016666666666666666,
+    "maxSubSteps": 8,
+    "timeScale": 1
+  },
+  "content": {
+    "materials": {},
+    "textures": [],
+    "prefabs": {},
+    "prefabInstances": {},
+    "audio": [],
+    "physics": {
+      "groups": [
+        {
+          "name": "Default",
+          "mask": 1
+        }
+      ],
+      "debug": false
+    },
+    "mixer": {
+      "buses": [
+        {
+          "id": "Master",
+          "name": "Master",
+          "parentId": null,
+          "volume": 1,
+          "mute": false
+        }
+      ],
+      "snapshots": [],
+      "ducking": [],
+      "maxVoices": 32
+    },
+    "animationControllers": {},
+    "retargetProfiles": {},
+    "gameplay": {
+      "captureInput": true,
+      "actions": [
+        {
+          "name": "moveX",
+          "positive": [
+            "KeyD"
+          ],
+          "negative": [
+            "KeyA"
+          ]
+        },
+        {
+          "name": "moveZ",
+          "positive": [
+            "KeyW"
+          ],
+          "negative": [
+            "KeyS"
+          ]
+        },
+        {
+          "name": "jump",
+          "positive": [
+            "Space"
+          ],
+          "negative": []
+        },
+        {
+          "name": "interact",
+          "positive": [
+            "KeyE"
+          ],
+          "negative": []
+        },
+        {
+          "name": "camera",
+          "positive": [
+            "KeyF"
+          ],
+          "negative": []
+        },
+        {
+          "name": "reset",
+          "positive": [
+            "KeyR"
+          ],
+          "negative": []
+        }
+      ],
+      "hud": [
+        {
+          "id": "title",
+          "kind": "text",
+          "text": "ArkGlide · 通用视角 / 传送门实验室",
+          "x": 3,
+          "y": 3,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16
+        },
+        {
+          "id": "hint",
+          "kind": "text",
+          "text": "WASD 移动 · 空格跳跃 · 左/右键放门 · E 拿放物体 · F 切换视角 · R 复位",
+          "x": 3,
+          "y": 8,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16
+        },
+        {
+          "id": "lock",
+          "kind": "text",
+          "text": "点击画面锁定鼠标",
+          "x": 3,
+          "y": 13,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16
+        },
+        {
+          "id": "mode",
+          "kind": "text",
+          "text": "视角：firstPerson",
+          "x": 3,
+          "y": 18,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16
+        },
+        {
+          "id": "status",
+          "kind": "text",
+          "text": "穿越次数：0",
+          "x": 3,
+          "y": 23,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16
+        },
+        {
+          "id": "crosshair",
+          "kind": "text",
+          "text": "+",
+          "x": 50,
+          "y": 50,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 26,
+          "anchorX": 0.5,
+          "anchorY": 0.5
+        },
+        {
+          "id": "wallPair",
+          "kind": "button",
+          "text": "墙面互传",
+          "x": 2,
+          "y": 92,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16,
+          "width": 18,
+          "height": 5
+        },
+        {
+          "id": "floorPair",
+          "kind": "button",
+          "text": "地面 → 墙面",
+          "x": 21,
+          "y": 92,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16,
+          "width": 18,
+          "height": 5
+        },
+        {
+          "id": "launch",
+          "kind": "button",
+          "text": "高处落入门",
+          "x": 40,
+          "y": 92,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16,
+          "width": 18,
+          "height": 5
+        },
+        {
+          "id": "movingPair",
+          "kind": "button",
+          "text": "移动平板门",
+          "x": 59,
+          "y": 92,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16,
+          "width": 18,
+          "height": 5
+        },
+        {
+          "id": "assembly",
+          "kind": "button",
+          "text": "关节组穿越",
+          "x": 78,
+          "y": 92,
+          "color": "#FFFFFF",
+          "background": "#15202B",
+          "fontSize": 16,
+          "width": 18,
+          "height": 5
+        }
+      ]
+    }
+  }
+}

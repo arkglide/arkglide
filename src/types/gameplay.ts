@@ -1,4 +1,6 @@
 export interface PhysicsComponent {
+  linearDamping?: number;
+  angularDamping?: number;
   motion: "static" | "dynamic" | "kinematic";
   shape: "box" | "sphere" | "capsule" | "convex" | "mesh";
   group?: string;

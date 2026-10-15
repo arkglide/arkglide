@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: composition lab connects real grab, plate, reflection, motion, projected bridge/field, saves, death retry and cleanup
+ok 1 - composition lab connects real grab, plate, reflection, motion, projected bridge/field, saves, death retry and cleanup
+  ---
+  duration_ms: 6930.549862
+  type: 'test'
+  ...
+# Subtest: independent opaque-origin runtime renders assets, injects every foundation API, restores saves and retains persistence across restart
+ok 2 - independent opaque-origin runtime renders assets, injects every foundation API, restores saves and retains persistence across restart
+  ---
+  duration_ms: 6392.005325
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7831.137621

@@ -3,6 +3,7 @@
   "use strict";
   function createSession(options = {}) {
     const records = [],
+      scopes = new Set(),
       scheduled = new Map(),
       subscriptions = new Set(),
       nativeListeners = new Set();
@@ -84,7 +85,7 @@
       const index = records.indexOf(record);
       if (index >= 0) records.splice(index, 1);
     }
-    function owner(entity, file) {
+    function owner(entity, file, options = {}) {
       const record = {
         entity,
         file,
@@ -95,7 +96,9 @@
         cleanup: new Set(),
         failed: new Set(),
       };
-      if (record.active) records.push(record);
+      if (record.active) {
+        if (options.scope) scopes.add(record); else records.push(record);
+      }
       const allowed = () =>
         record.active &&
         !record.destroying &&
@@ -245,6 +248,7 @@
           cleanup(record);
           const index = records.indexOf(record);
           if (index >= 0) records.splice(index, 1);
+          scopes.delete(record);
         },
       };
     }
@@ -368,6 +372,8 @@
       active = false;
       // Reverse registration order gives child scripts a chance to release first.
       for (const record of [...records].reverse()) release(record);
+      for (const record of [...scopes].reverse()) release(record);
+      scopes.clear();
       records.length = 0;
       scheduled.clear();
       subscriptions.clear();

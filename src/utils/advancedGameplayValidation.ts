@@ -41,6 +41,15 @@ export function validateAdvancedComponents(n: SceneNode) {
       "三角网格仅支持静态刚体",
     );
   }
+  if (p)
+    check(
+      ["linearDamping", "angularDamping"].every(
+        (k) =>
+          p[k as keyof typeof p] === undefined ||
+          num(p[k as keyof typeof p], 0, 100),
+      ),
+      "无效刚体阻尼",
+    );
   const c = n.character;
   if (c) {
     check(
@@ -54,6 +63,14 @@ export function validateAdvancedComponents(n: SceneNode) {
         num(c.maxSlope, 0, 89) &&
         num(c.speed, 0, 1000) &&
         num(c.jumpSpeed, 0, 1000) &&
+        (c.mass === undefined || num(c.mass, 0.001, 10000)) &&
+        (c.movementMode === undefined ||
+          ["direct", "inertial"].includes(c.movementMode)) &&
+        ["groundAcceleration", "airAcceleration", "groundFriction"].every(
+          (k) =>
+            c[k as keyof typeof c] === undefined ||
+            num(c[k as keyof typeof c], 0, 10000),
+        ) &&
         (c.group === undefined || key(c.group)),
       "无效角色控制器参数",
     );

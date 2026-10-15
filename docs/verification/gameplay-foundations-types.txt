@@ -1,0 +1,4 @@
+node node_modules/typescript/bin/tsc --noEmit --pretty false
+Exit status: 0
+No diagnostics; no emitted files.
+Composition demo Monaco diagnostics: 0 in main.js and config.js.

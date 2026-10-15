@@ -21,6 +21,19 @@
     "audio",
     "ui",
     "animation",
+    "cameras",
+    "portals",
+    "interaction",
+    "visuals",
+    "surfaces",
+    "fields",
+    "levels",
+    "storage",
+    "saves",
+    "triggers",
+    "signals",
+    "motion",
+    "optics",
   ];
   function failure(file, message, node) {
     const error = new Error(message);

@@ -11,6 +11,8 @@
       cacheBytes = 0,
       activeQueries = 0,
       debugEnabled = !!o.config?.debug;
+    let maxConvexQueryVertices = o.config?.maxConvexQueryVertices ?? 256;
+    const movementDefaults = Object.freeze({ groundAcceleration: 40, airAcceleration: 6, groundFriction: 8 });
     const v = (j) => ({ x: j.GetX(), y: j.GetY(), z: j.GetZ() });
     function finite(p) {
       if (!p || ![p.x, p.y, p.z].every(Number.isFinite))
@@ -93,7 +95,13 @@
             J.destroy(p);
           }
           for (let i = 0; i < data.indices.length; i += 3) {
-            const t = new J.IndexedTriangle(...data.indices.slice(i, i + 3), 0);
+            // Babylon LH faces use the opposite winding from Jolt triangle faces.
+            const t = new J.IndexedTriangle(
+              data.indices[i],
+              data.indices[i + 2],
+              data.indices[i + 1],
+              0,
+            );
             settings.mIndexedTriangles.push_back(t);
             J.destroy(t);
           }
@@ -213,6 +221,7 @@
           try {
             hits.push({
               entity,
+              subShape: h.mSubShapeID2.GetValue(),
               fraction,
               distance: length * fraction,
               point,
@@ -234,7 +243,7 @@
         for (const x of [collector, settings, ray, b, a]) J.destroy(x);
       }
     }
-    function queryShape(c) {
+    function primitiveQueryShape(c) {
       if (c.kind === "sphere") {
         if (!Number.isFinite(c.radius) || c.radius <= 0)
           throw Error("无效查询半径");
@@ -263,20 +272,56 @@
         throw Error("无效查询盒体");
       const p = vector({ x: c.size.x / 2, y: c.size.y / 2, z: c.size.z / 2 });
       try {
-        return new J.BoxShape(p, 0.001);
+        return new J.BoxShape(p, Math.min(0.001,c.size.x/4,c.size.y/4,c.size.z/4));
       } finally {
         J.destroy(p);
       }
     }
-    function shapeQuery(kind, c, position, direction, q = {}) {
+    // Returned shapes own one reference; callers must release it once.
+    function queryShape(c) {
+      if (c.kind !== "convex") { const shape = primitiveQueryShape(c); shape.AddRef(); return shape; }
+      if (!Array.isArray(c.points) || c.points.length < 4 || c.points.length > maxConvexQueryVertices) throw Error("Invalid convex query points/budget");
+      c.points.forEach(finite);
+      const settings = new J.ConvexHullShapeSettings(); let result;
+      try {
+        settings.mMaxConvexRadius = 0;
+        for (const p of c.points) { const point=vector(p); settings.mPoints.push_back(point); J.destroy(point); }
+        result=settings.Create(); if(result.HasError())throw Error(result.GetError().c_str());
+        const shape=result.Get(); shape.AddRef(); return shape;
+      } finally { if(result)J.destroy(result);J.destroy(settings); }
+    }
+    function shapeQuery(kind, c, position, direction, q = {}, nativeShape) {
       validateQuery(q);
       if (stopped) throw Error("物理会话已停止");
       finite(position);
       finite(direction);
-      const shape = queryShape(c);
-      shape.AddRef();
+      const shape = nativeShape || queryShape(c);
+      if (nativeShape) shape.AddRef();
+      let queryPosition = position;
+      {
+        // Public queries use the authored shape origin; Jolt needs the COM
+        // transform. Off-center query hulls need this just like body casts.
+        const com = v(shape.GetCenterOfMass()),
+          rotation = q.rotation
+            ? new B.Quaternion(
+                q.rotation.x,
+                q.rotation.y,
+                q.rotation.z,
+                q.rotation.w,
+              )
+            : B.Quaternion.Identity(),
+          offset = B.Vector3.TransformNormal(
+            new B.Vector3(com.x, com.y, com.z),
+            B.Matrix.Compose(B.Vector3.One(), rotation, B.Vector3.Zero()),
+          );
+        queryPosition = {
+          x: position.x + offset.x,
+          y: position.y + offset.y,
+          z: position.z + offset.z,
+        };
+      }
       const scale = new J.Vec3(1, 1, 1),
-        p = vector(position, J.RVec3),
+        p = vector(queryPosition, J.RVec3),
         rot = q.rotation
           ? new J.Quat(q.rotation.x, q.rotation.y, q.rotation.z, q.rotation.w)
           : new J.Quat(0, 0, 0, 1),
@@ -324,6 +369,7 @@
             length = Math.hypot(axis.x, axis.y, axis.z) || 1;
           hits.push({
             entity,
+            subShape: h.mSubShapeID2.GetValue(),
             point: v(h.mContactPointOn2),
             normal: {
               x: -axis.x / length,
@@ -379,6 +425,7 @@
       }
     }
     function character(node) {
+      o.mutate?.();
       if (!node.character || chars.has(node.id)) return;
       if (node.physics) throw Error("角色控制器与刚体不能同时控制同一实体");
       const object = o.getObject(node.id),
@@ -418,6 +465,23 @@
         c.maxSlope >= 90
       )
         throw Error("无效角色配置");
+      if (!["direct", "inertial"].includes(c.movementMode || "direct"))
+        throw Error("Invalid character movement mode");
+      for (const key of [
+        "groundAcceleration",
+        "airAcceleration",
+        "groundFriction",
+      ])
+        if (
+          c[key] !== undefined &&
+          (!Number.isFinite(c[key]) || c[key] < 0 || c[key] > 10000)
+        )
+          throw Error("Invalid character movement coefficient");
+      if (
+        c.mass !== undefined &&
+        (!Number.isFinite(c.mass) || c.mass <= 0 || c.mass > 10000)
+      )
+        throw Error("Invalid character mass");
       group(c.group);
       const shape = new J.CapsuleShape(
         Math.max(0.001, (c.height / 2 - c.radius) * pose.scale.x),
@@ -431,6 +495,7 @@
         plane = new J.Plane(up, -c.radius * pose.scale.x);
       let ch;
       try {
+        if (c.mass !== undefined) cs.mMass = c.mass;
         cs.mShape = shape;
         cs.mInnerBodyShape = shape;
         cs.mInnerBodyLayer = layer({ ...c, motion: "kinematic" });
@@ -467,6 +532,8 @@
         move: { x: 0, y: 0, z: 0 },
         rootMotion: false,
         jump: false,
+        pendingVelocity: null,
+        carry: { x: 0, y: 0, z: 0 },
         last: o.signature(pose),
       });
     }
@@ -475,6 +542,46 @@
       if (stopped || !c || e.destroyed || o.find(e.id) !== e)
         throw Error("角色不存在");
       return c;
+    }
+    function configureCharacter(e, patch = {}, resize = {}) {
+      o.mutate?.();
+      const c = requireCharacter(e), allowed = ["radius", "height", "stepHeight", "maxSlope", "speed", "jumpSpeed", "movementMode", "groundAcceleration", "airAcceleration", "groundFriction", "gravity", "gravityFactor", "mass", "controlEnabled"];
+      if (Object.keys(patch).some(k => !allowed.includes(k))) throw Error("Unknown character property");
+      const next = { ...c.config, ...structuredClone(patch) };
+      for (const k of ["radius", "height", "stepHeight", "maxSlope", "speed", "jumpSpeed", "groundAcceleration", "airAcceleration", "groundFriction", "gravityFactor", "mass"])
+        if (next[k] !== undefined && (!Number.isFinite(next[k]) || next[k] < 0)) throw Error("Invalid character " + k);
+      if (next.radius <= 0 || next.height < next.radius * 2 || next.maxSlope >= 90 || next.mass === 0 || !["direct", "inertial"].includes(next.movementMode || "direct")) throw Error("Invalid character configuration");
+      if (next.controlEnabled !== undefined && typeof next.controlEnabled !== "boolean") throw Error("Invalid character controlEnabled");
+      if (next.gravity) finite(next.gravity);
+      // Permit the existing ground contact's numerical penetration, while
+      // rejecting new obstacles. Callers can override the native tolerance.
+      const tolerance = resize.maxPenetration ?? c.ch.GetCharacterPadding();
+      if (!Number.isFinite(tolerance) || tolerance < 0) throw Error("Invalid resize penetration");
+      if (next.radius !== c.config.radius || next.height !== c.config.height) {
+        const position = v(c.ch.GetPosition()), candidate = { ...position };
+        if (resize.keepFeet !== false) candidate.y += (next.height - c.config.height) * c.scale.x / 2;
+        const shape = queryShape({ kind: "capsule", radius: next.radius * c.scale.x, height: next.height * c.scale.x }),
+          f = filters({ group: next.group || "Default", sensors: false, ignore: [e] }), p = vector(candidate, J.RVec3);
+        try {
+          c.ch.SetPosition(p);
+          if (!c.ch.SetShape(shape, tolerance, ...f.args, world.GetTempAllocator())) {
+            const original = vector(position, J.RVec3);
+            try { c.ch.SetPosition(original); } finally { J.destroy(original); }
+            return false;
+          }
+          c.ch.SetInnerBodyShape(shape);
+          writePosition(c.object, candidate);
+        } finally { J.destroy(p); f.dispose(); shape.Release(); }
+      }
+      c.config = next;
+      c.ch.SetMaxSlopeAngle(next.maxSlope * Math.PI / 180);
+      if (next.mass !== undefined) c.ch.SetMass(next.mass);
+      const step = new J.Vec3(0, next.stepHeight * c.scale.x, 0), floor = new J.Vec3(0, -next.stepHeight * c.scale.x, 0);
+      try { c.ext.mWalkStairsStepUp = step; c.ext.mStickToFloorStepDown = floor; } finally { J.destroy(step); J.destroy(floor); }
+      if (c.wish) c.move = { x: c.wish.x * next.speed, y: 0, z: c.wish.z * next.speed };
+      if (next.controlEnabled === false) { c.move = { x: 0, y: 0, z: 0 }; c.jump = false; }
+      c.last = o.signature(o.worldPose(c.object));
+      return true;
     }
     function beforeStep(dt) {
       contactPoints.length = 0;
@@ -499,17 +606,78 @@
         const old = v(c.ch.GetLinearVelocity()),
           ground = v(c.ch.GetGroundVelocity()),
           grounded = c.ch.GetGroundState() === J.EGroundState_OnGround;
-        const g = o.gravity || { x: 0, y: -9.8, z: 0 };
+        const sourceGravity = c.config.gravity || o.gravity || { x: 0, y: -9.8, z: 0 }, factor = c.config.gravityFactor ?? 1;
+        const g = { x: sourceGravity.x * factor, y: sourceGravity.y * factor, z: sourceGravity.z * factor };
+        let horizontal = { x: c.move.x, z: c.move.z };
+        const pending = c.pendingVelocity;
+        if (c.config.movementMode === "inertial" && !c.rootMotion) {
+          horizontal = { x: pending?.x ?? old.x, z: pending?.z ?? old.z };
+          if (grounded) {
+            const friction = c.config.groundFriction ?? movementDefaults.groundFriction;
+            const factor = Math.max(0, 1 - friction * dt);
+            horizontal.x *= factor;
+            horizontal.z *= factor;
+            const delta = {
+                x: c.move.x - horizontal.x,
+                z: c.move.z - horizontal.z,
+              },
+              length = Math.hypot(delta.x, delta.z),
+              max = (c.config.groundAcceleration ?? movementDefaults.groundAcceleration) * dt;
+            if (length) {
+              const f = Math.min(1, max / length);
+              horizontal.x += delta.x * f;
+              horizontal.z += delta.z * f;
+            }
+          } else {
+            // Acceleration along the wish direction is capped, external momentum is not.
+            const speed = Math.hypot(c.move.x, c.move.z);
+            if (speed) {
+              const x = c.move.x / speed,
+                z = c.move.z / speed,
+                add = Math.max(
+                  0,
+                  Math.min(
+                    speed - horizontal.x * x - horizontal.z * z,
+                    (c.config.airAcceleration ?? movementDefaults.airAcceleration) * dt,
+                  ),
+                );
+              horizontal.x += x * add;
+              horizontal.z += z * add;
+            }
+          }
+        } else if (!c.rootMotion) {
+          if (pending) {
+            c.carry = {
+              x: pending.x - c.move.x,
+              y: 0,
+              z: pending.z - c.move.z,
+            };
+          }
+          if (grounded && !pending) {
+            const f = Math.max(0, 1 - (c.config.groundFriction ?? movementDefaults.groundFriction) * dt);
+            c.carry.x *= f;
+            c.carry.z *= f;
+          }
+          horizontal.x += c.carry.x;
+          horizontal.z += c.carry.z;
+        }
         const velocity = {
-          x: c.move.x + ground.x + g.x * dt,
+          x: horizontal.x + (grounded ? ground.x : 0) + g.x * dt,
           y:
             (c.rootMotion ? c.move.y : 0) +
-            (grounded ? Math.max(0, old.y - ground.y) : old.y) +
+            (pending?.y ?? (grounded ? Math.max(0, old.y - ground.y) : old.y)) +
             g.y * dt,
-          z: c.move.z + ground.z + g.z * dt,
+          z: horizontal.z + (grounded ? ground.z : 0) + g.z * dt,
         };
+        c.pendingVelocity = null;
         if (c.jump && grounded) velocity.y = c.config.jumpSpeed + ground.y;
         else if (grounded) velocity.y += ground.y;
+        const force = c.force || { x: 0, y: 0, z: 0 };
+        for (const k of ["x", "y", "z"]) velocity[k] += force[k] / c.ch.GetMass() * dt;
+        if (c.config.movementMode !== "inertial" && !c.rootMotion) {
+          c.carry.x += force.x / c.ch.GetMass() * dt + g.x * dt;
+          c.carry.z += force.z / c.ch.GetMass() * dt + g.z * dt;
+        }
         c.jump = false;
         const vv = vector(velocity),
           gravity = vector(g),
@@ -538,6 +706,8 @@
       }
     }
     function joint(e, target, c, owner) {
+      o.mutate?.();
+      c = structuredClone(c);
       const a = bodies.get(e?.id),
         b = bodies.get(target?.id);
       if (!a || !b || e === target || e.destroyed || target.destroyed)
@@ -565,14 +735,14 @@
         throw Error("铰链角度限制必须在 -π..π");
       if (c.kind === "distance" && (c.min ?? 0) < 0)
         throw Error("距离限制不能为负");
-      if (
-        c.motor &&
-        (!["hinge", "slider"].includes(c.kind) ||
-          !Number.isFinite(c.motor.force) ||
-          c.motor.force < 0 ||
-          !Number.isFinite(c.motor.velocity))
-      )
-        throw Error("无效关节电机");
+      function validateMotor(m) {
+        const mode = m.mode || "velocity";
+        if (!["hinge", "slider"].includes(c.kind) || !["off", "velocity", "position"].includes(mode)) throw Error("Invalid motor mode");
+        if (mode !== "off" && (!Number.isFinite(m.force) || m.force < 0 || !Number.isFinite(mode === "position" ? m.position : m.velocity))) throw Error("Invalid motor target/force");
+        for (const k of ["frequency", "damping"]) if (m[k] !== undefined && (!Number.isFinite(m[k]) || m[k] < 0)) throw Error("Invalid motor spring");
+        return mode;
+      }
+      if (c.motor) validateMotor(c.motor);
       const anchor = c.anchor || v(a.body.GetPosition()),
         anchor2 = c.anchor2 || anchor,
         axis = c.axis || { x: 0, y: 1, z: 0 };
@@ -615,12 +785,7 @@
           settings.mMinDistance = c.min ?? 0;
           settings.mMaxDistance = c.max ?? 1;
         }
-        if (
-          c.motor &&
-          ![c.motor.velocity, c.motor.force].every(Number.isFinite)
-        )
-          throw Error("无效关节电机");
-        if (c.motor && (c.kind === "hinge" || c.kind === "slider")) {
+        if (c.motor && (c.motor.mode || "velocity") !== "off") {
           settings.mMotorSettings.mMinForceLimit = -c.motor.force;
           settings.mMotorSettings.mMaxForceLimit = c.motor.force;
           settings.mMotorSettings.mMinTorqueLimit = -c.motor.force;
@@ -638,10 +803,13 @@
             constraint,
             c.kind === "hinge" ? J.HingeConstraint : J.SliderConstraint,
           );
-          cast.SetMotorState(J.EMotorState_Velocity);
-          if (c.kind === "hinge")
-            cast.SetTargetAngularVelocity(c.motor.velocity);
-          else cast.SetTargetVelocity(c.motor.velocity);
+          const mode = c.motor.mode || "velocity";
+          cast.SetMotorState(J["EMotorState_" + mode[0].toUpperCase() + mode.slice(1)]);
+          if (mode === "velocity") cast[c.kind === "hinge" ? "SetTargetAngularVelocity" : "SetTargetVelocity"](c.motor.velocity);
+          if (mode === "position") cast[c.kind === "hinge" ? "SetTargetAngle" : "SetTargetPosition"](c.motor.position);
+          const spring = cast.GetMotorSettings().mSpringSettings;
+          if (c.motor.frequency !== undefined) spring.mFrequency = c.motor.frequency;
+          if (c.motor.damping !== undefined) spring.mDamping = c.motor.damping;
         }
       } catch (error) {
         if (constraint) {
@@ -657,21 +825,58 @@
         untrack;
       function destroy() {
         if (!live) return;
+        o.mutate?.();
         live = false;
         system.RemoveConstraint(constraint);
         constraint.Release();
         joints.delete(id);
         untrack?.();
       }
-      joints.set(id, { a: e.id, b: target.id, destroy });
-      if (owner) untrack = owner.track(destroy);
-      return Object.freeze({
-        id,
-        destroy,
-        get active() {
-          return live;
+      const cast = J.castObject(constraint, { fixed: J.FixedConstraint, hinge: J.HingeConstraint, slider: J.SliderConstraint, distance: J.DistanceConstraint }[c.kind]);
+      function check() {
+        if (!live || stopped || (owner && !owner.record.active)) throw Error("Joint expired");
+      }
+      function setMotor(m) {
+        check(); o.mutate?.();
+        const mode = validateMotor(m), settings = cast.GetMotorSettings();
+        if (mode !== "off") {
+          settings.mMinForceLimit = settings.mMinTorqueLimit = -m.force;
+          settings.mMaxForceLimit = settings.mMaxTorqueLimit = m.force;
+          if (m.frequency !== undefined) settings.mSpringSettings.mFrequency = m.frequency;
+          if (m.damping !== undefined) settings.mSpringSettings.mDamping = m.damping;
+          cast[mode === "position" ? c.kind === "hinge" ? "SetTargetAngle" : "SetTargetPosition" : c.kind === "hinge" ? "SetTargetAngularVelocity" : "SetTargetVelocity"](mode === "position" ? m.position : m.velocity);
+        }
+        cast.SetMotorState(J["EMotorState_" + mode[0].toUpperCase() + mode.slice(1)]);
+        c.motor = structuredClone(m);
+        bi.ActivateBody(a.body.GetID()); bi.ActivateBody(b.body.GetID());
+      }
+      const handle = Object.freeze({
+        id, destroy, setMotor,
+        entities: Object.freeze([e,target]),
+        get active() { return live; },
+        get kind() { return c.kind; },
+        setLimits(min, max) {
+          check(); o.mutate?.();
+          if (c.kind === "fixed" || ![min, max].every(Number.isFinite) || min > max || (c.kind === "hinge" && (min < -Math.PI || max > Math.PI)) || (c.kind === "distance" && min < 0)) throw Error("Invalid joint limits");
+          cast[c.kind === "distance" ? "SetDistance" : "SetLimits"](min, max);
+          c.min = min; c.max = max;
+          bi.ActivateBody(a.body.GetID()); bi.ActivateBody(b.body.GetID());
+        },
+        getState() {
+          check();
+          const current = c.kind === "hinge" ? cast.GetCurrentAngle() : c.kind === "slider" ? cast.GetCurrentPosition() : c.kind === "distance"
+            ? B.Vector3.Distance(B.Vector3.TransformCoordinates(localA, a.object.computeWorldMatrix(true)), B.Vector3.TransformCoordinates(localB, b.object.computeWorldMatrix(true))) : null;
+          return { kind: c.kind, current, min: c.kind === "fixed" ? null : c.kind === "distance" ? cast.GetMinDistance() : cast.GetLimitsMin(),
+            max: c.kind === "fixed" ? null : c.kind === "distance" ? cast.GetMaxDistance() : cast.GetLimitsMax(), motor: c.motor ? structuredClone(c.motor) : { mode: "off" },
+            motorImpulse: ["hinge", "slider"].includes(c.kind) ? cast.GetTotalLambdaMotor() : null };
         },
       });
+      // Capture local anchors once; measured distance follows moving bodies.
+      const localA = B.Vector3.TransformCoordinates(new B.Vector3(anchor.x, anchor.y, anchor.z), B.Matrix.Invert(a.object.computeWorldMatrix(true))),
+        localB = B.Vector3.TransformCoordinates(new B.Vector3(anchor2.x, anchor2.y, anchor2.z), B.Matrix.Invert(b.object.computeWorldMatrix(true)));
+      joints.set(id, { a: e.id, b: target.id, destroy, handle });
+      if (owner) untrack = owner.track(destroy);
+      return handle;
     }
     function attachJoints(nodes) {
       for (const n of nodes)
@@ -692,8 +897,30 @@
               new B.Vector3(c.axis.x, c.axis.y, c.axis.z),
               object.getWorldMatrix(),
             ).normalize();
-          joint(o.find(n.id), target, { ...c, anchor, anchor2, axis });
+          // Babylon vectors keep coordinates behind prototype accessors. The
+          // joint API clones plain options, so cross that boundary as Vec3 data.
+          const plain = vector => ({ x: vector.x, y: vector.y, z: vector.z });
+          joint(o.find(n.id), target, { ...c, anchor: plain(anchor), anchor2: plain(anchor2), axis: plain(axis) });
         }
+    }
+    function connectedBodies(entity) {
+      if (!entity || entity.destroyed || o.find(entity.id) !== entity || !bodies.has(entity.id))
+        throw Error("Connected body query needs a valid rigid body");
+      const ids = new Set([entity.id]);
+      const queue = [entity.id];
+      const adjacency = new Map();
+      for (const joint of joints.values()) {
+        for (const [from, to] of [[joint.a, joint.b], [joint.b, joint.a]]) {
+          if (!adjacency.has(from)) adjacency.set(from, []);
+          adjacency.get(from).push(to);
+        }
+      }
+      for (let i = 0; i < queue.length; i++)
+        for (const next of adjacency.get(queue[i]) || []) {
+          const candidate = o.find(next);
+          if (!ids.has(next) && bodies.has(next) && candidate && !candidate.destroyed) { ids.add(next); queue.push(next); }
+        }
+      return queue.map((id) => o.find(id));
     }
     function remove(id) {
       const c = chars.get(id);
@@ -828,6 +1055,59 @@
         debug.set("__contacts", mesh);
       }
     }
+    function state(e) {
+      const c = requireCharacter(e),
+        p = o.worldPose(c.object);
+      return {
+        kind: "character",
+        group: c.config.group || "Default",
+        sensor: false,
+        mass: c.ch.GetMass(),
+        position: v(c.ch.GetPosition()),
+        rotation: { x: p.rot.x, y: p.rot.y, z: p.rot.z, w: p.rot.w },
+        velocity: { ...(c.pendingVelocity || v(c.ch.GetLinearVelocity())) },
+        angularVelocity: { x: 0, y: 0, z: 0 },
+        radius: c.config.radius * c.scale.x,
+        height: c.config.height * c.scale.x,
+      };
+    }
+    function setState(e, s) {
+      const c = requireCharacter(e);
+      if (s.position) {
+        const p = vector(s.position, J.RVec3);
+        try {
+          c.ch.SetPosition(p);
+          writePosition(c.object, s.position);
+        } finally {
+          J.destroy(p);
+        }
+      }
+      if (s.rotation) {
+        const q = s.rotation;
+        if (
+          ![q.x, q.y, q.z, q.w].every(Number.isFinite) ||
+          Math.abs(Math.hypot(q.x, q.y, q.z, q.w) - 1) > 0.001
+        )
+          throw Error("Expected unit quaternion");
+        const r = new J.Quat(q.x, q.y, q.z, q.w);
+        try {
+          c.ch.SetRotation(r);
+          writePosition(c.object, v(c.ch.GetPosition()), q);
+        } finally {
+          J.destroy(r);
+        }
+      }
+      if (s.velocity) {
+        const p = vector(s.velocity);
+        try {
+          c.ch.SetLinearVelocity(p);
+          c.pendingVelocity = { ...s.velocity };
+        } finally {
+          J.destroy(p);
+        }
+      }
+      c.last = o.signature(o.worldPose(c.object));
+    }
     const ownerAPI = (owner) =>
       Object.freeze({
         raycast: (p, d, q) => {
@@ -842,6 +1122,11 @@
           if (!owner.record.active) throw Error("脚本已销毁");
           return shapeQuery("overlap", s, p, { x: 0, y: 0, z: 0 }, q);
         },
+        setQueryLimits(limits) {
+          if (!owner.record.active) throw Error("脚本已销毁");
+          if (Object.keys(limits).some(k=>k!=="maxConvexVertices") || !Number.isInteger(limits.maxConvexVertices) || limits.maxConvexVertices<4) throw Error("Invalid convex query budget");
+          maxConvexQueryVertices=limits.maxConvexVertices;
+        },
         setDebug(value) {
           if (!owner.record.active) throw Error("脚本已销毁");
           debugEnabled = !!value;
@@ -850,6 +1135,11 @@
         createJoint(e, t, c) {
           if (!owner.record.active) throw Error("脚本已销毁");
           return joint(e, t, c, owner);
+        },
+        getJoints(e) {
+          if (!owner.record.active) throw Error("脚本已销毁");
+          if (e && (!bodies.has(e.id) || o.find(e.id) !== e)) throw Error("Invalid joint endpoint");
+          return [...joints.values()].filter(j => !e || j.a === e.id || j.b === e.id).map(j => j.handle);
         },
         character(e) {
           const c = requireCharacter(e);
@@ -860,18 +1150,52 @@
           return Object.freeze({
             move(direction) {
               guard();
+              o.mutate?.();
               if (c.rootMotion) throw Error("根运动正在控制角色移动");
               finite(direction);
               const length = Math.max(1, Math.hypot(direction.x, direction.z));
+              c.wish = { x: direction.x / length, z: direction.z / length };
               c.move = {
-                x: (direction.x / length) * c.config.speed,
+                x: c.config.controlEnabled === false ? 0 : c.wish.x * c.config.speed,
                 y: 0,
-                z: (direction.z / length) * c.config.speed,
+                z: c.config.controlEnabled === false ? 0 : c.wish.z * c.config.speed,
               };
             },
             jump() {
               guard();
-              c.jump = true;
+              o.mutate?.();
+              c.jump = c.config.controlEnabled !== false;
+            },
+            clearInput() {
+              guard(); o.mutate?.();
+              c.wish = { x: 0, z: 0 }; c.move = { x: 0, y: 0, z: 0 }; c.jump = false;
+            },
+            configure(patch, resize) { guard(); return configureCharacter(e, patch, resize); },
+            getConfig() { guard(); return structuredClone(c.config); },
+            getGround() {
+              guard();
+              if (c.ch.GetGroundState() !== J.EGroundState_OnGround) return null;
+              const id = numbers.get(c.ch.GetGroundBodyID().GetIndexAndSequenceNumber());
+              return { entity: o.find(id) || null, point: v(c.ch.GetGroundPosition()), normal: v(c.ch.GetGroundNormal()), velocity: v(c.ch.GetGroundVelocity()) };
+            },
+            applyForce(value) { guard(); o.mutate?.(); finite(value); const f = c.force ||= { x: 0, y: 0, z: 0 }; for (const k of ["x", "y", "z"]) f[k] += value[k]; },
+            setVelocity(velocity) {
+              guard();
+              o.mutate?.();
+              setState(e, { velocity });
+            },
+            addImpulse(deltaVelocity) {
+              guard();
+              o.mutate?.();
+              finite(deltaVelocity);
+              const old = c.pendingVelocity || v(c.ch.GetLinearVelocity());
+              setState(e, {
+                velocity: {
+                  x: old.x + deltaVelocity.x,
+                  y: old.y + deltaVelocity.y,
+                  z: old.z + deltaVelocity.z,
+                },
+              });
             },
             get grounded() {
               guard();
@@ -887,6 +1211,7 @@
             },
             teleport(position) {
               guard();
+              o.mutate?.();
               const p = vector(position, J.RVec3);
               try {
                 c.ch.SetPosition(p);
@@ -945,12 +1270,54 @@
     }
     return {
       hasCharacter: (id) => chars.has(id),
+      state,
+      setState,
+      castBody(e, position, rotation, direction, filter) {
+        const r = bodies.get(e.id) || chars.get(e.id);
+        if (!r) throw Error("Motion component absent");
+        const shape = (r.body || r.queryBody).GetShape();
+        return shapeQuery(
+          "cast",
+          null,
+          position,
+          direction,
+          { ...filter, rotation, all: true },
+          shape,
+        );
+      },
       applyRootMotion,
       clearRootMotion,
       layer,
       modelShape,
+      modelBounds(object, parts, scale) {
+        const data = geometry(object, parts, scale),
+          min = [Infinity, Infinity, Infinity],
+          max = [-Infinity, -Infinity, -Infinity];
+        data.vertices.forEach((v, i) => {
+          const k = i % 3;
+          min[k] = Math.min(min[k], v);
+          max[k] = Math.max(max[k], v);
+        });
+        return { x: max[0] - min[0], y: max[1] - min[1], z: max[2] - min[2] };
+      },
       character,
+      queryShape,
+      configureCharacter,
+      force(e, value) { const c = requireCharacter(e), f = c.force ||= { x: 0, y: 0, z: 0 }; for (const k of ["x", "y", "z"]) f[k] += value[k]; },
+      clearForces() { for (const c of chars.values()) c.force = null; },
+      warpInput(entity, matrix) {
+        const c = chars.get(entity.id);
+        if (!c) return;
+        const map = value => {
+          const result = B.Vector3.TransformNormal(new B.Vector3(value.x, value.y || 0, value.z), matrix);
+          if (!c.rootMotion) result.y = 0;
+          return { x: result.x, y: result.y, z: result.z };
+        };
+        c.move = map(c.move);
+        if (c.wish) { const wish = map(c.wish); c.wish = { x: wish.x, z: wish.z }; }
+      },
       attachJoints,
+      connectedBodies,
       beforeStep,
       updateDebug,
       contactPoint,

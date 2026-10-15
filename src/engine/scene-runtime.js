@@ -227,6 +227,7 @@
     const nodes = new Map(),
       records = new Map(),
       resources = new Map(),
+      legacyMaterials = new Map(),
       pending = new Map();
     let definitions = [],
       disposed = false;
@@ -335,11 +336,13 @@
       if (node.type === "mesh" && !node.materialId && node.color) {
         materialLibrary.prepareDestroy(object);
         let mat = object.material;
-        if (!mat)
+        if (!mat) {
           object.material = mat = new B.StandardMaterial(
             node.id + ":material",
             scene,
           );
+          legacyMaterials.set(node.id,mat);
+        }
         mat.diffuseColor = B.Color3.FromHexString(node.color);
       }
       materialLibrary.apply(node, object);
@@ -533,6 +536,8 @@
       });
       nodes.clear();
       records.clear();
+      for(const mat of legacyMaterials.values())mat.dispose(false,false);
+      legacyMaterials.clear();
       materialLibrary.clear();
     }
     function dispose() {
@@ -563,7 +568,12 @@
       dispose,
       activeCamera,
       materials: materialLibrary.materials,
-      prepareDestroy: (id) => materialLibrary.prepareDestroy(nodes.get(id)),
+      prepareDestroy: (id) => {
+        materialLibrary.prepareDestroy(nodes.get(id));
+        legacyMaterials.get(id)?.dispose(false,false);
+        legacyMaterials.delete(id);
+        disposeContent(id);
+      },
     };
   }
   root.ArkGlideScene = { createSceneAdapter, primitiveOf };

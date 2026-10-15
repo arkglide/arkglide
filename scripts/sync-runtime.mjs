@@ -15,6 +15,22 @@ copyFileSync(
 );
 
 for (const [source, target] of [
+  ["state-runtime", "state"],
+  ["storage-host", "storage-host"],
+  ["visual-runtime", "visuals"],
+  ["surface-runtime", "surfaces"],
+  ["field-runtime", "fields"],
+  ["trigger-runtime", "triggers"],
+  ["signal-runtime", "signals"],
+  ["motion-runtime", "motion"],
+  ["optics-runtime", "optics"],
+  ["level-runtime", "levels"],
+  ["checkpoint-runtime", "checkpoints"],
+  ["portal-projection", "portal-projection"],
+  ["spatial-runtime", "spatial"],
+  ["camera-runtime", "cameras"],
+  ["portal-runtime", "portals"],
+  ["interaction-runtime", "interaction"],
   ["physics-runtime", "physics"],
   ["physics-advanced", "physics-tools"],
   ["input-ui-runtime", "input-ui"],

@@ -26,9 +26,6 @@ export default defineConfig({
           executablePath,
           args: [
             "--no-sandbox",
-            "--no-zygote",
-            "--single-process",
-            "--in-process-gpu",
             "--use-gl=angle",
             "--use-angle=swiftshader",
             "--enable-unsafe-swiftshader",

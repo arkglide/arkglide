@@ -16,12 +16,7 @@ interface Vec2 {
   y: number;
 }
 type PrimitiveType =
-  | "box"
-  | "sphere"
-  | "plane"
-  | "cylinder"
-  | "capsule"
-  | "torus";
+  "box" | "sphere" | "plane" | "cylinder" | "capsule" | "torus";
 
 /** Engine-independent entity handle. Obtain via this.entity or scene, not new Entity(). */
 interface Entity {
@@ -72,7 +67,7 @@ interface InputAPI {
   /** -1, 0 or 1. Opposite keys cancel each other. */
   getAxis(negativeKey: string, positiveKey: string): number;
   getMousePosition(): Vec2;
-  /** Accumulated movement this frame while a mouse button is held. */
+  /** Accumulated movement this frame: relative under pointer lock, otherwise button dragging. */
   getMouseDelta(): Vec2;
   isMouseDown(): boolean;
   wasMousePressed(): boolean;
@@ -221,6 +216,8 @@ interface PrefabsAPI {
 declare const prefabs: PrefabsAPI;
 
 interface PhysicsOptions {
+  linearDamping?: number;
+  angularDamping?: number;
   motion: "static" | "dynamic" | "kinematic";
   shape: "box" | "sphere" | "capsule" | "convex" | "mesh";
   group?: string;
@@ -233,12 +230,14 @@ interface PhysicsOptions {
   lockRotation: boolean;
 }
 interface ContactEvent {
-  phase: "enter" | "exit";
+  phase: "enter" | "stay" | "exit";
   self: Entity;
   other: Entity;
   sensor: boolean;
 }
 interface PhysicsAPI {
+  /** Fresh list of the native joint-connected island, including the queried body. */
+  getConnectedBodies(entity: Entity): Entity[];
   readonly backend: "jolt-wasm";
   has(entity: Entity): boolean;
   /** Collision dimensions are local units; world scale is applied once. */
@@ -358,7 +357,8 @@ interface PhysicsQueryFilter {
 type PhysicsQueryShape =
   | { kind: "box"; size: Vec3 }
   | { kind: "sphere"; radius: number }
-  | { kind: "capsule"; radius: number; height: number };
+  | { kind: "capsule"; radius: number; height: number }
+  | { kind: "convex"; points: Vec3[] };
 interface PhysicsHit {
   entity: Entity;
   point: Vec3;
@@ -368,6 +368,7 @@ interface PhysicsHit {
   penetration?: number;
 }
 interface CharacterOptions {
+  mass?: number;
   radius: number;
   height: number;
   stepHeight: number;
@@ -377,6 +378,8 @@ interface CharacterOptions {
   group?: string;
 }
 interface CharacterHandle {
+  /** Clears queued movement/jump input; external velocity and impulses remain. */
+  clearInput(): void;
   /** World X/Z direction; magnitude clamped to 1 and multiplied by configured speed. */
   move(direction: Vec3): void;
   jump(): void;
@@ -392,7 +395,7 @@ interface JointOptions {
   axis?: Vec3;
   min?: number;
   max?: number;
-  motor?: { velocity: number; force: number };
+  motor?: JointMotorOptions;
 }
 interface JointHandle {
   readonly id: string;
@@ -551,13 +554,7 @@ interface InputAPI {
   ): Promise<InputBindingResult>;
 }
 type UIKind =
-  | "text"
-  | "button"
-  | "container"
-  | "image"
-  | "richtext"
-  | "input"
-  | "joystick";
+  "text" | "button" | "container" | "image" | "richtext" | "input" | "joystick";
 interface HUDOptions {
   parentId?: string | null;
   width?: number;
@@ -596,3 +593,494 @@ interface HUDHandle {
 interface UIAPI {
   create(options: HUDOptions & { kind: UIKind }): HUDHandle;
 }
+
+/** World-space view, inertial motion and paired apertures (radians except lens FOV). */
+interface WorldPose {
+  position: Vec3;
+  rotation: Quat;
+}
+interface InputAPI {
+  /** Must be invoked by a user gesture; false means unsupported, denied or canceled. */
+  requestPointerLock(): Promise<boolean>;
+  releasePointerLock(): void;
+  isPointerLocked(): boolean;
+  onPointerLockChange(callback: (locked: boolean) => void): () => void;
+  isMouseButtonDown(button?: number): boolean;
+  wasMouseButtonPressed(button?: number): boolean;
+  wasMouseButtonReleased(button?: number): boolean;
+}
+interface CharacterOptions {
+  movementMode?: "direct" | "inertial";
+  groundAcceleration?: number;
+  airAcceleration?: number;
+  groundFriction?: number;
+}
+interface CharacterHandle {
+  setVelocity(worldVelocity: Vec3): void;
+  /** Delta velocity, independent of body mass. */
+  addImpulse(deltaVelocity: Vec3): void;
+}
+interface PhysicsState extends WorldPose {
+  group?: string;
+  sensor?: boolean;
+  kind: "static" | "dynamic" | "kinematic" | "character";
+  velocity: Vec3;
+  angularVelocity: Vec3;
+  mass?: number;
+  shape?: string;
+  size?: Vec3;
+  radius?: number;
+  height?: number;
+}
+interface PhysicsAPI {
+  addImpulseAt(entity: Entity, impulse: Vec3, worldPoint: Vec3): void;
+  addAngularImpulse(entity: Entity, impulse: Vec3): void;
+  getPointVelocity(entity: Entity, worldPoint: Vec3): Vec3;
+  getState(entity: Entity): PhysicsState;
+  setState(
+    entity: Entity,
+    state: Partial<WorldPose> & { velocity?: Vec3; angularVelocity?: Vec3 },
+  ): void;
+  getAngularVelocity(entity: Entity): Vec3;
+  setAngularVelocity(entity: Entity, worldRadiansPerSecond: Vec3): void;
+}
+interface CameraLens {
+  fov: number;
+  near: number;
+  far: number;
+}
+interface CameraOptions extends Partial<CameraLens> {
+  id?: string;
+  position?: Vec3;
+  rotation?: Quat;
+  active?: boolean;
+}
+interface CameraRay {
+  origin: Vec3;
+  direction: Vec3;
+}
+interface CameraHandle {
+  readonly id: string;
+  getPose(): WorldPose;
+  setPose(pose: WorldPose): void;
+  lookAt(worldPoint: Vec3, up?: Vec3): void;
+  setLens(lens: Partial<CameraLens>): void;
+  getLens(): CameraLens;
+  /** Normalized screen position; direction length is the query range. */
+  ray(x?: number, y?: number, length?: number): CameraRay;
+  destroy(): void;
+}
+type CameraRigMode = "firstPerson" | "thirdPerson" | "observer" | "fixed";
+interface CameraRigOptions extends CameraOptions {
+  mode?: CameraRigMode;
+  /** Controlled/followed actor and observer viewpoint are independent. */
+  target?: Entity;
+  viewpoint?: Entity;
+  offset?: Vec3;
+  pivotOffset?: Vec3;
+  eyeOffset?: Vec3;
+  followOffset?: Vec3;
+  observerOffset?: Vec3;
+  sensitivity?: number;
+  pitchLimit?: number;
+  /** Optional horizon recovery after an arbitrary world-space warp. */
+  uprightSpeed?: number;
+  collision?: boolean;
+  collisionRadius?: number;
+  lookAtTarget?: boolean;
+}
+interface CameraRigHandle {
+  readonly camera: CameraHandle;
+  look(deltaX: number, deltaY: number): void;
+  direction(strafe: number, forward: number): Vec3;
+  setRotation(worldRotation: Quat): void;
+  setMode(mode: CameraRigMode): void;
+  update(): void;
+  destroy(): void;
+}
+interface CamerasAPI {
+  create(options?: CameraOptions): CameraHandle;
+  get(id: string): CameraHandle | null;
+  active(): CameraHandle | null;
+  setActive(camera: string | CameraHandle): void;
+  createRig(options: CameraRigOptions): CameraRigHandle;
+}
+interface PortalOptions extends Partial<WorldPose> {
+  id?: string;
+  width?: number;
+  height?: number;
+  shape?: "ellipse" | "rectangle";
+  color?: string;
+  enabled?: boolean;
+}
+interface PortalHandle {
+  readonly width: number;
+  readonly height: number;
+  readonly shape: "ellipse" | "rectangle";
+  readonly id: string;
+  readonly enabled: boolean;
+  readonly linked: boolean;
+  getDestination(): PortalHandle | null;
+  getPose(): WorldPose;
+  setPose(pose: WorldPose): void;
+  setEnabled(enabled: boolean): void;
+  link(other: PortalHandle | string): void;
+  unlink(): void;
+  place(
+    origin: Vec3,
+    direction: Vec3,
+    options?: {
+      up?: Vec3;
+      ignore?: (Entity | string)[];
+      throughPortals?: boolean;
+    },
+  ): {
+    placed: boolean;
+    reason?: string;
+    surface?: Entity;
+    point?: Vec3;
+    normal?: Vec3;
+  };
+  mapPoint(worldPoint: Vec3): Vec3;
+  mapVector(worldVector: Vec3): Vec3;
+  mapRotation(worldRotation: Quat): Quat;
+  destroy(): void;
+}
+interface PortalTrace {
+  hit: PhysicsHit | null;
+  segments: { origin: Vec3; end: Vec3; portalId?: string }[];
+  path: string[];
+  truncated: boolean;
+}
+interface PortalTraverseEvent {
+  entity: Entity;
+  source: PortalHandle;
+  destination: PortalHandle;
+  position: Vec3;
+  velocity: Vec3;
+  matrix: number[];
+  /** Present for atomic assembly transport; every state is written before callbacks. */
+  entities?: readonly Entity[];
+}
+interface PortalBlockedEvent {
+  entity: Entity;
+  entities: readonly Entity[];
+  source: PortalHandle;
+  destination: PortalHandle;
+  reason: "joint-policy" | "assembly-too-large" | "assembly-exit-obstructed"
+    | "traveler-does-not-fit" | "exit-does-not-fit";
+}
+interface PortalsAPI {
+  getTraversalLimits(): { maxSubSteps: number; maxStepTime: number; maxTravelDistance: number };
+  setTraversalLimits(patch: Partial<{ maxSubSteps: number; maxStepTime: number; maxTravelDistance: number }>): void;
+  create(options?: PortalOptions): PortalHandle;
+  get(id: string): PortalHandle | null;
+  /** Centered box mesh (static/dynamic/kinematic), fixed positive world scale and matching collision bounds. */
+  addSurface(
+    entity: Entity,
+    options?: PortalSurfaceOptions,
+  ): PortalSurfaceHandle;
+  watch(
+    entity: Entity,
+    options?: { keepUpright?: boolean },
+  ): { entity: Entity; destroy(): void };
+  /** Atomic whole-island transport; requires dynamic members without world anchors. */
+  watchAssembly(
+    entity: Entity,
+    options?: { keepUpright?: boolean; maxBodies?: number },
+  ): { readonly entities: readonly Entity[]; destroy(): void };
+  raycast(
+    origin: Vec3,
+    direction: Vec3,
+    filter?: PhysicsQueryFilter & { maxHops?: number },
+  ): PortalTrace;
+  onTraverse(callback: (event: PortalTraverseEvent) => void): () => void;
+  onBlocked(callback: (event: PortalBlockedEvent) => void): () => void;
+  setQuality(options: {
+    depth?: number;
+    scale?: number;
+    maxViews?: number;
+  }): void;
+}
+interface GrabHandle {
+  readonly entity: Entity;
+  readonly active: boolean;
+  setTarget(worldPosition: Vec3, worldRotation?: Quat): void;
+  setRay(
+    origin: Vec3,
+    direction: Vec3,
+    distance?: number,
+    options?: { segment?: number; ignore?: (Entity | string)[] },
+  ): void;
+  release(): void;
+}
+interface InteractionAPI {
+  grab(
+    entity: Entity,
+    options?: {
+      position?: Vec3;
+      rotation?: Quat;
+      stiffness?: number;
+      damping?: number;
+      maxForce?: number;
+      maxDistance?: number;
+    },
+  ): GrabHandle;
+}
+declare const cameras: CamerasAPI;
+declare const portals: PortalsAPI;
+declare const interaction: InteractionAPI;
+interface ScriptContext {
+  cameras: CamerasAPI;
+  portals: PortalsAPI;
+  interaction: InteractionAPI;
+}
+
+/** General gameplay foundations. World distances are engine units; no game rules are implicit. */
+interface PhysicsOptions { gravityFactor?: number; }
+interface ContactEvent {
+  /** Unit normal from self toward other. Exit events retain the last known manifold. */
+  normal: Vec3;
+  point: Vec3 | null;
+  points: Vec3[];
+  subShape: number;
+  otherSubShape: number;
+}
+interface PhysicsHit { subShape?: number; }
+interface ContactMaterialOverride { friction?: number; restitution?: number; /** Relative velocity of body 2's surface against body 1. */ surfaceVelocity?: Vec3; }
+interface BodyPropertyPatch { mass?: number; friction?: number; restitution?: number; gravityFactor?: number; linearDamping?: number; angularDamping?: number; }
+interface PhysicsAPI {
+  getProperties(entity: Entity): PhysicsOptions;
+  configure(entity: Entity, patch: BodyPropertyPatch): void;
+  /** Retains BodyID/COM frame and joints. Unregister portal surfaces before shape changes. */
+  updateShape(entity: Entity, patch: Partial<Pick<PhysicsOptions, 'shape' | 'size' | 'parts'>>): void;
+  /** Newtons, applied over the next full fixed step, including portal substeps. */
+  applyForce(entity: Entity, force: Vec3, worldPoint?: Vec3): void;
+  applyTorque(entity: Entity, torque: Vec3): void;
+  /** Pure pre-solver callback: return material overrides, never mutate the scene/physics here. */
+  onContactMaterial(entity: Entity | null, callback: (event: ContactEvent) => ContactMaterialOverride | void): () => void;
+  getJoints(entity?: Entity): JointHandle[];
+  setQueryLimits(limits: { maxConvexVertices: number }): void;
+}
+interface CharacterOptions { gravity?: Vec3; gravityFactor?: number; controlEnabled?: boolean; }
+interface CharacterHandle {
+  /** false means a shape enlargement is obstructed; all configuration remains unchanged. */
+  configure(patch: Partial<Omit<CharacterOptions, 'group'>>, resize?: { keepFeet?: boolean; maxPenetration?: number }): boolean;
+  getConfig(): CharacterOptions;
+  getGround(): { entity: Entity | null; point: Vec3; normal: Vec3; velocity: Vec3 } | null;
+  applyForce(force: Vec3): void;
+}
+interface JointMotorOptions { mode?: 'off' | 'velocity' | 'position'; velocity?: number; position?: number; force?: number; frequency?: number; damping?: number; }
+interface JointHandle {
+  readonly kind: JointOptions['kind'];
+  readonly entities: readonly Entity[];
+  setMotor(options: JointMotorOptions): void;
+  /** Hinge limits use radians; slider/distance limits use world distances. */
+  setLimits(min: number, max: number): void;
+  getState(): { kind: JointOptions['kind']; current: number | null; min: number | null; max: number | null; motor: JointMotorOptions; /** Native motor impulse for the most recent substep, not force. */ motorImpulse: number | null };
+}
+interface TextureHandle { readonly active: boolean; readonly ready: Promise<TextureHandle>; destroy(): void; }
+interface MaterialOptions { color?: string; emissive?: string; alpha?: number; unlit?: boolean; doubleSided?: boolean; wireframe?: boolean; texture?: TextureHandle | null; emissiveTexture?: TextureHandle | null; }
+interface MaterialHandle {
+  readonly active: boolean;
+  update(patch: MaterialOptions): void;
+  apply(entity: Entity, options?: { includeChildren?: boolean }): void;
+  detach(entity: Entity): void;
+  destroy(): void;
+}
+interface MeshGeometry { positions: number[]; indices: number[]; normals?: number[]; uvs?: number[]; }
+interface VisualMeshOptions { id?: string; name?: string; parent?: Entity; pose?: WorldPose; material?: MaterialHandle; }
+interface VisualMeshHandle {
+  readonly entity: Entity;
+  readonly active: boolean;
+  updateGeometry(data: MeshGeometry): void;
+  setMaterial(material: MaterialHandle): void;
+  setPose(worldPose: WorldPose): void;
+  destroy(): void;
+}
+interface BeamOptions extends VisualMeshOptions { segments: { origin: Vec3; end: Vec3 }[]; radius: number; sides?: number; color?: string; }
+interface BeamHandle { readonly entity: Entity; readonly active: boolean; update(patch: Partial<BeamOptions>): void; destroy(): void; }
+interface ParticleOptions {
+  capacity: number; rate: number; lifetime: [number, number]; size: [number, number]; velocity: { min: Vec3; max: Vec3 }; colors: [string, string]; texture?: TextureHandle; entity?: Entity; position?: Vec3;
+}
+interface ParticleHandle { readonly active: boolean; start(): void; stop(): void; destroy(): void; }
+interface VisualsAPI {
+  createMaterial(options?: MaterialOptions): MaterialHandle;
+  createTexture(options: { assetId: string; invertY?: boolean }): TextureHandle;
+  createMesh(geometry: MeshGeometry, options?: VisualMeshOptions): VisualMeshHandle;
+  createBeam(options: BeamOptions): BeamHandle;
+  createDecal(entity: Entity, options: VisualMeshOptions & { position: Vec3; normal: Vec3; size: Vec3; angle?: number }): VisualMeshHandle;
+  createParticles(options: ParticleOptions): ParticleHandle;
+  setLimits(patch: { maxVertices?: number; maxIndices?: number; maxParticles?: number }): void;
+}
+interface SurfacePatchOptions {
+  id?: string; position: Vec3; normal: Vec3; up?: Vec3; width: number; height: number; depth: number; shape?: 'rectangle' | 'ellipse'; tags: string[]; properties?: Record<string, unknown>; priority?: number; material?: MaterialHandle;
+}
+interface SurfacePatchHandle { readonly id: string; readonly entity: Entity; readonly active: boolean; update(patch: Pick<Partial<SurfacePatchOptions>, 'tags' | 'properties' | 'priority'>): void; destroy(): void; }
+interface SurfaceSample { id: string; entity: Entity; tags: string[]; properties: Record<string, unknown>; priority: number; }
+interface SurfacesAPI {
+  /** World-space placement, then follows host motion/scale in its local frame. */
+  paint(entity: Entity, options: SurfacePatchOptions): SurfacePatchHandle;
+  get(id: string): SurfacePatchHandle | null;
+  query(entity: Entity, worldPoint: Vec3): SurfaceSample[];
+  /** Conservative convex-footprint coverage by one patch, not the union of several patches. */
+  covers(entity: Entity, worldPoints: Vec3[], tag?: string): boolean;
+  clear(entity: Entity): void;
+  setLimit(maxPatches: number): void;
+}
+interface PortalPlacementCandidate { entity: Entity; point: Vec3; normal: Vec3; footprint: Vec3[]; portal: PortalHandle; regionId: string | null; subShape?: number; }
+interface PortalPlanarRegion { id: string; /** Host-local frame, units and normal; region must be covered by planar mesh triangles. */ position: Vec3; normal: Vec3; up?: Vec3; width: number; height: number; depth: number; }
+interface PortalSurfaceOptions { faces?: string[]; margin?: number; regions?: PortalPlanarRegion[]; canPlace?: (candidate: PortalPlacementCandidate) => boolean; }
+interface PortalSurfaceHandle { readonly entity: Entity; setPlacementRule(predicate: ((candidate: PortalPlacementCandidate) => boolean) | null): void; destroy(): void; }
+interface PortalShapeTrace extends PortalTrace { blocked: { portalId: string; reason: 'entrance-does-not-fit' | 'exit-does-not-fit' | 'hop-limit' } | null; }
+interface PortalVolumeOptions { origin: Vec3; direction: Vec3; up?: Vec3; /** Convex cross-section in the plane perpendicular to the initial direction. */ profile: Vec2[]; /** Native hull query thickness, independent of the ray center line. */ thickness: number; inset?: number; maxHops?: number; filter?: PhysicsQueryFilter; }
+interface PortalVolumeTrace { hit: PhysicsHit | null; path: string[]; truncated: boolean; segments: { origin: Vec3; end: Vec3; direction: Vec3; start: Vec3[]; finish: Vec3[]; geometry: MeshGeometry; portalId?: string }[]; }
+interface PortalsAPI {
+  /** First-obstruction query with orientation mapping and finite-shape aperture fit checks. */
+  shapeCast(shape: PhysicsQueryShape, origin: Vec3, direction: Vec3, filter?: PhysicsQueryFilter & { maxHops?: number }): PortalShapeTrace;
+  /** Convex volume extrusion; clips its profile at each aperture and returns world-space meshes. */
+  projectVolume(options: PortalVolumeOptions): PortalVolumeTrace;
+  setProjectionLimits(patch: { maxHops?: number; maxProfileVertices?: number }): void;
+}
+interface FieldVolume { shape: PhysicsQueryShape; position: Vec3; rotation?: Quat; vector?: Vec3; }
+interface FieldEvent { entity: Entity; deltaTime: number; field: FieldHandle; }
+interface FieldOptions {
+  volumes: FieldVolume[]; mode: 'force' | 'acceleration'; vector: Vec3 | ((entity: Entity, info: { deltaTime: number; state: PhysicsState }) => Vec3); filter?: PhysicsQueryFilter; filterEntity?: (entity: Entity) => boolean; enabled?: boolean; onEnter?: (event: FieldEvent) => void; onStay?: (event: FieldEvent) => void; onExit?: (event: FieldEvent) => void;
+}
+interface FieldHandle { readonly active: boolean; setEnabled(enabled: boolean): void; update(patch: Partial<FieldOptions>): void; getEntities(): Entity[]; destroy(): void; }
+interface FieldsAPI { create(options: FieldOptions): FieldHandle; }
+/** World-space volumes, queried against actual physics shapes. */
+interface TriggerVolume { shape: PhysicsQueryShape; position: Vec3; rotation?: Quat; }
+interface TriggerEvent {
+  entity: Entity;
+  trigger: TriggerHandle;
+  phase: 'enter' | 'stay' | 'exit';
+  /** Scaled simulation time since the preceding occupancy sample. */
+  deltaTime: number;
+  /** Exit only; destroyed handles may still be reported here. */
+  reason?: 'left' | 'disabled' | 'destroyed';
+}
+interface TriggerOptions {
+  volumes: TriggerVolume[];
+  /** Default: dynamic, kinematic and character. Static bodies can be opted in. */
+  motions?: ('static' | 'dynamic' | 'kinematic' | 'character')[];
+  filter?: Pick<PhysicsQueryFilter, 'group' | 'mask' | 'sensors' | 'ignore'>;
+  /** Synchronous boolean predicate, evaluated once per distinct candidate. */
+  filterEntity?: (entity: Entity) => boolean;
+  enabled?: boolean;
+  /** Seconds between samples; zero samples every fixed step. No swept crossing detection. */
+  interval?: number;
+  onEnter?: (event: TriggerEvent) => void;
+  onStay?: (event: TriggerEvent) => void;
+  onExit?: (event: TriggerEvent) => void;
+}
+interface TriggerHandle {
+  readonly active: boolean;
+  /** Changes apply on the next fixed step, including exits when disabled. */
+  setEnabled(enabled: boolean): void;
+  /** Validates the entire replacement before changing existing options. */
+  update(patch: Partial<TriggerOptions>): void;
+  /** Last sampled occupants. Returns a copy, excluding destroyed entities. */
+  getEntities(): Entity[];
+  contains(entity: Entity): boolean;
+  /** Queries current occupancy without changing membership or emitting events. */
+  query(): Entity[];
+  /** Idempotent; destruction emits no gameplay callbacks. */
+  destroy(): void;
+}
+interface TriggerLimits { maxTriggers: number; maxVolumesPerTrigger: number; maxMembersPerTrigger: number; }
+interface TriggersAPI {
+  create(options: TriggerOptions): TriggerHandle;
+  /** Session-wide budgets; cannot lower them below current usage. */
+  setLimits(patch: Partial<TriggerLimits>): void;
+  getLimits(): TriggerLimits;
+}
+interface ReadonlySignal {
+  readonly active: boolean;
+  readonly value: boolean;
+  /** Also destroys derived nodes that depend on this node. */
+  destroy(): void;
+}
+interface SignalHandle extends ReadonlySignal { set(value: boolean): void; }
+interface SignalLimits { maxNodes: number; maxListeners: number; maxPasses: number; }
+interface SignalsAPI {
+  create(initial?: boolean): SignalHandle;
+  gate(operation: 'and' | 'or' | 'not' | 'xor', inputs: ReadonlySignal[]): ReadonlySignal;
+  /** Notifications occur at flush; derived values settle before callbacks. No initial notification. */
+  onChange(signal: ReadonlySignal, callback: (event: { signal: ReadonlySignal; value: boolean; previous: boolean }) => void): () => void;
+  /** Automatically called before and after each fixed step. Reentrant flushing is rejected. */
+  flush(): void;
+  getLimits(): SignalLimits;
+  setLimits(patch: Partial<SignalLimits>): void;
+}
+interface MotionState { progress: number; target: number; paused: boolean; }
+interface MotionHandle {
+  readonly active: boolean;
+  setTarget(progress: number): void;
+  setPaused(paused: boolean): void;
+  getState(): MotionState;
+  /** Validates and teleports to a saved progress; ordinary updates use native kinematic movement. */
+  restore(state: MotionState): void;
+  destroy(): void;
+}
+interface MotionAPI {
+  create(entity: Entity, options: { from?: WorldPose; to: WorldPose; duration: number; easing?: 'linear' | 'smoothstep'; progress?: number; target?: number; paused?: boolean }): MotionHandle;
+  setLimit(maxMotions: number): void;
+}
+interface ReflectorOptions { reflectivity?: number; twoSided?: boolean; }
+interface ReflectorHandle { readonly active: boolean; update(patch: ReflectorOptions): void; destroy(): void; }
+interface OpticalLimits { maxReflectors: number; maxBounces: number; maxPortalHops: number; maxSegments: number; }
+interface OpticalTrace {
+  segments: { origin: Vec3; end: Vec3; energy: number; portalId?: string }[];
+  reflections: { entity: Entity; point: Vec3; normal: Vec3; direction: Vec3; energy: number }[];
+  path: string[];
+  hit: PhysicsHit | null;
+  energy: number;
+  distance: number;
+  truncated: boolean;
+  reason: 'range' | 'hit' | 'energy' | 'budget';
+}
+interface OpticsAPI {
+  addReflector(entity: Entity, options?: ReflectorOptions): ReflectorHandle;
+  trace(options: { origin: Vec3; direction: Vec3; filter?: Pick<PhysicsQueryFilter, 'group' | 'mask' | 'ignore' | 'sensors'>; throughPortals?: boolean; energy?: number; minEnergy?: number; epsilon?: number; maxBounces?: number; maxPortalHops?: number }): OpticalTrace;
+  setLimits(patch: Partial<OpticalLimits>): void;
+  getLimits(): OpticalLimits;
+}
+declare const signals: SignalsAPI;
+declare const motion: MotionAPI;
+declare const optics: OpticsAPI;
+interface ScriptContext { signals: SignalsAPI; motion: MotionAPI; optics: OpticsAPI; }
+interface PrefabSpawnOptions { visible?: boolean; /** Load assets first, activate component/script bindings via handle.startScripts(). */ deferScripts?: boolean; }
+interface PrefabHandle { startScripts(): void; }
+interface LevelDescriptor { id: string; prefabId: string; }
+interface LoadedLevel extends LevelDescriptor { root: Entity; entities: Entity[]; }
+interface LevelsAPI {
+  register(id: string, options: { prefabId: string; spawn?: Omit<PrefabSpawnOptions, 'parent' | 'deferScripts'> }): void;
+  list(): LevelDescriptor[];
+  current(): LoadedLevel | null;
+  /** Preloads prefab assets; replaces the previous level before starting new scripts. Bootstrap scene remains. */
+  load(id: string): Promise<LoadedLevel>;
+  unload(): void;
+  find(localPrefabNodeId: string): Entity | null;
+  onChange(callback: (event: { phase: 'loaded' | 'unloaded'; previousId: string | null; current: LoadedLevel | null }) => void): () => void;
+}
+interface StorageAPI { read<T = unknown>(key: string): Promise<T | null>; write(key: string, jsonValue: unknown): Promise<void>; remove(key: string): Promise<void>; }
+interface CheckpointSnapshot { format: 'arkglide-checkpoint-1'; levelId: string | null; providers: Record<string, { version: number; state: unknown }>; }
+interface CheckpointProvider<T> { version: number; capture(): T; validate?(state: T): boolean | void; restore(state: T): void | Promise<void>; }
+interface SavesAPI {
+  /** Register before capture. Capture and validation must be synchronous; restore may be async. */
+  register<T>(id: string, provider: CheckpointProvider<T>): () => void;
+  capture(): CheckpointSnapshot;
+  /** Reloads a registered saved level. Built-in state requires matching world/joint/portal structure. */
+  restore(snapshot: CheckpointSnapshot): Promise<void>;
+  save(slot: string): Promise<void>;
+  load(slot: string): Promise<boolean>;
+}
+declare const visuals: VisualsAPI;
+declare const surfaces: SurfacesAPI;
+declare const fields: FieldsAPI;
+declare const triggers: TriggersAPI;
+declare const levels: LevelsAPI;
+declare const storage: StorageAPI;
+declare const saves: SavesAPI;
+interface ScriptContext { visuals: VisualsAPI; surfaces: SurfacesAPI; fields: FieldsAPI; levels: LevelsAPI; storage: StorageAPI; saves: SavesAPI; triggers: TriggersAPI; }

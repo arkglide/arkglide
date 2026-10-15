@@ -49,3 +49,15 @@ playwright-report/
 
 # Temporary standalone deployment fixtures
 .static-test-fixtures/
+
+# Portal verification deployments
+.portal-test-game/
+.portal-test-game.zip
+.portal-browser-test/
+.portal-browser-test.zip
+
+# Gameplay foundation verification deployment
+.foundations-browser-test/
+
+# Composition verification deployment
+.composition-browser-test/

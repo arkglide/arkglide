@@ -1,0 +1,2986 @@
+TAP version 13
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:10]: Babylon.js v9.28.0 - Null engine
+# Subtest: state controllers isolate parameters, interpolate real imported channels and dispatch owned loop events
+ok 1 - state controllers isolate parameters, interpolate real imported channels and dispatch owned loop events
+  ---
+  duration_ms: 13.178204
+  type: 'test'
+  ...
+# Subtest: 1D and 2D blend weights are continuous, normalized and recover exact sample points
+ok 2 - 1D and 2D blend weights are continuous, normalized and recover exact sample points
+  ---
+  duration_ms: 1.20348
+  type: 'test'
+  ...
+# Subtest: root motion unwraps looping translation, is extracted once at fixed time and leaves visual child stationary
+ok 3 - root motion unwraps looping translation, is extracted once at fixed time and leaves visual child stationary
+  ---
+  duration_ms: 3.350411
+  type: 'test'
+  ...
+# Subtest: explicit node/bone mapping transfers animation to differently named compatible hierarchy with pose and scale corrections
+ok 4 - explicit node/bone mapping transfers animation to differently named compatible hierarchy with pose and scale corrections
+  ---
+  duration_ms: 2.08769
+  type: 'test'
+  ...
+# Subtest: controller transitions restore untouched channels to bind pose and cleanup returns every channel
+ok 5 - controller transitions restore untouched channels to bind pose and cleanup returns every channel
+  ---
+  duration_ms: 1.302199
+  type: 'test'
+  ...
+# Subtest: looped root quaternion motion remains continuous across multiple full cycles
+ok 6 - looped root quaternion motion remains continuous across multiple full cycles
+  ---
+  duration_ms: 4.439358
+  type: 'test'
+  ...
+# Subtest: cross-frame event catch-up is bounded to 128 and skipped events are counted
+ok 7 - cross-frame event catch-up is bounded to 128 and skipped events are counted
+  ---
+  duration_ms: 1.195358
+  type: 'test'
+  ...
+# Subtest: rejected legacy animation playback preserves the active controller
+ok 8 - rejected legacy animation playback preserves the active controller
+  ---
+  duration_ms: 2.634302
+  type: 'test'
+  ...
+# Subtest: invalid replacement controllers preserve the previous controller and bind pose
+ok 9 - invalid replacement controllers preserve the previous controller and bind pose
+  ---
+  duration_ms: 1.38267
+  type: 'test'
+  ...
+# Subtest: destroying an obsolete controller handle leaves its replacement running
+ok 10 - destroying an obsolete controller handle leaves its replacement running
+  ---
+  duration_ms: 1.467207
+  type: 'test'
+  ...
+# Subtest: animation event destruction stops frame writes, root motion and further event dispatch
+ok 11 - animation event destruction stops frame writes, root motion and further event dispatch
+  ---
+  duration_ms: 1.74168
+  type: 'test'
+  ...
+# Subtest: controller replacement inside an event is not overwritten by the old frame
+ok 12 - controller replacement inside an event is not overwritten by the old frame
+  ---
+  duration_ms: 0.561204
+  type: 'test'
+  ...
+# Subtest: state changes inside animation events stop old-state events and pose writes
+ok 13 - state changes inside animation events stop old-state events and pose writes
+  ---
+  duration_ms: 0.772452
+  type: 'test'
+  ...
+# Subtest: event-triggered state restarts cancel old dispatch without breaking subsequent fixed updates
+ok 14 - event-triggered state restarts cancel old dispatch without breaking subsequent fixed updates
+  ---
+  duration_ms: 0.62474
+  type: 'test'
+  ...
+# Subtest: animation subscriptions canceled during dispatch do not receive the current event
+ok 15 - animation subscriptions canceled during dispatch do not receive the current event
+  ---
+  duration_ms: 0.521505
+  type: 'test'
+  ...
+# Subtest: retarget owner cleanup only removes controllers that reference its generated clips
+ok 16 - retarget owner cleanup only removes controllers that reference its generated clips
+  ---
+  duration_ms: 1.152864
+  type: 'test'
+  ...
+# Subtest: nested time-zero state events share the dispatch limit without overflowing the stack
+ok 17 - nested time-zero state events share the dispatch limit without overflowing the stack
+  ---
+  duration_ms: 0.932843
+  type: 'test'
+  ...
+# Subtest: animation subscriptions requested during owner teardown leave no retained listener
+ok 18 - animation subscriptions requested during owner teardown leave no retained listener
+  ---
+  duration_ms: 1.265203
+  type: 'test'
+  ...
+# Subtest: controller creation during owner teardown preserves another owners controller
+ok 19 - controller creation during owner teardown preserves another owners controller
+  ---
+  duration_ms: 1.124732
+  type: 'test'
+  ...
+# Subtest: legacy playback requested during owner teardown preserves active controller
+ok 20 - legacy playback requested during owner teardown preserves active controller
+  ---
+  duration_ms: 0.625681
+  type: 'test'
+  ...
+# Subtest: animation events skip subscribers whose owner entity has been destroyed
+ok 21 - animation events skip subscribers whose owner entity has been destroyed
+  ---
+  duration_ms: 0.652993
+  type: 'test'
+  ...
+# Subtest: failed animation event subscriptions are removed before reporting diagnostics
+ok 22 - failed animation event subscriptions are removed before reporting diagnostics
+  ---
+  duration_ms: 0.709788
+  type: 'test'
+  ...
+# Subtest: WSOLA preserves a 440 Hz PCM tone at 0.5/1/2x with bounded duration and finite stereo output
+ok 23 - WSOLA preserves a 440 Hz PCM tone at 0.5/1/2x with bounded duration and finite stereo output
+  ---
+  duration_ms: 175.696567
+  type: 'test'
+  ...
+# Subtest: buffer source start failures release voice nodes and owner cleanup
+ok 24 - buffer source start failures release voice nodes and owner cleanup
+  ---
+  duration_ms: 2.596115
+  type: 'test'
+  ...
+# Subtest: a failed replacement voice preserves existing playback at the voice limit
+ok 25 - a failed replacement voice preserves existing playback at the voice limit
+  ---
+  duration_ms: 1.161938
+  type: 'test'
+  ...
+# Subtest: bus routing, fades, deterministic voice stealing, snapshots and ducking clean up on owner release
+ok 26 - bus routing, fades, deterministic voice stealing, snapshots and ducking clean up on owner release
+  ---
+  duration_ms: 1.580838
+  type: 'test'
+  ...
+# Subtest: streaming skips decode and retains media position through pause/resume; stop revokes URLs
+ok 27 - streaming skips decode and retains media position through pause/resume; stop revokes URLs
+  ---
+  duration_ms: 1.883453
+  type: 'test'
+  ...
+# Subtest: loading after audio disposal performs no decoding or resource diagnostics
+ok 28 - loading after audio disposal performs no decoding or resource diagnostics
+  ---
+  duration_ms: 0.293531
+  type: 'test'
+  ...
+# Subtest: late audio decoding cannot replace the latest version of an asset
+ok 29 - late audio decoding cannot replace the latest version of an asset
+  ---
+  duration_ms: 1.221858
+  type: 'test'
+  ...
+# Subtest: failed audio replacement does not reuse decoded bytes from the previous asset version
+ok 30 - failed audio replacement does not reuse decoded bytes from the previous asset version
+  ---
+  duration_ms: 0.475816
+  type: 'test'
+  ...
+# Subtest: playing buffer voices retain their original duration after asset replacement
+ok 31 - playing buffer voices retain their original duration after asset replacement
+  ---
+  duration_ms: 1.330171
+  type: 'test'
+  ...
+# Subtest: spatial audio allocation failure releases its partially created voice gain
+ok 32 - spatial audio allocation failure releases its partially created voice gain
+  ---
+  duration_ms: 0.594915
+  type: 'test'
+  ...
+# Subtest: buffer voice position advances at playback rate and freezes while locally paused
+ok 33 - buffer voice position advances at playback rate and freezes while locally paused
+  ---
+  duration_ms: 0.679162
+  type: 'test'
+  ...
+# Subtest: stream decode errors release the voice even if diagnostic reporting throws
+ok 34 - stream decode errors release the voice even if diagnostic reporting throws
+  ---
+  duration_ms: 0.602486
+  type: 'test'
+  ...
+# Subtest: failed worklet voice setup closes its message port
+ok 35 - failed worklet voice setup closes its message port
+  ---
+  duration_ms: 0.65855
+  type: 'test'
+  ...
+# Subtest: worklet stop message failures cannot interrupt voice cleanup
+ok 36 - worklet stop message failures cannot interrupt voice cleanup
+  ---
+  duration_ms: 0.972473
+  type: 'test'
+  ...
+# Subtest: snapshot requests during owner teardown preserve another owners restore handle
+ok 37 - snapshot requests during owner teardown preserve another owners restore handle
+  ---
+  duration_ms: 1.4226
+  type: 'test'
+  ...
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# Subtest: signal gates settle as a graph before notification and coalesce changes without glitches
+ok 38 - signal gates settle as a graph before notification and coalesce changes without glitches
+  ---
+  duration_ms: 23.403567
+  type: 'test'
+  ...
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:12]: Babylon.js v9.28.0 - Null engine
+# Subtest: signal feedback is bounded, exceptions are isolated, and consumer subscriptions have their own owner
+ok 39 - signal feedback is bounded, exceptions are isolated, and consumer subscriptions have their own owner
+  ---
+  duration_ms: 7.588786
+  type: 'test'
+  ...
+# Subtest: signal budgets and source destruction prevent orphan derived nodes and listeners
+ok 40 - signal budgets and source destruction prevent orphan derived nodes and listeners
+  ---
+  duration_ms: 1.392405
+  type: 'test'
+  ...
+# Subtest: kinematic actuators reverse, pause, restore and retain native velocity across portal substeps
+ok 41 - kinematic actuators reverse, pause, restore and retain native velocity across portal substeps
+  ---
+  duration_ms: 143.103877
+  type: 'test'
+  ...
+# Subtest: native character rides a moving kinematic platform without a scripted teleport
+ok 42 - native character rides a moving kinematic platform without a scripted teleport
+  ---
+  duration_ms: 24.189319
+  type: 'test'
+  ...
+# Subtest: optical traces use real mirror normals, conserve path range and stop on receiver collisions
+ok 43 - optical traces use real mirror normals, conserve path range and stop on receiver collisions
+  ---
+  duration_ms: 5.129457
+  type: 'test'
+  ...
+# Subtest: reflection after a real portal preserves the mapped direction and shares a total portal budget
+ok 44 - reflection after a real portal preserves the mapped direction and shares a total portal budget
+  ---
+  duration_ms: 13.705487
+  type: 'test'
+  ...
+# Subtest: materials and textures share references, preserve IDs on replacement and undo all resource edits
+ok 45 - materials and textures share references, preserve IDs on replacement and undo all resource edits
+  ---
+  duration_ms: 1180.95448
+  type: 'test'
+  ...
+# Subtest: unique material copies let instances change appearance without changing shared definitions
+ok 46 - unique material copies let instances change appearance without changing shared definitions
+  ---
+  duration_ms: 11.695356
+  type: 'test'
+  ...
+# Subtest: prefab snapshots outlive their source model and generate independent IDs and binary buffers
+ok 47 - prefab snapshots outlive their source model and generate independent IDs and binary buffers
+  ---
+  duration_ms: 3.64224
+  type: 'test'
+  ...
+# Subtest: template updates merge individual transform axes, preserve placement and keep local property overrides
+ok 48 - template updates merge individual transform axes, preserve placement and keep local property overrides
+  ---
+  duration_ms: 5.441086
+  type: 'test'
+  ...
+# Subtest: new template children propagate; removed inherited children stay removed until reset
+ok 49 - new template children propagate; removed inherited children stay removed until reset
+  ---
+  duration_ms: 10.358555
+  type: 'test'
+  ...
+# Subtest: template deletion preserves scene-only children and reattaches them to the instance root
+ok 50 - template deletion preserves scene-only children and reattaches them to the instance root
+  ---
+  duration_ms: 18.534826
+  type: 'test'
+  ...
+# Subtest: duplicate and clipboard preserve full-instance associations; partial subtree copies are ordinary nodes
+ok 51 - duplicate and clipboard preserve full-instance associations; partial subtree copies are ordinary nodes
+  ---
+  duration_ms: 10.270582
+  type: 'test'
+  ...
+# Subtest: rename/delete scripts updates templates, instance baselines and copied bindings
+ok 52 - rename/delete scripts updates templates, instance baselines and copied bindings
+  ---
+  duration_ms: 30.566779
+  type: 'test'
+  ...
+# Subtest: binary model replacements propagate through templates while retaining a local replacement override
+ok 53 - binary model replacements propagate through templates while retaining a local replacement override
+  ---
+  duration_ms: 8.072816
+  type: 'test'
+  ...
+# Subtest: unpack retains the subtree and resources, template deletion is guarded, and undo restores links
+ok 54 - unpack retains the subtree and resources, template deletion is guarded, and undo restores links
+  ---
+  duration_ms: 3.206725
+  type: 'test'
+  ...
+# Subtest: project ZIP, IndexedDB and recovery preserve template-only models, textures and instance overrides
+ok 55 - project ZIP, IndexedDB and recovery preserve template-only models, textures and instance overrides
+  ---
+  duration_ms: 41.458266
+  type: 'test'
+  ...
+# Subtest: invalid resource parameters and damaged references fail atomically before replacing the document
+ok 56 - invalid resource parameters and damaged references fail atomically before replacing the document
+  ---
+  duration_ms: 7.437249
+  type: 'test'
+  ...
+# Subtest: missing texture binaries retain the editable metadata and can be relinked by the same ID
+ok 57 - missing texture binaries retain the editable metadata and can be relinked by the same ID
+  ---
+  duration_ms: 3.491273
+  type: 'test'
+  ...
+# Subtest: clipboard can restore deleted templates, materials and texture bytes without overwriting still-existing resources
+ok 58 - clipboard can restore deleted templates, materials and texture bytes without overwriting still-existing resources
+  ---
+  duration_ms: 3.578213
+  type: 'test'
+  ...
+# Subtest: moving linked roots into other instances is rejected without changing the hierarchy
+ok 59 - moving linked roots into other instances is rejected without changing the hierarchy
+  ---
+  duration_ms: 1.489361
+  type: 'test'
+  ...
+# Subtest: undo/redo of script renames and deletion keeps clipboard template bindings valid, including a later copy
+ok 60 - undo/redo of script renames and deletion keeps clipboard template bindings valid, including a later copy
+  ---
+  duration_ms: 8.936725
+  type: 'test'
+  ...
+# Subtest: CLI export preserves an existing sibling ZIP and leaves the output directory empty
+ok 61 - CLI export preserves an existing sibling ZIP and leaves the output directory empty
+  ---
+  duration_ms: 741.182693
+  type: 'test'
+  ...
+# BJS - [11:37:16]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:16]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:17]: Babylon.js v9.28.0 - Null engine
+# Subtest: native contact points/stay events and pre-solver material override are oriented and owner scoped
+ok 62 - native contact points/stay events and pre-solver material override are oriented and owner scoped
+  ---
+  duration_ms: 40.706825
+  type: 'test'
+  ...
+# Subtest: runtime mass/gravity/damping and force are real native properties; force survives substeps
+ok 63 - runtime mass/gravity/damping and force are real native properties; force survives substeps
+  ---
+  duration_ms: 4.395714
+  type: 'test'
+  ...
+# Subtest: collider update keeps native joints, body identity, authored mass and responds to larger shape
+ok 64 - collider update keeps native joints, body identity, authored mass and responds to larger shape
+  ---
+  duration_ms: 9.016496
+  type: 'test'
+  ...
+# Subtest: hinge/slider motors switch between position, velocity and off and expose measured state
+ok 65 - hinge/slider motors switch between position, velocity and off and expose measured state
+  ---
+  duration_ms: 21.367473
+  type: 'test'
+  ...
+# Subtest: character runtime parameters, ground identity, blocked resize and force integrate without changing its handle
+ok 66 - character runtime parameters, ground identity, blocked resize and force integrate without changing its handle
+  ---
+  duration_ms: 23.412826
+  type: 'test'
+  ...
+# Subtest: force fields apply acceleration to both rigid bodies and characters, deduplicate volumes and release callbacks
+ok 67 - force fields apply acceleration to both rigid bodies and characters, deduplicate volumes and release callbacks
+  ---
+  duration_ms: 6.986311
+  type: 'test'
+  ...
+# Subtest: pre-solver scene destruction rejects before changing entity lifetime, then destruction works after the step
+ok 68 - pre-solver scene destruction rejects before changing entity lifetime, then destruction works after the step
+  ---
+  duration_ms: 5.502679
+  type: 'test'
+  ...
+# Subtest: off-center convex queries and force volumes preserve their authored origins
+ok 69 - off-center convex queries and force volumes preserve their authored origins
+  ---
+  duration_ms: 4.59274
+  type: 'test'
+  ...
+# BJS - [11:37:18]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:18]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:18]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:18]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:18]: Babylon.js v9.28.0 - Null engine
+# Subtest: finite sweeps preserve orientation, report aperture rejection and hit an obstruction after crossing
+ok 70 - finite sweeps preserve orientation, report aperture rejection and hit an obstruction after crossing
+  ---
+  duration_ms: 72.351986
+  type: 'test'
+  ...
+# Subtest: wide convex extrusion clips through an aperture and produces usable native convex colliders on both sides
+ok 71 - wide convex extrusion clips through an aperture and produces usable native convex colliders on both sides
+  ---
+  duration_ms: 21.185194
+  type: 'test'
+  ...
+# Subtest: extrusion checks finite width against obstacles outside its center line, supports limits and rejects concave profiles
+ok 72 - extrusion checks finite width against obstacles outside its center line, supports limits and rejects concave profiles
+  ---
+  duration_ms: 2.550417
+  type: 'test'
+  ...
+# Subtest: static model planar regions validate actual coverage, cut native holes and restore their original geometry
+ok 73 - static model planar regions validate actual coverage, cut native holes and restore their original geometry
+  ---
+  duration_ms: 12.567639
+  type: 'test'
+  ...
+# Subtest: projection rejects self-intersecting profiles and enforces configurable budgets before native work
+ok 74 - projection rejects self-intersecting profiles and enforces configurable budgets before native work
+  ---
+  duration_ms: 1.579977
+  type: 'test'
+  ...
+# BJS - [11:37:20]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:20]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:20]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:20]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:20]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:20]: Babylon.js v9.28.0 - Null engine
+# Subtest: strict JSON and host namespaces enforce byte budgets and preserve other project saves
+ok 75 - strict JSON and host namespaces enforce byte budgets and preserve other project saves
+  ---
+  duration_ms: 14.026048
+  type: 'test'
+  ...
+# Subtest: storage pending requests reject on owner destruction and ignore late responses
+ok 76 - storage pending requests reject on owner destruction and ignore late responses
+  ---
+  duration_ms: 1.829823
+  type: 'test'
+  ...
+# Subtest: level transitions preload before replacing scripts, retain bootstrap entities, and clean failed/canceled loads
+ok 77 - level transitions preload before replacing scripts, retain bootstrap entities, and clean failed/canceled loads
+  ---
+  duration_ms: 22.935581
+  type: 'test'
+  ...
+# Subtest: checkpoint save/load reloads stable prefab IDs and restores native velocity, world transforms and game provider state
+ok 78 - checkpoint save/load reloads stable prefab IDs and restores native velocity, world transforms and game provider state
+  ---
+  duration_ms: 17.069037
+  type: 'test'
+  ...
+# Subtest: checkpoint restores attached portal holes and links without detaching them from the host
+ok 79 - checkpoint restores attached portal holes and links without detaching them from the host
+  ---
+  duration_ms: 37.798348
+  type: 'test'
+  ...
+# Subtest: checkpoint capture during level transition rejects instead of including partially mounted resources
+ok 80 - checkpoint capture during level transition rejects instead of including partially mounted resources
+  ---
+  duration_ms: 3.318291
+  type: 'test'
+  ...
+# BJS - [11:37:21]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:21]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:21]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:21]: Babylon.js v9.28.0 - Null engine
+# Subtest: owned material changes restore sharing chains and do not dispose another entity material
+ok 81 - owned material changes restore sharing chains and do not dispose another entity material
+  ---
+  duration_ms: 21.30642
+  type: 'test'
+  ...
+# Subtest: dynamic visual geometry, separated beam segments, decal attachment and particle cleanup use actual Babylon resources
+ok 82 - dynamic visual geometry, separated beam segments, decal attachment and particle cleanup use actual Babylon resources
+  ---
+  duration_ms: 10.777492
+  type: 'test'
+  ...
+# Subtest: surface coatings follow rotated/scaled hosts and placement predicate checks the complete footprint
+ok 83 - surface coatings follow rotated/scaled hosts and placement predicate checks the complete footprint
+  ---
+  duration_ms: 12.508336
+  type: 'test'
+  ...
+# Subtest: failed beam creation is atomic and direct visual entity destruction releases its owned resources
+ok 84 - failed beam creation is atomic and direct visual entity destruction releases its owned resources
+  ---
+  duration_ms: 2.946172
+  type: 'test'
+  ...
+# BJS - [11:37:22]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:22]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:22]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:22]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:22]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:22]: Babylon.js v9.28.0 - Null engine
+# Subtest: actual Jolt WASM gravity, floor collision, velocity and impulse integrate at fixed steps
+ok 85 - actual Jolt WASM gravity, floor collision, velocity and impulse integrate at fixed steps
+  ---
+  duration_ms: 36.057229
+  type: 'test'
+  ...
+# Subtest: sensor callbacks are deferred outside solver and can safely destroy the contacting body
+ok 86 - sensor callbacks are deferred outside solver and can safely destroy the contacting body
+  ---
+  duration_ms: 3.727498
+  type: 'test'
+  ...
+# Subtest: physics world-space teleport writes through a transformed parent and kinematic motion stays managed
+ok 87 - physics world-space teleport writes through a transformed parent and kinematic motion stays managed
+  ---
+  duration_ms: 10.254857
+  type: 'test'
+  ...
+# Subtest: lifecycle pause and zero time scale do not advance real physics
+ok 88 - lifecycle pause and zero time scale do not advance real physics
+  ---
+  duration_ms: 2.040389
+  type: 'test'
+  ...
+# Subtest: action mappings combine opposing keyboard and multiple touch sources and clear on blur/pause
+ok 89 - action mappings combine opposing keyboard and multiple touch sources and clear on blur/pause
+  ---
+  duration_ms: 2.184867
+  type: 'test'
+  ...
+# Subtest: HUD text is literal and script destruction clears buttons, callbacks and virtual input
+ok 90 - HUD text is literal and script destruction clears buttons, callbacks and virtual input
+  ---
+  duration_ms: 0.573973
+  type: 'test'
+  ...
+# Subtest: audio buffers decode once, voices track owner/position, pause and timeScale freeze context, stop releases all
+ok 91 - audio buffers decode once, voices track owner/position, pause and timeScale freeze context, stop releases all
+  ---
+  duration_ms: 1.824254
+  type: 'test'
+  ...
+# Subtest: a late audio decode cannot revive a stopped run
+ok 92 - a late audio decode cannot revive a stopped run
+  ---
+  duration_ms: 0.24567
+  type: 'test'
+  ...
+# Subtest: animation groups switch with blend weights and owner destruction stops playback
+ok 93 - animation groups switch with blend weights and owner destruction stops playback
+  ---
+  duration_ms: 4.148942
+  type: 'test'
+  ...
+# Subtest: hiding a held HUD button releases only its own touches and does not resume stale input
+ok 94 - hiding a held HUD button releases only its own touches and does not resume stale input
+  ---
+  duration_ms: 0.896699
+  type: 'test'
+  ...
+# Subtest: HUD buttons created during pause stay disabled until the session resumes
+ok 95 - HUD buttons created during pause stay disabled until the session resumes
+  ---
+  duration_ms: 0.354824
+  type: 'test'
+  ...
+# Subtest: invalid spatial audio parameters allocate no Web Audio nodes
+ok 96 - invalid spatial audio parameters allocate no Web Audio nodes
+  ---
+  duration_ms: 0.622797
+  type: 'test'
+  ...
+# Subtest: aborted script physics APIs cannot mutate surviving rigid bodies
+ok 97 - aborted script physics APIs cannot mutate surviving rigid bodies
+  ---
+  duration_ms: 1.60894
+  type: 'test'
+  ...
+# Subtest: losing canvas pointer capture releases held mouse input
+ok 98 - losing canvas pointer capture releases held mouse input
+  ---
+  duration_ms: 1.882372
+  type: 'test'
+  ...
+# Subtest: unrelated pointer release does not end the active canvas drag
+ok 99 - unrelated pointer release does not end the active canvas drag
+  ---
+  duration_ms: 0.293251
+  type: 'test'
+  ...
+# Subtest: gamepad deadzones, opposing keyboard input, disconnect and zero-time reset; remap conflicts and defaults
+ok 100 - gamepad deadzones, opposing keyboard input, disconnect and zero-time reset; remap conflicts and defaults
+  ---
+  duration_ms: 2.669155
+  type: 'test'
+  ...
+# Subtest: hierarchy, owner subscriptions, disabled release and paused keyboard/gamepad menu activation
+ok 101 - hierarchy, owner subscriptions, disabled release and paused keyboard/gamepad menu activation
+  ---
+  duration_ms: 2.169804
+  type: 'test'
+  ...
+# Subtest: multi-touch joystick has radial deadzone and independent button ownership; cancellation and resize clear both axes
+ok 102 - multi-touch joystick has radial deadzone and independent button ownership; cancellation and resize clear both axes
+  ---
+  duration_ms: 0.978802
+  type: 'test'
+  ...
+# Subtest: rich text only creates allowlisted DOM elements and preserves untrusted markup as text
+ok 103 - rich text only creates allowlisted DOM elements and preserves untrusted markup as text
+  ---
+  duration_ms: 0.608004
+  type: 'test'
+  ...
+# Subtest: floating joystick follows the touch origin, hiding a parent releases descendants, owned rebind capture cancels
+ok 104 - floating joystick follows the touch origin, hiding a parent releases descendants, owned rebind capture cancels
+  ---
+  duration_ms: 0.906904
+  type: 'test'
+  ...
+# Subtest: window blur clears menu blockers and unfocused gamepad polling cannot activate menus
+ok 105 - window blur clears menu blockers and unfocused gamepad polling cannot activate menus
+  ---
+  duration_ms: 0.713714
+  type: 'test'
+  ...
+# Subtest: reverse menu navigation starts at the last item and Shift+Tab moves backwards
+ok 106 - reverse menu navigation starts at the last item and Shift+Tab moves backwards
+  ---
+  duration_ms: 0.839623
+  type: 'test'
+  ...
+# Subtest: invalid captured bindings reject promptly without escaping the keyboard handler
+ok 107 - invalid captured bindings reject promptly without escaping the keyboard handler
+  ---
+  duration_ms: 0.947815
+  type: 'test'
+  ...
+# Subtest: disposed input sessions reject binding mutations and new captures
+ok 108 - disposed input sessions reject binding mutations and new captures
+  ---
+  duration_ms: 0.401233
+  type: 'test'
+  ...
+# Subtest: UI subscriptions canceled inside a callback do not fire in the same dispatch
+ok 109 - UI subscriptions canceled inside a callback do not fire in the same dispatch
+  ---
+  duration_ms: 0.487774
+  type: 'test'
+  ...
+# Subtest: hiding a UI element inside an event prevents subsequent callbacks until shown
+ok 110 - hiding a UI element inside an event prevents subsequent callbacks until shown
+  ---
+  duration_ms: 0.35898
+  type: 'test'
+  ...
+# Subtest: invalid button callbacks fail without leaving window listeners or HUD elements
+ok 111 - invalid button callbacks fail without leaving window listeners or HUD elements
+  ---
+  duration_ms: 0.382676
+  type: 'test'
+  ...
+# Subtest: key release follows the original physical key when modifiers change its character
+ok 112 - key release follows the original physical key when modifiers change its character
+  ---
+  duration_ms: 0.549987
+  type: 'test'
+  ...
+# Subtest: releasing one of two physical modifier keys leaves the other held
+ok 113 - releasing one of two physical modifier keys leaves the other held
+  ---
+  duration_ms: 0.194522
+  type: 'test'
+  ...
+# Subtest: keyboard reset clears physical-key associations while action mappings retain their edges
+ok 114 - keyboard reset clears physical-key associations while action mappings retain their edges
+  ---
+  duration_ms: 0.27966
+  type: 'test'
+  ...
+# Subtest: blocking HUD interaction releases mouse state and pending mouse movement
+ok 115 - blocking HUD interaction releases mouse state and pending mouse movement
+  ---
+  duration_ms: 0.415545
+  type: 'test'
+  ...
+# Subtest: input events under disabled parents preserve their text and do not emit changes
+ok 116 - input events under disabled parents preserve their text and do not emit changes
+  ---
+  duration_ms: 0.629817
+  type: 'test'
+  ...
+# Subtest: rebinding keys preserves the action identity when passed an action descriptor
+ok 117 - rebinding keys preserves the action identity when passed an action descriptor
+  ---
+  duration_ms: 0.233351
+  type: 'test'
+  ...
+# Subtest: resetting an unknown action rejects without clearing held input or valid bindings
+ok 118 - resetting an unknown action rejects without clearing held input or valid bindings
+  ---
+  duration_ms: 0.253882
+  type: 'test'
+  ...
+# Subtest: HUD events skip subscribers whose owner entity is destroyed
+ok 119 - HUD events skip subscribers whose owner entity is destroyed
+  ---
+  duration_ms: 0.220171
+  type: 'test'
+  ...
+# Subtest: input mutations from an owner being destroyed preserve existing action mappings
+ok 120 - input mutations from an owner being destroyed preserve existing action mappings
+  ---
+  duration_ms: 1.694709
+  type: 'test'
+  ...
+# Subtest: pointer lock consumes relative motion without dragging, tracks buttons and releases on pause
+ok 121 - pointer lock consumes relative motion without dragging, tracks buttons and releases on pause
+  ---
+  duration_ms: 0.617368
+  type: 'test'
+  ...
+# Subtest: denied and late pointer lock grants are canceled without orphaning a destroyed owner
+ok 122 - denied and late pointer lock grants are canceled without orphaning a destroyed owner
+  ---
+  duration_ms: 0.216385
+  type: 'test'
+  ...
+# Lifecycle error reporting failed Error: reporter failed
+#     at Object.onError (file:///workspace/arkglide/tests/lifecycle.test.mjs:181:40)
+#     at report (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:44:26)
+#     at call (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:62:9)
+#     at release (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:82:7)
+#     at Object.stop (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:374:52)
+#     at file:///workspace/arkglide/tests/lifecycle.test.mjs:186:50
+#     at getActual (node:assert:611:5)
+#     at strict.doesNotThrow (node:assert:779:32)
+#     at TestContext.<anonymous> (file:///workspace/arkglide/tests/lifecycle.test.mjs:186:25)
+#     at Test.runInAsyncScope (node:async_hooks:227:14) Error: script destroy failed
+#     at Object.onDestroy (file:///workspace/arkglide/tests/lifecycle.test.mjs:184:30)
+#     at call (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:59:18)
+#     at release (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:82:7)
+#     at Object.stop (file:///workspace/arkglide/src/engine/lifecycle-runtime.js:374:52)
+#     at file:///workspace/arkglide/tests/lifecycle.test.mjs:186:50
+#     at getActual (node:assert:611:5)
+#     at strict.doesNotThrow (node:assert:779:32)
+#     at TestContext.<anonymous> (file:///workspace/arkglide/tests/lifecycle.test.mjs:186:25)
+#     at Test.runInAsyncScope (node:async_hooks:227:14)
+#     at Test.run (node:internal/test_runner/test:1382:25)
+# Subtest: injected native timers reject non-function callbacks without allocating timers
+ok 123 - injected native timers reject non-function callbacks without allocating timers
+  ---
+  duration_ms: 2.617898
+  type: 'test'
+  ...
+# Subtest: destroyed entities stop receiving events before the next cleanup tick
+ok 124 - destroyed entities stop receiving events before the next cleanup tick
+  ---
+  duration_ms: 1.162398
+  type: 'test'
+  ...
+# Subtest: invalid startup time scale preserves the existing simulation settings
+ok 125 - invalid startup time scale preserves the existing simulation settings
+  ---
+  duration_ms: 0.289175
+  type: 'test'
+  ...
+# Subtest: listener telemetry counts native event listeners rather than unrelated owned resources
+ok 126 - listener telemetry counts native event listeners rather than unrelated owned resources
+  ---
+  duration_ms: 0.409165
+  type: 'test'
+  ...
+# Subtest: tick removes script records of entities destroyed outside the lifecycle API
+ok 127 - tick removes script records of entities destroyed outside the lifecycle API
+  ---
+  duration_ms: 0.500813
+  type: 'test'
+  ...
+# Subtest: destroying owners do not receive events emitted by another owner during teardown
+ok 128 - destroying owners do not receive events emitted by another owner during teardown
+  ---
+  duration_ms: 0.321934
+  type: 'test'
+  ...
+# Subtest: pause requested during startup remains effective until explicit resume
+ok 129 - pause requested during startup remains effective until explicit resume
+  ---
+  duration_ms: 0.262355
+  type: 'test'
+  ...
+# Subtest: late owners after session stop remain inactive and retain no script records
+ok 130 - late owners after session stop remain inactive and retain no script records
+  ---
+  duration_ms: 0.50573
+  type: 'test'
+  ...
+# Subtest: stopping inside a fixed hook prevents physics stepping and stopped sessions cannot resume
+ok 131 - stopping inside a fixed hook prevents physics stepping and stopped sessions cannot resume
+  ---
+  duration_ms: 1.024421
+  type: 'test'
+  ...
+# Subtest: pausing inside a timer defers remaining timers and frame hooks until resume
+ok 132 - pausing inside a timer defers remaining timers and frame hooks until resume
+  ---
+  duration_ms: 1.626402
+  type: 'test'
+  ...
+# Subtest: fixed-step results agree at 30, 60 and 120 FPS and run before frame hooks
+ok 133 - fixed-step results agree at 30, 60 and 120 FPS and run before frame hooks
+  ---
+  duration_ms: 0.770659
+  type: 'test'
+  ...
+# Subtest: time scaling freezes timers; pause/resume and catch-up limits avoid a large jump
+ok 134 - time scaling freezes timers; pause/resume and catch-up limits avoid a large jump
+  ---
+  duration_ms: 0.258649
+  type: 'test'
+  ...
+# Subtest: timer/event ownership, native listener cleanup and repeated stop are deterministic
+ok 135 - timer/event ownership, native listener cleanup and repeated stop are deterministic
+  ---
+  duration_ms: 0.509967
+  type: 'test'
+  ...
+# Subtest: all factories complete before startup; destroyed and aborted owners release resources
+ok 136 - all factories complete before startup; destroyed and aborted owners release resources
+  ---
+  duration_ms: 0.238068
+  type: 'test'
+  ...
+# Subtest: a throwing hook is disabled once while other scripts continue
+ok 137 - a throwing hook is disabled once while other scripts continue
+  ---
+  duration_ms: 0.430298
+  type: 'test'
+  ...
+# Subtest: invalid fixed settings fail rather than looping and a timer cannot fire after cancel
+ok 138 - invalid fixed settings fail rather than looping and a timer cannot fire after cancel
+  ---
+  duration_ms: 0.287993
+  type: 'test'
+  ...
+# Subtest: one bad subscriber does not cancel other same-name subscriptions and once listeners are counted accurately
+ok 139 - one bad subscriber does not cancel other same-name subscriptions and once listeners are counted accurately
+  ---
+  duration_ms: 0.215414
+  type: 'test'
+  ...
+# Subtest: canceled event subscriptions do not fire later in the same dispatch or nested once dispatch
+ok 140 - canceled event subscriptions do not fire later in the same dispatch or nested once dispatch
+  ---
+  duration_ms: 0.230938
+  type: 'test'
+  ...
+# Subtest: listener cleanup uses the capture mode from registration
+ok 141 - listener cleanup uses the capture mode from registration
+  ---
+  duration_ms: 0.154752
+  type: 'test'
+  ...
+# Subtest: aborted native listeners release their owned cleanup records
+ok 142 - aborted native listeners release their owned cleanup records
+  ---
+  duration_ms: 0.270246
+  type: 'test'
+  ...
+# Subtest: a throwing error reporter cannot interrupt script teardown or remaining owners
+ok 143 - a throwing error reporter cannot interrupt script teardown or remaining owners
+  ---
+  duration_ms: 1.302589
+  type: 'test'
+  ...
+# Subtest: WASM Vector3 API matches JS including zero vectors and interpolation
+ok 144 - WASM Vector3 API matches JS including zero vectors and interpolation
+  ---
+  duration_ms: 2.581323
+  type: 'test'
+  ...
+# Subtest: WASM Matrix4 scene compose matches Babylon YXZ transforms and hierarchy
+ok 145 - WASM Matrix4 scene compose matches Babylon YXZ transforms and hierarchy
+  ---
+  duration_ms: 13.046556
+  type: 'test'
+  ...
+# Subtest: WASM quaternion facade uses shortest path and keeps slerp endpoints
+ok 146 - WASM quaternion facade uses shortest path and keeps slerp endpoints
+  ---
+  duration_ms: 0.928226
+  type: 'test'
+  ...
+# Subtest: vector normalization remains finite for nonzero vectors across float magnitudes
+ok 147 - vector normalization remains finite for nonzero vectors across float magnitudes
+  ---
+  duration_ms: 0.23938
+  type: 'test'
+  ...
+# Subtest: quaternion normalization preserves rotations across float magnitudes
+ok 148 - quaternion normalization preserves rotations across float magnitudes
+  ---
+  duration_ms: 0.233641
+  type: 'test'
+  ...
+# Subtest: axis-angle rotation is independent of finite nonzero axis magnitude
+ok 149 - axis-angle rotation is independent of finite nonzero axis magnitude
+  ---
+  duration_ms: 0.229225
+  type: 'test'
+  ...
+# Subtest: vector length stays representable across very small and large magnitudes
+ok 150 - vector length stays representable across very small and large magnitudes
+  ---
+  duration_ms: 0.167813
+  type: 'test'
+  ...
+# Subtest: vector distance preserves representable small and large separations
+ok 151 - vector distance preserves representable small and large separations
+  ---
+  duration_ms: 0.154002
+  type: 'test'
+  ...
+# Subtest: native imports support live bindings, default, aliases, namespace, reexports and side effects
+ok 152 - native imports support live bindings, default, aliases, namespace, reexports and side effects
+  ---
+  duration_ms: 15.894078
+  type: 'test'
+  ...
+# Subtest: exported factories receive isolated API contexts; literal dynamic imports use the project graph
+ok 153 - exported factories receive isolated API contexts; literal dynamic imports use the project graph
+  ---
+  duration_ms: 7.998141
+  type: 'test'
+  ...
+# Subtest: invalid graphs report actionable file diagnostics without breaking unrelated entry scripts
+ok 154 - invalid graphs report actionable file diagnostics without breaking unrelated entry scripts
+  ---
+  duration_ms: 10.970453
+  type: 'test'
+  ...
+# Subtest: async iteration inside a script factory remains supported
+ok 155 - async iteration inside a script factory remains supported
+  ---
+  duration_ms: 0.9372
+  type: 'test'
+  ...
+# Subtest: native module errors map rewritten import paths and factory headers to original line and column
+ok 156 - native module errors map rewritten import paths and factory headers to original line and column
+  ---
+  duration_ms: 2.363305
+  type: 'test'
+  ...
+# Subtest: cancellation revokes blobs and never retains late module factories
+ok 157 - cancellation revokes blobs and never retains late module factories
+  ---
+  duration_ms: 0.416898
+  type: 'test'
+  ...
+# Subtest: preparing a disposed loader does not create or import modules
+ok 158 - preparing a disposed loader does not create or import modules
+  ---
+  duration_ms: 0.196255
+  type: 'test'
+  ...
+# Subtest: renaming modules rewrites static imports, reexports, literal dynamic imports and moved relative dependencies
+ok 159 - renaming modules rewrites static imports, reexports, literal dynamic imports and moved relative dependencies
+  ---
+  duration_ms: 2.48652
+  type: 'test'
+  ...
+# Subtest: renaming modules retains dynamic imports and reexports while code is incomplete
+ok 160 - renaming modules retains dynamic imports and reexports while code is incomplete
+  ---
+  duration_ms: 6.784886
+  type: 'test'
+  ...
+# Subtest: parser ignores imports in comments, strings and regexes; diagnostics preserve original module line
+ok 161 - parser ignores imports in comments, strings and regexes; diagnostics preserve original module line
+  ---
+  duration_ms: 1.045683
+  type: 'test'
+  ...
+# Subtest: renaming incomplete modules preserves reexports with string export names
+ok 162 - renaming incomplete modules preserves reexports with string export names
+  ---
+  duration_ms: 0.531089
+  type: 'test'
+  ...
+# Subtest: renaming incomplete modules preserves imports with string binding names
+ok 163 - renaming incomplete modules preserves imports with string binding names
+  ---
+  duration_ms: 0.438379
+  type: 'test'
+  ...
+# Subtest: tolerant renaming handles string namespace reexport aliases
+ok 164 - tolerant renaming handles string namespace reexport aliases
+  ---
+  duration_ms: 0.536037
+  type: 'test'
+  ...
+# Subtest: nested templates create independent parent/child associations; updates retain local axes
+ok 165 - nested templates create independent parent/child associations; updates retain local axes
+  ---
+  duration_ms: 656.179495
+  type: 'test'
+  ...
+# Subtest: nested child additions and removals propagate through enclosing templates without duplicated source nodes
+ok 166 - nested child additions and removals propagate through enclosing templates without duplicated source nodes
+  ---
+  duration_ms: 11.226387
+  type: 'test'
+  ...
+# Subtest: nested child local deletion, resets, unpacking and undo retain valid associations
+ok 167 - nested child local deletion, resets, unpacking and undo retain valid associations
+  ---
+  duration_ms: 16.256239
+  type: 'test'
+  ...
+# Subtest: multi-level nesting propagates updates and prevents cyclic dependencies atomically
+ok 168 - multi-level nesting propagates updates and prevents cyclic dependencies atomically
+  ---
+  duration_ms: 11.109542
+  type: 'test'
+  ...
+# Subtest: full nested copies retain associations; copying a child produces a standalone child instance
+ok 169 - full nested copies retain associations; copying a child produces a standalone child instance
+  ---
+  duration_ms: 4.422282
+  type: 'test'
+  ...
+# Subtest: nested templates and per-part materials roundtrip ZIP; missing child templates and cycles reject atomically
+ok 170 - nested templates and per-part materials roundtrip ZIP; missing child templates and cycles reject atomically
+  ---
+  duration_ms: 25.79336
+  type: 'test'
+  ...
+# Subtest: enclosing template edits retain nested associations, configured child overrides and child template independence
+ok 171 - enclosing template edits retain nested associations, configured child overrides and child template independence
+  ---
+  duration_ms: 8.487919
+  type: 'test'
+  ...
+# Subtest: resetting an enclosing instance restores nested mounts; unpacking an outer instance retains linked children
+ok 172 - resetting an enclosing instance restores nested mounts; unpacking an outer instance retains linked children
+  ---
+  duration_ms: 6.642452
+  type: 'test'
+  ...
+# Subtest: parent template can remove a nested association; template-only dependency deletion remains guarded
+ok 173 - parent template can remove a nested association; template-only dependency deletion remains guarded
+  ---
+  duration_ms: 7.439922
+  type: 'test'
+  ...
+# Subtest: clipboard restores deleted nested dependencies, slot materials and texture buffers
+ok 174 - clipboard restores deleted nested dependencies, slot materials and texture buffers
+  ---
+  duration_ms: 24.162016
+  type: 'test'
+  ...
+# Subtest: script rename/delete and their undo preserve nested baseline bindings and later generated templates
+ok 175 - script rename/delete and their undo preserve nested baseline bindings and later generated templates
+  ---
+  duration_ms: 15.435489
+  type: 'test'
+  ...
+# Subtest: nested snapshots and slot assignments persist in atomic IndexedDB and recovery records
+ok 176 - nested snapshots and slot assignments persist in atomic IndexedDB and recovery records
+  ---
+  duration_ms: 23.143114
+  type: 'test'
+  ...
+# Subtest: applying a scene-only nested child first to the outer template and then the inner template never duplicates it
+ok 177 - applying a scene-only nested child first to the outer template and then the inner template never duplicates it
+  ---
+  duration_ms: 5.806925
+  type: 'test'
+  ...
+# Subtest: resetting an enclosing prefab preserves unpacked nested mounts in undo history
+ok 178 - resetting an enclosing prefab preserves unpacked nested mounts in undo history
+  ---
+  duration_ms: 8.686748
+  type: 'test'
+  ...
+# Subtest: template propagation removes deleted nodes from the current selection
+ok 179 - template propagation removes deleted nodes from the current selection
+  ---
+  duration_ms: 3.368056
+  type: 'test'
+  ...
+# Subtest: template propagation clears selection when every selected node is removed
+ok 180 - template propagation clears selection when every selected node is removed
+  ---
+  duration_ms: 3.701467
+  type: 'test'
+  ...
+# Subtest: template node deletion clears scene joints targeting removed instance bodies
+ok 181 - template node deletion clears scene joints targeting removed instance bodies
+  ---
+  duration_ms: 7.717119
+  type: 'test'
+  ...
+# Subtest: prefab subtree traversal handles deep reverse storage and preserves source order
+ok 182 - prefab subtree traversal handles deep reverse storage and preserves source order
+  ---
+  duration_ms: 19.024317
+  type: 'test'
+  ...
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:26]: Babylon.js v9.28.0 - Null engine
+# Subtest: real Jolt ray, shape cast and overlap return live world-space hits and obey group filters
+ok 183 - real Jolt ray, shape cast and overlap return live world-space hits and obey group filters
+  ---
+  duration_ms: 28.861475
+  type: 'test'
+  ...
+# Subtest: real Jolt model hull and static mesh shapes build, cache and release; dynamic mesh is rejected
+ok 184 - real Jolt model hull and static mesh shapes build, cache and release; dynamic mesh is rejected
+  ---
+  duration_ms: 30.400681
+  type: 'test'
+  ...
+# Subtest: model collision geometry accepts index counts within the documented limit
+ok 185 - model collision geometry accepts index counts within the documented limit
+  ---
+  duration_ms: 40.147733
+  type: 'test'
+  ...
+# Subtest: native capsule controller walks, grounds, jumps and releases on owner disposal
+ok 186 - native capsule controller walks, grounds, jumps and releases on owner disposal
+  ---
+  duration_ms: 31.68338
+  type: 'test'
+  ...
+# Subtest: four native joint types attach to live bodies and are removed before endpoint destruction
+ok 187 - four native joint types attach to live bodies and are removed before endpoint destruction
+  ---
+  duration_ms: 16.154561
+  type: 'test'
+  ...
+# Subtest: native collider wireframes follow rotated parent world transforms and disabling disposes every mesh
+ok 188 - native collider wireframes follow rotated parent world transforms and disabling disposes every mesh
+  ---
+  duration_ms: 7.430077
+  type: 'test'
+  ...
+# Subtest: native character crosses a low step, follows a walkable ramp and slides along a wall
+ok 189 - native character crosses a low step, follows a walkable ramp and slides along a wall
+  ---
+  duration_ms: 63.962957
+  type: 'test'
+  ...
+# Subtest: native character inherits kinematic platform velocity and platform stops without residual drift
+ok 190 - native character inherits kinematic platform velocity and platform stops without residual drift
+  ---
+  duration_ms: 17.240234
+  type: 'test'
+  ...
+# Subtest: mutual collision masks control native sensor contacts, and invalid limits/filters reject before native allocation
+ok 191 - mutual collision masks control native sensor contacts, and invalid limits/filters reject before native allocation
+  ---
+  duration_ms: 4.103713
+  type: 'test'
+  ...
+# Subtest: virtual character peer collisions obey the same mutual group masks as native bodies
+ok 192 - virtual character peer collisions obey the same mutual group masks as native bodies
+  ---
+  duration_ms: 44.303745
+  type: 'test'
+  ...
+# Subtest: removed character handles cannot control a replacement on the same entity
+ok 193 - removed character handles cannot control a replacement on the same entity
+  ---
+  duration_ms: 1.844214
+  type: 'test'
+  ...
+# Subtest: aborting an old character owner leaves another owner's replacement alive
+ok 194 - aborting an old character owner leaves another owner's replacement alive
+  ---
+  duration_ms: 1.288198
+  type: 'test'
+  ...
+# Subtest: invalid joint anchors are rejected before allocating native settings or vectors
+ok 195 - invalid joint anchors are rejected before allocating native settings or vectors
+  ---
+  duration_ms: 1.166124
+  type: 'test'
+  ...
+# Subtest: unknown collision groups fail before allocating native body shapes
+ok 196 - unknown collision groups fail before allocating native body shapes
+  ---
+  duration_ms: 0.840334
+  type: 'test'
+  ...
+# Subtest: contact subscriptions created through another owner during shutdown are released
+ok 197 - contact subscriptions created through another owner during shutdown are released
+  ---
+  duration_ms: 1.373977
+  type: 'test'
+  ...
+# Subtest: contact callbacks skip owners whose entity was destroyed before cleanup
+ok 198 - contact callbacks skip owners whose entity was destroyed before cleanup
+  ---
+  duration_ms: 1.282168
+  type: 'test'
+  ...
+# Subtest: a failed contact callback is unsubscribed before diagnostic reporting
+ok 199 - a failed contact callback is unsubscribed before diagnostic reporting
+  ---
+  duration_ms: 0.979994
+  type: 'test'
+  ...
+# Subtest: contact registration after physics disposal rejects without retaining a subscription
+ok 200 - contact registration after physics disposal rejects without retaining a subscription
+  ---
+  duration_ms: 0.540012
+  type: 'test'
+  ...
+# Subtest: contact dispatch skips remaining subscribers after a contact entity is disposed
+ok 201 - contact dispatch skips remaining subscribers after a contact entity is disposed
+  ---
+  duration_ms: 1.745907
+  type: 'test'
+  ...
+# Subtest: queries ignore disposed entities before the next physics cleanup step
+ok 202 - queries ignore disposed entities before the next physics cleanup step
+  ---
+  duration_ms: 1.904094
+  type: 'test'
+  ...
+# Subtest: static Babylon triangle meshes have outward Jolt winding and support a real character
+ok 203 - static Babylon triangle meshes have outward Jolt winding and support a real character
+  ---
+  duration_ms: 10.381767
+  type: 'test'
+  ...
+# Subtest: Inspector-authored joint anchors cross the cloned API boundary as plain world vectors
+ok 204 - Inspector-authored joint anchors cross the cloned API boundary as plain world vectors
+  ---
+  duration_ms: 3.519023
+  type: 'test'
+  ...
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:28]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:29]: Babylon.js v9.28.0 - Null engine
+# Subtest: vertical rig headings retain transformed azimuth instead of snapping to world +Z
+ok 205 - vertical rig headings retain transformed azimuth instead of snapping to world +Z
+  ---
+  duration_ms: 22.141978
+  type: 'test'
+  ...
+# Subtest: upright characters retain azimuth when a portal maps their facing exactly vertical
+ok 206 - upright characters retain azimuth when a portal maps their facing exactly vertical
+  ---
+  duration_ms: 29.033464
+  type: 'test'
+  ...
+# Subtest: portal warps map direct character input so the next control update cannot add stale carry
+ok 207 - portal warps map direct character input so the next control update cannot add stale carry
+  ---
+  duration_ms: 2.175212
+  type: 'test'
+  ...
+# Subtest: traversal budgets are configurable and invalid step or ray inputs leave the world unchanged
+ok 208 - traversal budgets are configurable and invalid step or ray inputs leave the world unchanged
+  ---
+  duration_ms: 35.79843
+  type: 'test'
+  ...
+# Subtest: a native box returns through the destination aperture without being stopped by its entrance ghost
+ok 209 - a native box returns through the destination aperture without being stopped by its entrance ghost
+  ---
+  duration_ms: 48.343411
+  type: 'test'
+  ...
+# Subtest: a rotated native box that fits the ellipse can traverse and return without an AABB corner false rejection
+ok 210 - a rotated native box that fits the ellipse can traverse and return without an AABB corner false rejection
+  ---
+  duration_ms: 44.352268
+  type: 'test'
+  ...
+# Subtest: a grounded capsule that physically fits the low ellipse must traverse instead of walking out through the cut wall
+ok 211 - a grounded capsule that physically fits the low ellipse must traverse instead of walking out through the cut wall
+  ---
+  duration_ms: 247.447653
+  type: 'test'
+  ...
+# Subtest: force-held native bodies can return through either endpoint with floor contacts and gravity
+ok 212 - force-held native bodies can return through either endpoint with floor contacts and gravity
+  ---
+  duration_ms: 27.218183
+  type: 'test'
+  ...
+# Subtest: an exit-floor contact supports the traveler without canceling tangential portal movement
+ok 213 - an exit-floor contact supports the traveler without canceling tangential portal movement
+  ---
+  duration_ms: 15.181607
+  type: 'test'
+  ...
+# Subtest: rejected kinematic entries are solid and report their reason instead of leaking through an open wall
+ok 214 - rejected kinematic entries are solid and report their reason instead of leaking through an open wall
+  ---
+  duration_ms: 10.846186
+  type: 'test'
+  ...
+# Subtest: an incompatible upright exit and crossings shallower than the old epsilon are handled explicitly
+ok 215 - an incompatible upright exit and crossings shallower than the old epsilon are handled explicitly
+  ---
+  duration_ms: 5.499312
+  type: 'test'
+  ...
+# Subtest: portal maps points, rotation and momentum round-trip across rotated frames
+ok 216 - portal maps points, rotation and momentum round-trip across rotated frames
+  ---
+  duration_ms: 2.334242
+  type: 'test'
+  ...
+# Subtest: linked ellipse cuts only its aperture, close restores real wall and invalid placement does not move it
+ok 217 - linked ellipse cuts only its aperture, close restores real wall and invalid placement does not move it
+  ---
+  duration_ms: 11.236522
+  type: 'test'
+  ...
+# Subtest: native dynamic traveler crosses rotated walls with momentum and angular velocity; reverse movement does not bounce
+ok 218 - native dynamic traveler crosses rotated walls with momentum and angular velocity; reverse movement does not bounce
+  ---
+  duration_ms: 10.416229
+  type: 'test'
+  ...
+# Subtest: native wall remains solid beyond aperture and oversized bodies cannot tunnel through edges
+ok 219 - native wall remains solid beyond aperture and oversized bodies cannot tunnel through edges
+  ---
+  duration_ms: 16.503866
+  type: 'test'
+  ...
+# Subtest: cross-portal ray keeps total range and maps its path to a destination object
+ok 220 - cross-portal ray keeps total range and maps its path to a destination object
+  ---
+  duration_ms: 6.760349
+  type: 'test'
+  ...
+# Subtest: inertial characters retain horizontal launch speed, receive delta velocity impulses and remain compatible with cameras
+ok 221 - inertial characters retain horizontal launch speed, receive delta velocity impulses and remain compatible with cameras
+  ---
+  duration_ms: 3.449249
+  type: 'test'
+  ...
+# Subtest: observer follows a separate viewpoint, third-person collision shortens its boom, invalid rigs release resources
+ok 222 - observer follows a separate viewpoint, third-person collision shortens its boom, invalid rigs release resources
+  ---
+  duration_ms: 2.857979
+  type: 'test'
+  ...
+# Subtest: floor-to-wall character launch converts vertical momentum and camera orientation without horizontal loss
+ok 223 - floor-to-wall character launch converts vertical momentum and camera orientation without horizontal loss
+  ---
+  duration_ms: 17.353394
+  type: 'test'
+  ...
+# Subtest: exit collision applies before traveler center crosses
+ok 224 - exit collision applies before traveler center crosses
+  ---
+  duration_ms: 17.688858
+  type: 'test'
+  ...
+# Subtest: partially crossing objects render clipped clones, closing evacuates the actor and owner disposal releases all resources
+ok 225 - partially crossing objects render clipped clones, closing evacuates the actor and owner disposal releases all resources
+  ---
+  duration_ms: 11.398997
+  type: 'test'
+  ...
+# Subtest: force grab obeys mass, custom force budget, collision, release and owner cleanup
+ok 226 - force grab obeys mass, custom force budget, collision, release and owner cleanup
+  ---
+  duration_ms: 1.288859
+  type: 'test'
+  ...
+# Subtest: partial exit contacts transfer linear momentum to another dynamic body
+ok 227 - partial exit contacts transfer linear momentum to another dynamic body
+  ---
+  duration_ms: 17.57914
+  type: 'test'
+  ...
+# Subtest: camera validation and expired portal handles cannot leak or mutate engine resources
+ok 228 - camera validation and expired portal handles cannot leak or mutate engine resources
+  ---
+  duration_ms: 2.322003
+  type: 'test'
+  ...
+# Subtest: holding through a portal applies force in the object current segment and updates after traversal
+ok 229 - holding through a portal applies force in the object current segment and updates after traversal
+  ---
+  duration_ms: 6.160216
+  type: 'test'
+  ...
+# Subtest: generic point and angular impulses use native inertia and expose point velocity
+ok 230 - generic point and angular impulses use native inertia and expose point velocity
+  ---
+  duration_ms: 3.931283
+  type: 'test'
+  ...
+# Subtest: character mass config is native, invalid masses fail atomically and state copies cannot mutate pending motion
+ok 231 - character mass config is native, invalid masses fail atomically and state copies cannot mutate pending motion
+  ---
+  duration_ms: 3.82228
+  type: 'test'
+  ...
+# Subtest: portal visual clones release their texture copies while retaining shared source textures
+ok 232 - portal visual clones release their texture copies while retaining shared source textures
+  ---
+  duration_ms: 7.299841
+  type: 'test'
+  ...
+# Subtest: registered surfaces reject movement explicitly and removed components release registrations
+ok 233 - registered surfaces reject movement explicitly and removed components release registrations
+  ---
+  duration_ms: 5.367063
+  type: 'test'
+  ...
+# Subtest: kinematic portal panels retain real holes, interpolate full-frame targets and restore the original collider
+ok 234 - kinematic portal panels retain real holes, interpolate full-frame targets and restore the original collider
+  ---
+  duration_ms: 11.119256
+  type: 'test'
+  ...
+# Subtest: a moving entrance sweeps a stationary traveler and transfers frame-relative momentum
+ok 235 - a moving entrance sweeps a stationary traveler and transfers frame-relative momentum
+  ---
+  duration_ms: 8.0236
+  type: 'test'
+  ...
+# Subtest: dynamic portal hosts preserve configured mass through convex cutting and move attached poses
+ok 236 - dynamic portal hosts preserve configured mass through convex cutting and move attached poses
+  ---
+  duration_ms: 5.752734
+  type: 'test'
+  ...
+# Subtest: whole-island portal traversal preserves native fixed joints and publishes coherent states
+ok 237 - whole-island portal traversal preserves native fixed joints and publishes coherent states
+  ---
+  duration_ms: 15.686907
+  type: 'test'
+  ...
+# Subtest: whole-island portal traversal preserves native hinge joints and publishes coherent states
+ok 238 - whole-island portal traversal preserves native hinge joints and publishes coherent states
+  ---
+  duration_ms: 11.344065
+  type: 'test'
+  ...
+# Subtest: whole-island portal traversal preserves native slider joints and publishes coherent states
+ok 239 - whole-island portal traversal preserves native slider joints and publishes coherent states
+  ---
+  duration_ms: 10.80257
+  type: 'test'
+  ...
+# Subtest: whole-island portal traversal preserves native distance joints and publishes coherent states
+ok 240 - whole-island portal traversal preserves native distance joints and publishes coherent states
+  ---
+  duration_ms: 13.374529
+  type: 'test'
+  ...
+# Subtest: unregistered joint peers block crossing safely instead of pulling a transported endpoint across rooms
+ok 241 - unregistered joint peers block crossing safely instead of pulling a transported endpoint across rooms
+  ---
+  duration_ms: 6.617635
+  type: 'test'
+  ...
+# Subtest: assembly traversal checks both aperture fit and the entire exit clearance path
+ok 242 - assembly traversal checks both aperture fit and the entire exit clearance path
+  ---
+  duration_ms: 12.075635
+  type: 'test'
+  ...
+# Subtest: assembly registration validates atomically, observes topology changes and cleans up with its owner
+ok 243 - assembly registration validates atomically, observes topology changes and cleans up with its owner
+  ---
+  duration_ms: 7.04689
+  type: 'test'
+  ...
+# Subtest: closing a portal evacuates a partial native joint island by one shared translation
+ok 244 - closing a portal evacuates a partial native joint island by one shared translation
+  ---
+  duration_ms: 4.59312
+  type: 'test'
+  ...
+# Subtest: rotating entrances and moving exits convert point and angular velocities in both host frames
+ok 245 - rotating entrances and moving exits convert point and angular velocities in both host frames
+  ---
+  duration_ms: 7.223096
+  type: 'test'
+  ...
+# Subtest: kinematic traveler retains the mapped remainder of its whole-frame target after crossing
+ok 246 - kinematic traveler retains the mapped remainder of its whole-frame target after crossing
+  ---
+  duration_ms: 2.464277
+  type: 'test'
+  ...
+# Subtest: asymmetric holes on a dynamic host preserve its native constraint anchor frame through restoration
+ok 247 - asymmetric holes on a dynamic host preserve its native constraint anchor frame through restoration
+  ---
+  duration_ms: 9.182083
+  type: 'test'
+  ...
+# Subtest: subdivided kinematic targets preserve parented world poses even when child bodies were added first
+ok 248 - subdivided kinematic targets preserve parented world poses even when child bodies were added first
+  ---
+  duration_ms: 5.064989
+  type: 'test'
+  ...
+# Subtest: observer movement directions follow its actual viewpoint rather than a previous first-person heading
+ok 249 - observer movement directions follow its actual viewpoint rather than a previous first-person heading
+  ---
+  duration_ms: 1.961571
+  type: 'test'
+  ...
+# Subtest: prefab depth limits are independent of template insertion order
+ok 250 - prefab depth limits are independent of template insertion order
+  ---
+  duration_ms: 167.98235
+  type: 'test'
+  ...
+# Subtest: failed prefab model buffer copies release pending spawn bookkeeping
+ok 251 - failed prefab model buffer copies release pending spawn bookkeeping
+  ---
+  duration_ms: 10.23799
+  type: 'test'
+  ...
+# Subtest: module renaming and history preserve import source through IndexedDB and ZIP roundtrip
+ok 252 - module renaming and history preserve import source through IndexedDB and ZIP roundtrip
+  ---
+  duration_ms: 1968.671552
+  type: 'test'
+  ...
+# Subtest: IndexedDB migrates old schema and isolates models shared by node ID across projects
+ok 253 - IndexedDB migrates old schema and isolates models shared by node ID across projects
+  ---
+  duration_ms: 3.091811
+  type: 'test'
+  ...
+# BJS - [11:37:31]: Babylon.js v9.28.0 - Null engine
+# Subtest: synchronous binary clone failures roll back the whole project snapshot
+ok 254 - synchronous binary clone failures roll back the whole project snapshot
+  ---
+  duration_ms: 2.893443
+  type: 'test'
+  ...
+# Subtest: model copy/paste, duplicate, deletion and undo preserve binary assets and descendants
+ok 255 - model copy/paste, duplicate, deletion and undo preserve binary assets and descendants
+  ---
+  duration_ms: 3.810182
+  type: 'test'
+  ...
+# Subtest: ZIP roundtrip is atomic, preserves binaries/settings and clears project history
+ok 256 - ZIP roundtrip is atomic, preserves binaries/settings and clears project history
+  ---
+  duration_ms: 8.095258
+  type: 'test'
+  ...
+# Subtest: script renames/deletes update bindings and undo restores file identity and settings
+ok 257 - script renames/deletes update bindings and undo restores file identity and settings
+  ---
+  duration_ms: 2.378768
+  type: 'test'
+  ...
+# Subtest: invalid hierarchy is rejected before project replacement; new node IDs never collide
+ok 258 - invalid hierarchy is rejected before project replacement; new node IDs never collide
+  ---
+  duration_ms: 0.859824
+  type: 'test'
+  ...
+# Subtest: project validation rejects unsafe or non-JavaScript script paths before loading
+ok 259 - project validation rejects unsafe or non-JavaScript script paths before loading
+  ---
+  duration_ms: 0.306411
+  type: 'test'
+  ...
+# Subtest: script creation and renaming preserve saveable project paths
+ok 260 - script creation and renaming preserve saveable project paths
+  ---
+  duration_ms: 0.556537
+  type: 'test'
+  ...
+# Subtest: project validation rejects model paths that cannot be loaded as GLB or glTF
+ok 261 - project validation rejects model paths that cannot be loaded as GLB or glTF
+  ---
+  duration_ms: 0.398419
+  type: 'test'
+  ...
+# Subtest: project normalization rejects model references with non-model filenames
+ok 262 - project normalization rejects model references with non-model filenames
+  ---
+  duration_ms: 0.27896
+  type: 'test'
+  ...
+# Subtest: multi-selection applies rotation/scale around pivot and skips selected descendants
+ok 263 - multi-selection applies rotation/scale around pivot and skips selected descendants
+  ---
+  duration_ms: 10.253745
+  type: 'test'
+  ...
+# Subtest: pause before play is ignored and resume preserves the original play snapshot
+ok 264 - pause before play is ignored and resume preserves the original play snapshot
+  ---
+  duration_ms: 0.531039
+  type: 'test'
+  ...
+# Subtest: glTF sidecars are embedded before storing and missing resources fail explicitly
+ok 265 - glTF sidecars are embedded before storing and missing resources fail explicitly
+  ---
+  duration_ms: 0.976179
+  type: 'test'
+  ...
+# Subtest: glTF sidecars cannot resolve above the mounted asset root
+ok 266 - glTF sidecars cannot resolve above the mounted asset root
+  ---
+  duration_ms: 0.284138
+  type: 'test'
+  ...
+# Subtest: ZIP keeps a missing model missing when another model has the same filename
+ok 267 - ZIP keeps a missing model missing when another model has the same filename
+  ---
+  duration_ms: 3.522579
+  type: 'test'
+  ...
+# Subtest: legacy project migration adds time defaults; future versions and invalid references leave current project untouched
+ok 268 - legacy project migration adds time defaults; future versions and invalid references leave current project untouched
+  ---
+  duration_ms: 1.868101
+  type: 'test'
+  ...
+# Subtest: automatic recovery atomically stores script, scene and binary data without overwriting the saved project
+ok 269 - automatic recovery atomically stores script, scene and binary data without overwriting the saved project
+  ---
+  duration_ms: 6.614571
+  type: 'test'
+  ...
+# Subtest: failed auto save is visible, leaves editing data intact and can be retried
+ok 270 - failed auto save is visible, leaves editing data intact and can be retried
+  ---
+  duration_ms: 1.375589
+  type: 'test'
+  ...
+# Subtest: autosave switches documents safely and a queued stale save cannot overwrite newer edits
+ok 271 - autosave switches documents safely and a queued stale save cannot overwrite newer edits
+  ---
+  duration_ms: 1.181868
+  type: 'test'
+  ...
+# Subtest: restoring damaged data is atomic and missing binary data is reported
+ok 272 - restoring damaged data is atomic and missing binary data is reported
+  ---
+  duration_ms: 1.812005
+  type: 'test'
+  ...
+# Subtest: unchanged playback does not create a recovery draft and draft retention is bounded
+ok 273 - unchanged playback does not create a recovery draft and draft retention is bounded
+  ---
+  duration_ms: 30.701325
+  type: 'test'
+  ...
+# Subtest: third batch components, audio bytes and action/HUD configuration persist in ZIP, IndexedDB and recovery
+ok 274 - third batch components, audio bytes and action/HUD configuration persist in ZIP, IndexedDB and recovery
+  ---
+  duration_ms: 10.209899
+  type: 'test'
+  ...
+# Subtest: invalid gameplay imports are atomic; missing audio warns; audio replacement and deletion undo correctly
+ok 275 - invalid gameplay imports are atomic; missing audio warns; audio replacement and deletion undo correctly
+  ---
+  duration_ms: 1.406867
+  type: 'test'
+  ...
+# Subtest: prefab snapshots and clipboard preserve gameplay components and referenced audio
+ok 276 - prefab snapshots and clipboard preserve gameplay components and referenced audio
+  ---
+  duration_ms: 4.826717
+  type: 'test'
+  ...
+# Subtest: project replacement clears model part catalogs from the previous document
+ok 277 - project replacement clears model part catalogs from the previous document
+  ---
+  duration_ms: 0.800043
+  type: 'test'
+  ...
+# Subtest: overlapping first saves use one project ID and retain the later snapshot
+ok 278 - overlapping first saves use one project ID and retain the later snapshot
+  ---
+  duration_ms: 2.26706
+  type: 'test'
+  ...
+# Subtest: overlapping saves from different documents keep separate IDs and current state
+ok 279 - overlapping saves from different documents keep separate IDs and current state
+  ---
+  duration_ms: 2.373912
+  type: 'test'
+  ...
+# Subtest: a delayed file import cannot overwrite a document opened while reading
+ok 280 - a delayed file import cannot overwrite a document opened while reading
+  ---
+  duration_ms: 0.936769
+  type: 'test'
+  ...
+# Subtest: delayed model import and relink cannot modify a replacement document
+ok 281 - delayed model import and relink cannot modify a replacement document
+  ---
+  duration_ms: 1.139745
+  type: 'test'
+  ...
+# Subtest: normal model import and relink retain bytes, names and missing-resource cleanup
+ok 282 - normal model import and relink retain bytes, names and missing-resource cleanup
+  ---
+  duration_ms: 1.009519
+  type: 'test'
+  ...
+# Subtest: one undo restores the filename and binary from before model relinking
+ok 283 - one undo restores the filename and binary from before model relinking
+  ---
+  duration_ms: 0.576277
+  type: 'test'
+  ...
+# Subtest: invalid model filenames are rejected before import or relink changes the document
+ok 284 - invalid model filenames are rejected before import or relink changes the document
+  ---
+  duration_ms: 0.36599
+  type: 'test'
+  ...
+# Subtest: delayed model relink rejects deleted nodes and playback without writing bytes
+ok 285 - delayed model relink rejects deleted nodes and playback without writing bytes
+  ---
+  duration_ms: 0.690038
+  type: 'test'
+  ...
+# Subtest: delayed audio import cannot write resources into a replacement document
+ok 286 - delayed audio import cannot write resources into a replacement document
+  ---
+  duration_ms: 0.313752
+  type: 'test'
+  ...
+# Subtest: audio import and replacement preserve IDs and reject resources deleted during reading
+ok 287 - audio import and replacement preserve IDs and reject resources deleted during reading
+  ---
+  duration_ms: 0.79829
+  type: 'test'
+  ...
+# Subtest: delayed script import rejects document switches and preserves concurrently created scripts
+ok 288 - delayed script import rejects document switches and preserves concurrently created scripts
+  ---
+  duration_ms: 0.480994
+  type: 'test'
+  ...
+# Subtest: normal script imports load contents and existing scripts open without rereading
+ok 289 - normal script imports load contents and existing scripts open without rereading
+  ---
+  duration_ms: 0.309035
+  type: 'test'
+  ...
+# Subtest: script import is one complete undo and redo operation
+ok 290 - script import is one complete undo and redo operation
+  ---
+  duration_ms: 0.368254
+  type: 'test'
+  ...
+# Subtest: script imports finishing after playback starts preserve the editor script snapshot
+ok 291 - script imports finishing after playback starts preserve the editor script snapshot
+  ---
+  duration_ms: 0.234222
+  type: 'test'
+  ...
+# Subtest: recovery rejects truncated texture binaries before replacing the current document
+ok 292 - recovery rejects truncated texture binaries before replacing the current document
+  ---
+  duration_ms: 6.956645
+  type: 'test'
+  ...
+# Subtest: recovery rejects present resources with invalid binary types atomically
+ok 293 - recovery rejects present resources with invalid binary types atomically
+  ---
+  duration_ms: 8.562431
+  type: 'test'
+  ...
+# Subtest: stored projects with truncated texture or audio data fail before document replacement
+ok 294 - stored projects with truncated texture or audio data fail before document replacement
+  ---
+  duration_ms: 3.082988
+  type: 'test'
+  ...
+# Subtest: stored projects with invalid model binary types preserve the current document
+ok 295 - stored projects with invalid model binary types preserve the current document
+  ---
+  duration_ms: 1.377903
+  type: 'test'
+  ...
+# Subtest: texture file handle reads retain the document identity from the initial click
+ok 296 - texture file handle reads retain the document identity from the initial click
+  ---
+  duration_ms: 0.357148
+  type: 'test'
+  ...
+# Subtest: relinking glTF with unavailable sidecars preserves the existing model
+ok 297 - relinking glTF with unavailable sidecars preserves the existing model
+  ---
+  duration_ms: 0.394964
+  type: 'test'
+  ...
+# Subtest: relinking self-contained glTF preserves its embedded model data
+ok 298 - relinking self-contained glTF preserves its embedded model data
+  ---
+  duration_ms: 0.380563
+  type: 'test'
+  ...
+# Subtest: truncated glTF sidecar buffers fail before model import mutates the scene
+ok 299 - truncated glTF sidecar buffers fail before model import mutates the scene
+  ---
+  duration_ms: 0.31903
+  type: 'test'
+  ...
+# Subtest: script imports preserve directory paths and distinct same-name modules
+ok 300 - script imports preserve directory paths and distinct same-name modules
+  ---
+  duration_ms: 1.717674
+  type: 'test'
+  ...
+# Subtest: glTF local sidecar URI queries do not become part of the mounted filename
+ok 301 - glTF local sidecar URI queries do not become part of the mounted filename
+  ---
+  duration_ms: 0.276697
+  type: 'test'
+  ...
+# Subtest: encoded URI delimiters remain part of local glTF sidecar filenames
+ok 302 - encoded URI delimiters remain part of local glTF sidecar filenames
+  ---
+  duration_ms: 0.238159
+  type: 'test'
+  ...
+# Subtest: script mutations during playback and pause preserve the project and history
+ok 303 - script mutations during playback and pause preserve the project and history
+  ---
+  duration_ms: 0.65113
+  type: 'test'
+  ...
+# Subtest: project validation rejects non-string parent references instead of treating them as roots
+ok 304 - project validation rejects non-string parent references instead of treating them as roots
+  ---
+  duration_ms: 0.27298
+  type: 'test'
+  ...
+# Subtest: deep scene subtree deletion avoids recursive stack overflow and remains undoable
+ok 305 - deep scene subtree deletion avoids recursive stack overflow and remains undoable
+  ---
+  duration_ms: 22.617995
+  type: 'test'
+  ...
+# Subtest: deep scene subtree duplication preserves hierarchy without recursive stack overflow
+ok 306 - deep scene subtree duplication preserves hierarchy without recursive stack overflow
+  ---
+  duration_ms: 106.834855
+  type: 'test'
+  ...
+# Subtest: late audio file replacement cannot overwrite a newer completed replacement
+ok 307 - late audio file replacement cannot overwrite a newer completed replacement
+  ---
+  duration_ms: 1.347928
+  type: 'test'
+  ...
+# Subtest: late texture replacement preserves the newest file and closes decoded bitmaps
+ok 308 - late texture replacement preserves the newest file and closes decoded bitmaps
+  ---
+  duration_ms: 1.21008
+  type: 'test'
+  ...
+# Subtest: late model relinking cannot overwrite a newer completed replacement
+ok 309 - late model relinking cannot overwrite a newer completed replacement
+  ---
+  duration_ms: 0.587273
+  type: 'test'
+  ...
+# Subtest: model filenames rejected by persistence are also rejected before import
+ok 310 - model filenames rejected by persistence are also rejected before import
+  ---
+  duration_ms: 0.288924
+  type: 'test'
+  ...
+# Subtest: undo and redo retain all currently selected nodes that still exist
+ok 311 - undo and redo retain all currently selected nodes that still exist
+  ---
+  duration_ms: 0.432681
+  type: 'test'
+  ...
+# Subtest: deleting absent scene nodes preserves undo and redo history
+ok 312 - deleting absent scene nodes preserves undo and redo history
+  ---
+  duration_ms: 0.390357
+  type: 'test'
+  ...
+# Subtest: unchanged node renames preserve pending redo operations
+ok 313 - unchanged node renames preserve pending redo operations
+  ---
+  duration_ms: 0.396506
+  type: 'test'
+  ...
+# Subtest: reparenting to the current parent preserves pending redo history
+ok 314 - reparenting to the current parent preserves pending redo history
+  ---
+  duration_ms: 0.331809
+  type: 'test'
+  ...
+# Subtest: absent script binding operations preserve redo history
+ok 315 - absent script binding operations preserve redo history
+  ---
+  duration_ms: 0.414934
+  type: 'test'
+  ...
+# Subtest: synchronizing unchanged script contents preserves redo history
+ok 316 - synchronizing unchanged script contents preserves redo history
+  ---
+  duration_ms: 0.347844
+  type: 'test'
+  ...
+# Subtest: transform updates targeting missing nodes preserve the running camera and history
+ok 317 - transform updates targeting missing nodes preserve the running camera and history
+  ---
+  duration_ms: 0.359951
+  type: 'test'
+  ...
+# Subtest: camera activation rejects non-camera targets without changing scene or history
+ok 318 - camera activation rejects non-camera targets without changing scene or history
+  ---
+  duration_ms: 0.177137
+  type: 'test'
+  ...
+# Subtest: pasting into a missing parent preserves scene and redo history
+ok 319 - pasting into a missing parent preserves scene and redo history
+  ---
+  duration_ms: 0.332811
+  type: 'test'
+  ...
+# Subtest: duplicating or pasting the running camera preserves its exclusive activation
+ok 320 - duplicating or pasting the running camera preserves its exclusive activation
+  ---
+  duration_ms: 0.96398
+  type: 'test'
+  ...
+# Subtest: instantiating a camera prefab preserves the existing running camera
+ok 321 - instantiating a camera prefab preserves the existing running camera
+  ---
+  duration_ms: 1.553466
+  type: 'test'
+  ...
+# Subtest: unchanged material assignments preserve pending redo history
+ok 322 - unchanged material assignments preserve pending redo history
+  ---
+  duration_ms: 0.615355
+  type: 'test'
+  ...
+# Subtest: material assignment rejects non-renderable nodes before changing history
+ok 323 - material assignment rejects non-renderable nodes before changing history
+  ---
+  duration_ms: 0.335875
+  type: 'test'
+  ...
+# Subtest: empty material identifiers are rejected while undefined clears an assignment
+ok 324 - empty material identifiers are rejected while undefined clears an assignment
+  ---
+  duration_ms: 0.597559
+  type: 'test'
+  ...
+# Subtest: unchanged model material slot assignments preserve redo history
+ok 325 - unchanged model material slot assignments preserve redo history
+  ---
+  duration_ms: 1.280096
+  type: 'test'
+  ...
+# Subtest: applying unchanged project settings preserves redo history
+ok 326 - applying unchanged project settings preserves redo history
+  ---
+  duration_ms: 0.524209
+  type: 'test'
+  ...
+# Subtest: resetting a camera prefab preserves the scene running camera
+ok 327 - resetting a camera prefab preserves the scene running camera
+  ---
+  duration_ms: 2.562254
+  type: 'test'
+  ...
+# Subtest: camera prefab reset and updates retain an explicitly selected instance camera
+ok 328 - camera prefab reset and updates retain an explicitly selected instance camera
+  ---
+  duration_ms: 3.653326
+  type: 'test'
+  ...
+# Subtest: unchanged transform and scalar edits preserve redo history
+ok 329 - unchanged transform and scalar edits preserve redo history
+  ---
+  duration_ms: 0.403296
+  type: 'test'
+  ...
+# Subtest: unchanged material edits retain redo including cloned UV values
+ok 330 - unchanged material edits retain redo including cloned UV values
+  ---
+  duration_ms: 0.629457
+  type: 'test'
+  ...
+# Subtest: material edits own nested UV data independently of caller objects
+ok 331 - material edits own nested UV data independently of caller objects
+  ---
+  duration_ms: 0.582536
+  type: 'test'
+  ...
+# Subtest: transform edits own vector and component data independently of caller objects
+ok 332 - transform edits own vector and component data independently of caller objects
+  ---
+  duration_ms: 0.408905
+  type: 'test'
+  ...
+# Subtest: project settings own gravity values independently of caller objects
+ok 333 - project settings own gravity values independently of caller objects
+  ---
+  duration_ms: 0.173671
+  type: 'test'
+  ...
+# Subtest: imported audio and textures own metadata and bytes independently of caller objects
+ok 334 - imported audio and textures own metadata and bytes independently of caller objects
+  ---
+  duration_ms: 0.633974
+  type: 'test'
+  ...
+# Subtest: model buffers own imported bytes independently of caller memory
+ok 335 - model buffers own imported bytes independently of caller memory
+  ---
+  duration_ms: 0.143306
+  type: 'test'
+  ...
+# Subtest: project replacement owns resource maps, missing IDs and binary data
+ok 336 - project replacement owns resource maps, missing IDs and binary data
+  ---
+  duration_ms: 0.517419
+  type: 'test'
+  ...
+# Subtest: project replacement rejects detached resources before changing the current document
+ok 337 - project replacement rejects detached resources before changing the current document
+  ---
+  duration_ms: 0.736308
+  type: 'test'
+  ...
+# Subtest: playback project and restore snapshot isolate nested scene components and settings
+ok 338 - playback project and restore snapshot isolate nested scene components and settings
+  ---
+  duration_ms: 0.428785
+  type: 'test'
+  ...
+# Subtest: model relinking owns its bytes and rejects detached input before history changes
+ok 339 - model relinking owns its bytes and rejects detached input before history changes
+  ---
+  duration_ms: 0.328124
+  type: 'test'
+  ...
+# Subtest: normalized projects isolate node components and bindings from input documents
+ok 340 - normalized projects isolate node components and bindings from input documents
+  ---
+  duration_ms: 0.457207
+  type: 'test'
+  ...
+# Subtest: deep hierarchy validation reuses ancestor paths and still rejects distant cycles and missing parents
+ok 341 - deep hierarchy validation reuses ancestor paths and still rejects distant cycles and missing parents
+  ---
+  duration_ms: 134.724199
+  type: 'test'
+  ...
+# Subtest: failed paste of a deleted external joint reference preserves scene and redo history
+ok 342 - failed paste of a deleted external joint reference preserves scene and redo history
+  ---
+  duration_ms: 3.025662
+  type: 'test'
+  ...
+# Subtest: copying deep reverse-stored subtrees includes overlapping selections once in source order
+ok 343 - copying deep reverse-stored subtrees includes overlapping selections once in source order
+  ---
+  duration_ms: 262.671243
+  type: 'test'
+  ...
+# Subtest: duplicated missing models retain resource warnings through undo and redo
+ok 344 - duplicated missing models retain resource warnings through undo and redo
+  ---
+  duration_ms: 1.069759
+  type: 'test'
+  ...
+# Subtest: creating a prefab accounts for missing template model resources until replacement
+ok 345 - creating a prefab accounts for missing template model resources until replacement
+  ---
+  duration_ms: 2.305839
+  type: 'test'
+  ...
+# Subtest: scene drag ancestry checks handle deep chains, unrelated roots and malformed loops
+ok 346 - scene drag ancestry checks handle deep chains, unrelated roots and malformed loops
+  ---
+  duration_ms: 60.388529
+  type: 'test'
+  ...
+# Subtest: copy with no scene selection preserves the existing clipboard
+ok 347 - copy with no scene selection preserves the existing clipboard
+  ---
+  duration_ms: 2.647372
+  type: 'test'
+  ...
+# Subtest: cleared model catalogs release node entries after model disposal
+ok 348 - cleared model catalogs release node entries after model disposal
+  ---
+  duration_ms: 28.395466
+  type: 'test'
+  ...
+# Subtest: late model catalog callbacks do not recreate entries for deleted nodes
+ok 349 - late model catalog callbacks do not recreate entries for deleted nodes
+  ---
+  duration_ms: 0.749638
+  type: 'test'
+  ...
+# Subtest: deleting a model subtree immediately clears its catalogs while retaining other models
+ok 350 - deleting a model subtree immediately clears its catalogs while retaining other models
+  ---
+  duration_ms: 0.979313
+  type: 'test'
+  ...
+# Subtest: relinking a model clears catalogs belonging to its previous binary
+ok 351 - relinking a model clears catalogs belonging to its previous binary
+  ---
+  duration_ms: 0.393582
+  type: 'test'
+  ...
+# Subtest: visibility changes for missing nodes preserve pending redo
+ok 352 - visibility changes for missing nodes preserve pending redo
+  ---
+  duration_ms: 0.591269
+  type: 'test'
+  ...
+# Subtest: deleting absent resources preserves scene history and pending redo
+ok 353 - deleting absent resources preserves scene history and pending redo
+  ---
+  duration_ms: 0.431899
+  type: 'test'
+  ...
+# Subtest: unchanged prefab names preserve pending redo after trimming
+ok 354 - unchanged prefab names preserve pending redo after trimming
+  ---
+  duration_ms: 0.964461
+  type: 'test'
+  ...
+# Subtest: unchanged advanced and gameplay configurations retain pending redo
+ok 355 - unchanged advanced and gameplay configurations retain pending redo
+  ---
+  duration_ms: 1.260976
+  type: 'test'
+  ...
+# Subtest: configuration comparisons ignore object key order and retain ordered array changes
+ok 356 - configuration comparisons ignore object key order and retain ordered array changes
+  ---
+  duration_ms: 0.839754
+  type: 'test'
+  ...
+# Subtest: unchanged nested node components preserve pending redo
+ok 357 - unchanged nested node components preserve pending redo
+  ---
+  duration_ms: 0.774375
+  type: 'test'
+  ...
+# Subtest: storage saves capture metadata before asynchronous database access
+ok 358 - storage saves capture metadata before asynchronous database access
+  ---
+  duration_ms: 3.473455
+  type: 'test'
+  ...
+# Subtest: recovery storage captures metadata and binary resources before awaiting the database
+ok 359 - recovery storage captures metadata and binary resources before awaiting the database
+  ---
+  duration_ms: 3.074294
+  type: 'test'
+  ...
+# Subtest: stale file selection preserves the active script and its derived text
+ok 360 - stale file selection preserves the active script and its derived text
+  ---
+  duration_ms: 0.509196
+  type: 'test'
+  ...
+# Subtest: late script edits do not resurrect deleted files or consume redo history
+ok 361 - late script edits do not resurrect deleted files or consume redo history
+  ---
+  duration_ms: 0.464809
+  type: 'test'
+  ...
+# BJS - [11:37:33]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:33]: Babylon.js v9.28.0 - Null engine
+# Subtest: bound scripts receive factory context, axis input and pause-safe time
+ok 362 - bound scripts receive factory context, axis input and pause-safe time
+  ---
+  duration_ms: 77.450682
+  type: 'test'
+  ...
+# BJS - [11:37:33]: Babylon.js v9.28.0 - Null engine
+# Subtest: two entities bound to the same script keep independent custom state
+ok 363 - two entities bound to the same script keep independent custom state
+  ---
+  duration_ms: 30.44512
+  type: 'test'
+  ...
+# BJS - [11:37:33]: Babylon.js v9.28.0 - Null engine
+# Subtest: legacy single-script projects update and retain old transform methods
+ok 364 - legacy single-script projects update and retain old transform methods
+  ---
+  duration_ms: 17.852416
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: destroy hooks run before disposal and stop releases all owned timers/listeners/materials
+ok 365 - destroy hooks run before disposal and stop releases all owned timers/listeners/materials
+  ---
+  duration_ms: 20.011714
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: a failing script reports its filename and hook once without disabling other entities
+ok 366 - a failing script reports its filename and hook once without disabling other entities
+  ---
+  duration_ms: 21.967386
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: runtime spawning creates independent hierarchies and scripts without resetting existing live transforms or clock
+ok 367 - runtime spawning creates independent hierarchies and scripts without resetting existing live transforms or clock
+  ---
+  duration_ms: 25.329674
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: runtime spawning rejects missing dependencies and invalid options before mutating scene
+ok 368 - runtime spawning rejects missing dependencies and invalid options before mutating scene
+  ---
+  duration_ms: 10.660677
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: pending runtime model spawn cancels immediately on stop and disposes late model containers
+ok 369 - pending runtime model spawn cancels immediately on stop and disposes late model containers
+  ---
+  duration_ms: 13.254779
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: script-owned pending spawn cancels on owner destruction and does not attach late scripts
+ok 370 - script-owned pending spawn cancels on owner destruction and does not attach late scripts
+  ---
+  duration_ms: 15.64804
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: successful model instances survive subsequent spawns; parent disposal cancels pending children
+ok 371 - successful model instances survive subsequent spawns; parent disposal cancels pending children
+  ---
+  duration_ms: 12.458041
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: model load failure cleans partial prefab entities and reports the failure without disturbing the existing scene
+ok 372 - model load failure cleans partial prefab entities and reports the failure without disturbing the existing scene
+  ---
+  duration_ms: 12.210769
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: repeated model spawn/destroy releases model buffers, factory records and subscriptions without disposing shared materials
+ok 373 - repeated model spawn/destroy releases model buffers, factory records and subscriptions without disposing shared materials
+  ---
+  duration_ms: 35.958243
+  type: 'test'
+  ...
+# Subtest: early bootstrap resource failures report fatal errors with the current boot token
+ok 374 - early bootstrap resource failures report fatal errors with the current boot token
+  ---
+  duration_ms: 1.205153
+  type: 'test'
+  ...
+# BJS - [11:37:34]: Babylon.js v9.28.0 - Null engine
+# Subtest: all foundation services are injected and storage responses require the current parent/run
+ok 375 - all foundation services are injected and storage responses require the current parent/run
+  ---
+  duration_ms: 11.001129
+  type: 'test'
+  ...
+# Subtest: legacy-script triggers sample the completed physics step and release telemetry on stop
+ok 376 - legacy-script triggers sample the completed physics step and release telemetry on stop
+  ---
+  duration_ms: 30.148303
+  type: 'test'
+  ...
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:35]: Babylon.js v9.28.0 - Null engine
+# Subtest: clearing a scene before entity addition settles reports cancellation
+ok 377 - clearing a scene before entity addition settles reports cancellation
+  ---
+  duration_ms: 9.453751
+  type: 'test'
+  ...
+# Subtest: adding entities after scene disposal rejects rather than reporting success
+ok 378 - adding entities after scene disposal rejects rather than reporting success
+  ---
+  duration_ms: 0.819072
+  type: 'test'
+  ...
+# Subtest: a completion callback that clears then throws releases its model only once
+ok 379 - a completion callback that clears then throws releases its model only once
+  ---
+  duration_ms: 3.638765
+  type: 'test'
+  ...
+# Subtest: clearing from onLoaded makes prefab model addition report cancellation
+ok 380 - clearing from onLoaded makes prefab model addition report cancellation
+  ---
+  duration_ms: 6.247664
+  type: 'test'
+  ...
+# Subtest: clearing the scene from model metadata callbacks cancels the pending load
+ok 381 - clearing the scene from model metadata callbacks cancels the pending load
+  ---
+  duration_ms: 6.279346
+  type: 'test'
+  ...
+# Subtest: failed model initialization removes its disposed container and metadata
+ok 382 - failed model initialization removes its disposed container and metadata
+  ---
+  duration_ms: 2.832921
+  type: 'test'
+  ...
+# Subtest: replacing a model clears old animation metadata even when loading fails
+ok 383 - replacing a model clears old animation metadata even when loading fails
+  ---
+  duration_ms: 2.981845
+  type: 'test'
+  ...
+# Subtest: clearing a scene clears model metadata alongside its resources
+ok 384 - clearing a scene clears model metadata alongside its resources
+  ---
+  duration_ms: 2.815846
+  type: 'test'
+  ...
+# Subtest: scene construction preserves primitive shape, unordered hierarchy and zero light intensity
+ok 385 - scene construction preserves primitive shape, unordered hierarchy and zero light intensity
+  ---
+  duration_ms: 10.248096
+  type: 'test'
+  ...
+# Subtest: all node types can have entity handles and parent destruction removes descendant handles
+ok 386 - all node types can have entity handles and parent destruction removes descendant handles
+  ---
+  duration_ms: 2.00755
+  type: 'test'
+  ...
+# Subtest: late model containers are disposed after stop or replacement and URLs are revoked
+ok 387 - late model containers are disposed after stop or replacement and URLs are revoked
+  ---
+  duration_ms: 2.847794
+  type: 'test'
+  ...
+# Subtest: PBR material parameters are shared, updated live and restored to node colors on unassignment
+ok 388 - PBR material parameters are shared, updated live and restored to node colors on unassignment
+  ---
+  duration_ms: 8.662562
+  type: 'test'
+  ...
+# Subtest: removing a mesh using a shared PBR material cannot dispose the surviving mesh material
+ok 389 - removing a mesh using a shared PBR material cannot dispose the surviving mesh material
+  ---
+  duration_ms: 2.821164
+  type: 'test'
+  ...
+# Subtest: model material override applies after async loading and restores original imported materials
+ok 390 - model material override applies after async loading and restores original imported materials
+  ---
+  duration_ms: 3.698503
+  type: 'test'
+  ...
+# Subtest: model part and sub-material overrides preserve original slots, isolate models and release only managed wrappers
+ok 391 - model part and sub-material overrides preserve original slots, isolate models and release only managed wrappers
+  ---
+  duration_ms: 5.973847
+  type: 'test'
+  ...
+# Subtest: reloading an enclosing model preserves independently owned child-model material overrides
+ok 392 - reloading an enclosing model preserves independently owned child-model material overrides
+  ---
+  duration_ms: 8.84778
+  type: 'test'
+  ...
+# Subtest: removing a material does not release texture slots of IDs sharing its prefix
+ok 393 - removing a material does not release texture slots of IDs sharing its prefix
+  ---
+  duration_ms: 3.23741
+  type: 'test'
+  ...
+# Subtest: texture construction failures release pending resources and allow retry
+ok 394 - texture construction failures release pending resources and allow retry
+  ---
+  duration_ms: 3.100675
+  type: 'test'
+  ...
+# BJS - [11:37:36]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:37]: Babylon.js v9.28.0 - Null engine
+# Subtest: entity handles support live vectors, snapshots, aliases and relative movement
+ok 395 - entity handles support live vectors, snapshots, aliases and relative movement
+  ---
+  duration_ms: 15.670674
+  type: 'test'
+  ...
+# Subtest: name lookup uses display names while IDs remain stable; duplicate IDs cannot leak meshes
+ok 396 - name lookup uses display names while IDs remain stable; duplicate IDs cannot leak meshes
+  ---
+  duration_ms: 33.201546
+  type: 'test'
+  ...
+# Subtest: hidden objects can be shown again; destruction is idempotent and old live views fail clearly
+ok 397 - hidden objects can be shown again; destruction is idempotent and old live views fail clearly
+  ---
+  duration_ms: 6.238876
+  type: 'test'
+  ...
+# Subtest: imported quaternion roots respond to the Euler rotation API
+ok 398 - imported quaternion roots respond to the Euler rotation API
+  ---
+  duration_ms: 1.699247
+  type: 'test'
+  ...
+# Subtest: Euler rotation views read and edit quaternion-backed entities without losing other axes
+ok 399 - Euler rotation views read and edit quaternion-backed entities without losing other axes
+  ---
+  duration_ms: 1.082017
+  type: 'test'
+  ...
+# Subtest: entity destruction notifies lifecycle cleanup once for explicit and native disposal
+ok 400 - entity destruction notifies lifecycle cleanup once for explicit and native disposal
+  ---
+  duration_ms: 2.014581
+  type: 'test'
+  ...
+# Subtest: entity disposal completes when lifecycle notification throws
+ok 401 - entity disposal completes when lifecycle notification throws
+  ---
+  duration_ms: 1.461388
+  type: 'test'
+  ...
+# Subtest: native disposal unregisters the entity even when lifecycle reporting fails
+ok 402 - native disposal unregisters the entity even when lifecycle reporting fails
+  ---
+  duration_ms: 0.922898
+  type: 'test'
+  ...
+# Subtest: descendant cleanup failures do not prevent the rest of an entity subtree from disposing
+ok 403 - descendant cleanup failures do not prevent the rest of an entity subtree from disposing
+  ---
+  duration_ms: 1.715951
+  type: 'test'
+  ...
+# Subtest: entity teardown preserves falsy thrown values while completing cleanup
+ok 404 - entity teardown preserves falsy thrown values while completing cleanup
+  ---
+  duration_ms: 3.339324
+  type: 'test'
+  ...
+# Subtest: destroyAll completes unrelated entity cleanup before rethrowing the first failure
+ok 405 - destroyAll completes unrelated entity cleanup before rethrowing the first failure
+  ---
+  duration_ms: 0.901707
+  type: 'test'
+  ...
+# Subtest: default return lifecycle has typed entity, globals and no top-level-return error
+ok 406 - default return lifecycle has typed entity, globals and no top-level-return error
+  ---
+  duration_ms: 458.189197
+  type: 'test'
+  ...
+# Subtest: project ES modules resolve named/default imports with completion, definition, rename and source offsets
+ok 407 - project ES modules resolve named/default imports with completion, definition, rename and source offsets
+  ---
+  duration_ms: 685.876056
+  type: 'test'
+  ...
+# Subtest: explicit JS module factory gets typed ScriptContext and original diagnostics without a hidden wrapper
+ok 408 - explicit JS module factory gets typed ScriptContext and original diagnostics without a hidden wrapper
+  ---
+  duration_ms: 518.540261
+  type: 'test'
+  ...
+# Subtest: hidden factory declarations do not become invalid definition targets or completions
+ok 409 - hidden factory declarations do not become invalid definition targets or completions
+  ---
+  duration_ms: 380.216075
+  type: 'test'
+  ...
+# Subtest: separate factories can reuse names; this works at top level and in arrows
+ok 410 - separate factories can reuse names; this works at top level and in arrows
+  ---
+  duration_ms: 202.889159
+  type: 'test'
+  ...
+# Subtest: diagnostics and rename spans refer to the saved source, including Unicode
+ok 411 - diagnostics and rename spans refer to the saved source, including Unicode
+  ---
+  duration_ms: 181.333051
+  type: 'test'
+  ...
+# Subtest: defineScript infers per-instance state, and TS service gets the API too
+ok 412 - defineScript infers per-instance state, and TS service gets the API too
+  ---
+  duration_ms: 185.508093
+  type: 'test'
+  ...
+# Subtest: formatting is stable and does not add hidden-wrapper indentation
+ok 413 - formatting is stable and does not add hidden-wrapper indentation
+  ---
+  duration_ms: 217.100674
+  type: 'test'
+  ...
+# Subtest: prefab factory completion and async result types work in JS and TS at saved source offsets
+ok 414 - prefab factory completion and async result types work in JS and TS at saved source offsets
+  ---
+  duration_ms: 465.483919
+  type: 'test'
+  ...
+# Subtest: physics, audio, UI, animation and action APIs are typed in both JS and TS factories
+ok 415 - physics, audio, UI, animation and action APIs are typed in both JS and TS factories
+  ---
+  duration_ms: 1603.569698
+  type: 'test'
+  ...
+# Subtest: advanced third-batch APIs complete in JavaScript with original source diagnostics
+ok 416 - advanced third-batch APIs complete in JavaScript with original source diagnostics
+  ---
+  duration_ms: 1617.477925
+  type: 'test'
+  ...
+# Subtest: view, portal and interaction APIs provide typed legacy-script completions
+ok 417 - view, portal and interaction APIs provide typed legacy-script completions
+  ---
+  duration_ms: 1136.40926
+  type: 'test'
+  ...
+# Subtest: the portal lab ES-module factory has no semantic diagnostics with the published ScriptContext
+ok 418 - the portal lab ES-module factory has no semantic diagnostics with the published ScriptContext
+  ---
+  duration_ms: 386.46936
+  type: 'test'
+  ...
+# Subtest: composition services complete in legacy scripts and the actual demo modules have no semantic diagnostics
+ok 419 - composition services complete in legacy scripts and the actual demo modules have no semantic diagnostics
+  ---
+  duration_ms: 916.479135
+  type: 'test'
+  ...
+# Subtest: foundation globals and ES-module context have complete JS completions and matching signatures
+ok 420 - foundation globals and ES-module context have complete JS completions and matching signatures
+  ---
+  duration_ms: 1942.295963
+  type: 'test'
+  ...
+# Subtest: concurrent stop callers wait for runtime cleanup
+ok 421 - concurrent stop callers wait for runtime cleanup
+  ---
+  duration_ms: 5.413244
+  type: 'test'
+  ...
+# Subtest: hiding the page while resume is pending pauses after the runtime acknowledges
+ok 422 - hiding the page while resume is pending pauses after the runtime acknowledges
+  ---
+  duration_ms: 1.476131
+  type: 'test'
+  ...
+# Subtest: independent package includes every runtime/WASM, module, material, HUD, animation and prefab dependency
+ok 423 - independent package includes every runtime/WASM, module, material, HUD, animation and prefab dependency
+  ---
+  duration_ms: 1150.826922
+  type: 'test'
+  ...
+# Subtest: missing runtime-only prefab model is rejected before a ZIP is produced
+ok 424 - missing runtime-only prefab model is rejected before a ZIP is produced
+  ---
+  duration_ms: 5.99507
+  type: 'test'
+  ...
+# Subtest: missing texture and audio bytes cannot silently produce incomplete packages
+ok 425 - missing texture and audio bytes cannot silently produce incomplete packages
+  ---
+  duration_ms: 5.666935
+  type: 'test'
+  ...
+# Subtest: texture and audio byte-length mismatches are rejected
+ok 426 - texture and audio byte-length mismatches are rejected
+  ---
+  duration_ms: 6.491926
+  type: 'test'
+  ...
+# Subtest: external glTF sidecars and remote images are rejected
+ok 427 - external glTF sidecars and remote images are rejected
+  ---
+  duration_ms: 10.224773
+  type: 'test'
+  ...
+# Subtest: compressed decoder dependencies are rejected explicitly
+ok 428 - compressed decoder dependencies are rejected explicitly
+  ---
+  duration_ms: 19.923042
+  type: 'test'
+  ...
+# Subtest: malformed GLB data does not pass export validation
+ok 429 - malformed GLB data does not pass export validation
+  ---
+  duration_ms: 2.002863
+  type: 'test'
+  ...
+# Subtest: GLB binary chunks must be complete and satisfy embedded buffer lengths
+ok 430 - GLB binary chunks must be complete and satisfy embedded buffer lengths
+  ---
+  duration_ms: 26.746698
+  type: 'test'
+  ...
+# Subtest: self-contained glTF with data URIs can be packaged
+ok 431 - self-contained glTF with data URIs can be packaged
+  ---
+  duration_ms: 6.767963
+  type: 'test'
+  ...
+# Subtest: JSON glTF cannot declare a binary buffer without a resource URI
+ok 432 - JSON glTF cannot declare a binary buffer without a resource URI
+  ---
+  duration_ms: 7.77029
+  type: 'test'
+  ...
+# Subtest: embedded glTF buffers require a positive integer byte length
+ok 433 - embedded glTF buffers require a positive integer byte length
+  ---
+  duration_ms: 18.068162
+  type: 'test'
+  ...
+# Subtest: embedded glTF buffers may contain extra bytes beyond the declared buffer length
+ok 434 - embedded glTF buffers may contain extra bytes beyond the declared buffer length
+  ---
+  duration_ms: 6.614612
+  type: 'test'
+  ...
+# Subtest: self-contained glTF rejects malformed or mismatched data URI buffers
+ok 435 - self-contained glTF rejects malformed or mismatched data URI buffers
+  ---
+  duration_ms: 5.179873
+  type: 'test'
+  ...
+# Subtest: embedded buffers accept percent-encoded bytes and reject invalid base64 padding
+ok 436 - embedded buffers accept percent-encoded bytes and reject invalid base64 padding
+  ---
+  duration_ms: 7.821687
+  type: 'test'
+  ...
+# Subtest: literal import(), static imports and reexports all appear in the graph
+ok 437 - literal import(), static imports and reexports all appear in the graph
+  ---
+  duration_ms: 0.582606
+  type: 'test'
+  ...
+# Subtest: missing, remote, npm, variable imports, top-level await and cycles fail export preflight
+ok 438 - missing, remote, npm, variable imports, top-level await and cycles fail export preflight
+  ---
+  duration_ms: 2.240951
+  type: 'test'
+  ...
+# Subtest: top-level async iteration is rejected by export preflight
+ok 439 - top-level async iteration is rejected by export preflight
+  ---
+  duration_ms: 0.164297
+  type: 'test'
+  ...
+# Subtest: script traversal, non-JS, missing bindings and old-style script imports are rejected
+ok 440 - script traversal, non-JS, missing bindings and old-style script imports are rejected
+  ---
+  duration_ms: 0.364228
+  type: 'test'
+  ...
+# Subtest: runtime dependency registry cannot silently omit a script
+ok 441 - runtime dependency registry cannot silently omit a script
+  ---
+  duration_ms: 1.125814
+  type: 'test'
+  ...
+# Subtest: invalid display settings are rejected; titles are retained as plain data
+ok 442 - invalid display settings are rejected; titles are retained as plain data
+  ---
+  duration_ms: 0.163677
+  type: 'test'
+  ...
+# Subtest: a busy static server port rejects the startup promise
+ok 443 - a busy static server port rejects the startup promise
+  ---
+  duration_ms: 128.718066
+  type: 'test'
+  ...
+# Subtest: static directory redirects preserve encoded names and query strings
+ok 444 - static directory redirects preserve encoded names and query strings
+  ---
+  duration_ms: 71.824725
+  type: 'test'
+  ...
+# Subtest: advanced components remap references through templates, nested instances, duplicate, copy and undo
+ok 445 - advanced components remap references through templates, nested instances, duplicate, copy and undo
+  ---
+  duration_ms: 488.489355
+  type: 'test'
+  ...
+# Subtest: ZIP, IndexedDB and recovery preserve mixer/controllers/layout/default input/binary resources atomically
+ok 446 - ZIP, IndexedDB and recovery preserve mixer/controllers/layout/default input/binary resources atomically
+  ---
+  duration_ms: 116.002667
+  type: 'test'
+  ...
+# Subtest: 0.5 migration adds advanced defaults and rejects malformed/cyclic references including instance baselines
+ok 447 - 0.5 migration adds advanced defaults and rejects malformed/cyclic references including instance baselines
+  ---
+  duration_ms: 31.934603
+  type: 'test'
+  ...
+# Subtest: clipboard restores deleted advanced resources and remaps entity references without changing remaining masks
+ok 448 - clipboard restores deleted advanced resources and remaps entity references without changing remaining masks
+  ---
+  duration_ms: 17.847841
+  type: 'test'
+  ...
+# Subtest: template deletion clears external animation retarget references and undo restores them
+ok 449 - template deletion clears external animation retarget references and undo restores them
+  ---
+  duration_ms: 17.606192
+  type: 'test'
+  ...
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# Subtest: native trigger overlaps deduplicate volumes, deliver ordered transitions and never apply force
+ok 450 - native trigger overlaps deduplicate volumes, deliver ordered transitions and never apply force
+  ---
+  duration_ms: 27.636076
+  type: 'test'
+  ...
+# Subtest: trigger samples actual rotated shapes and can include static, sensor and character bodies
+ok 451 - trigger samples actual rotated shapes and can include static, sensor and character bodies
+  ---
+  duration_ms: 9.747044
+  type: 'test'
+  ...
+# Subtest: sampling intervals use simulation time; disabling bypasses the wait and emits one exit
+ok 452 - sampling intervals use simulation time; disabling bypasses the wait and emits one exit
+  ---
+  duration_ms: 2.896748
+  type: 'test'
+  ...
+# Subtest: configuration and native shape validation are atomic and limits reject invalid or excessive usage
+ok 453 - configuration and native shape validation are atomic and limits reject invalid or excessive usage
+  ---
+  duration_ms: 3.026283
+  type: 'test'
+  ...
+# Subtest: membership overflow reports an error and never emits a partially collected region
+ok 454 - membership overflow reports an error and never emits a partially collected region
+  ---
+  duration_ms: 2.116704
+  type: 'test'
+  ...
+# Subtest: callback mutation applies on the next sample, destruction stops dispatch, and failing regions are isolated
+ok 455 - callback mutation applies on the next sample, destruction stops dispatch, and failing regions are isolated
+  ---
+  duration_ms: 2.878922
+  type: 'test'
+  ...
+# Subtest: destroyed occupants report exits, while owner cleanup never invokes gameplay callbacks
+ok 456 - destroyed occupants report exits, while owner cleanup never invokes gameplay callbacks
+  ---
+  duration_ms: 2.331607
+  type: 'test'
+  ...
+# Subtest: trigger predicates reject asynchronous results and new regions wait until the next fixed step
+ok 457 - trigger predicates reject asynchronous results and new regions wait until the next fixed step
+  ---
+  duration_ms: 2.419039
+  type: 'test'
+  ...
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# BJS - [11:37:52]: Babylon.js v9.28.0 - Null engine
+# Subtest: async event rejections are reported without stopping other regions or leaking after owner cleanup
+ok 458 - async event rejections are reported without stopping other regions or leaking after owner cleanup
+  ---
+  duration_ms: 5.977943
+  type: 'test'
+  ...
+# Subtest: filter mutation keeps the next-step refresh even when the sampling interval is long
+ok 459 - filter mutation keeps the next-step refresh even when the sampling interval is long
+  ---
+  duration_ms: 2.0008
+  type: 'test'
+  ...
+# Subtest: convex volumes keep their authored origins and candidate filters exclude unrelated motion types
+ok 460 - convex volumes keep their authored origins and candidate filters exclude unrelated motion types
+  ---
+  duration_ms: 3.356229
+  type: 'test'
+  ...
+1..460
+# tests 460
+# suites 0
+# pass 460
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 44634.254412

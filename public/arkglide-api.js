@@ -34,6 +34,7 @@
       return view;
     }
     function setVector(entity, field, x, y, z) {
+      options.onBeforeMutate?.();
       const value = vector(x, y, z);
       const mesh = meshOf(entity);
       // GLB roots can carry quaternions; convert before using the Euler API.
@@ -66,11 +67,11 @@
       get id() { return handles.get(this).id; }
       get destroyed() { return !handles.get(this).mesh; }
       get name() { meshOf(this); return handles.get(this).name; }
-      set name(value) { meshOf(this); handles.get(this).name = String(value); }
+      set name(value) { options.onBeforeMutate?.(); meshOf(this); handles.get(this).name = String(value); }
       get transform() { return this.position; }
       set transform(value) { this.position = value; }
       get visible() { const mesh = meshOf(this); return mesh.isEnabled() && mesh.isVisible !== false; }
-      set visible(value) { const mesh = meshOf(this); mesh.isVisible = !!value; mesh.setEnabled(!!value); }
+      set visible(value) { options.onBeforeMutate?.(); const mesh = meshOf(this); mesh.isVisible = !!value; mesh.setEnabled(!!value); }
       getId() { return this.id; }
       getName() { return this.name; }
       setName(value) { this.name = value; }
@@ -109,6 +110,7 @@
       destroy() {
         const handle = handles.get(this);
         if (!handle.mesh) return;
+        options.onBeforeMutate?.();
         const mesh = handle.mesh;
         if (handle.destroying) return;
         handle.destroying = true;
@@ -129,7 +131,7 @@
         } catch (error) {
           captureFailure(error);
         } finally {
-          try { mesh.dispose(false, true); }
+          try { mesh.dispose(false, false); }
           finally {
             handle.mesh = null;
             if (entities.get(handle.id) === this) entities.delete(handle.id);
@@ -141,6 +143,7 @@
 
     function register(mesh, id, name) {
       if (entities.has(id)) throw new Error('Duplicate entity ID: ' + id);
+      mesh.metadata = { ...mesh.metadata, arkglideId: id };
       if (mesh.rotationQuaternion) {
         mesh.rotationQuaternion.toEulerAnglesToRef(mesh.rotation);
         mesh.rotationQuaternion = null;
@@ -167,6 +170,7 @@
       findAllByName(name) { return [...entities.values()].filter(entity => entity.name === name); },
       findAll() { return [...entities.values()]; },
       create(type, id) {
+        options.onBeforeMutate?.();
         const builders = {
           box: () => Babylon.MeshBuilder.CreateBox(id, { size: 1 }, getScene()),
           sphere: () => Babylon.MeshBuilder.CreateSphere(id, { diameter: 1 }, getScene()),
@@ -196,7 +200,9 @@
     };
     // The editor/runtime alone receives register and the map. User scripts get
     // only sceneAPI and EntityHandle instances, which hold no renderer fields.
-    return { sceneAPI, entities, register };
+    return { sceneAPI, entities, register, getObject: id => {
+      const entity = entities.get(id); return entity ? handles.get(entity).mesh : null;
+    } };
   }
 
   function defineScript(script) {

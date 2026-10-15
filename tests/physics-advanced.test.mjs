@@ -625,3 +625,23 @@ test('queries ignore disposed entities before the next physics cleanup step',()=
   assert.deepEqual(s.api.overlap({kind:'sphere',radius:2},{x:0,y:0,z:0}),[]);
  } finally {s.done();}
 });
+
+test('static Babylon triangle meshes have outward Jolt winding and support a real character',()=>{
+ const s=setup();try{const e=s.entity('mesh-floor',{x:0,y:0,z:0});s.objects.get(e.id).scaling.set(10,1,10);s.physics.add({id:e.id,name:e.id,physics:{motion:'static',shape:'mesh',size:{x:1,y:1,z:1},mass:1,friction:.5,restitution:0,sensor:false,lockRotation:true}});
+ const player=s.entity('standing',{x:0,y:4,z:0}),ch=s.api.addCharacter(player,{radius:.3,height:1.8,stepHeight:.3,maxSlope:45,speed:3,jumpSpeed:5});for(let i=0;i<180;i++)s.physics.step(1/60);assert.equal(ch.grounded,true);assert.ok(s.objects.get(player.id).position.y>1.3);
+ }finally{s.done();}
+});
+
+test('Inspector-authored joint anchors cross the cloned API boundary as plain world vectors', () => {
+ const s=setup();
+ try {
+  const anchor=s.body('authored-anchor',{x:0,y:0,z:0}),door=s.entity('authored-door',{x:0,y:2,z:0});
+  s.api.add(door,{motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:.5,restitution:0,sensor:false,lockRotation:false});
+  s.physics.attachJoints([{id:door.id,joints:[{id:'authored-hinge',kind:'hinge',targetId:anchor.id,
+   anchor:{x:0,y:-2,z:0},anchor2:{x:0,y:0,z:0},axis:{x:0,y:1,z:0},min:-1,max:1,motor:{velocity:.3,force:8}}]}]);
+  const joints=s.api.getJoints(door);assert.equal(joints.length,1);assert.equal(joints[0].active,true);
+  for(let i=0;i<30;i++)s.physics.step(1/60);
+  const state=joints[0].getState();assert.equal(state.kind,'hinge');assert.ok(Number.isFinite(state.current));
+  assert.ok(state.current>0);assert.equal(s.physics.stats().physicsConstraints,1);
+ } finally {s.done();}
+});

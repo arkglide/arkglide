@@ -6,6 +6,7 @@
   const startButton = $('start'), pauseButton = $('pause'), stopButton = $('stop');
   const stage = $('stage'), cover = $('cover'), status = $('status'), progress = $('progress');
   let generation = 0, controller = null, frame = null, token = '', state = 'idle';
+  let storageHost = null;
   let manifest = null, payload = null, timer = null, cleanupTimer = null, lastStats = null;
   let hiddenPause = false, stopResolve = null, stopPromise = null;
   function setState(next, message) {
@@ -46,6 +47,7 @@
     clearTimeout(timer); clearTimeout(cleanupTimer); timer = cleanupTimer = null;
     if (frame) { frame.remove(); frame = null; }
     payload = null;
+    storageHost?.dispose(); storageHost = null;
   }
   function fail(error) {
     ++generation; controller?.abort(); controller = null;
@@ -100,6 +102,7 @@
       const projectRaw = data.get(manifest.project);
       if (!projectRaw) throw Error('清单缺少项目文件');
       const project = JSON.parse(new TextDecoder().decode(projectRaw));
+      storageHost = ArkGlideStorageHost.create({namespace:project.projectId || base.href,getStorage:()=>localStorage});
       const modelData = Object.create(null), textureData = Object.create(null), audioData = Object.create(null), transfer = [];
       for (const r of manifest.resources) {
         const map = {model:modelData, texture:textureData, audio:audioData}[r.kind];
@@ -111,7 +114,7 @@
       payload = {message:{type:'run', project, modelData, textureData, audioData, standalone:true}, transfer};
       setState('initializing', '初始化 WASM、场景、脚本与声音…'); progress.value = 1;
       frame = document.createElement('iframe'); frame.title = 'ArkGlide Game Runtime';
-      frame.setAttribute('sandbox', 'allow-scripts'); frame.setAttribute('allow', 'gamepad *; fullscreen');
+      frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock'); frame.setAttribute('allow', 'gamepad *; fullscreen');
       frame.src = new URL('runtime.html?boot=' + encodeURIComponent(token), base).href;
       frame.addEventListener('error', () => { if (id === generation) fail(Error('游戏运行页加载失败')); });
       stage.prepend(frame); resize();
@@ -142,6 +145,7 @@
     if (!frame || event.source !== frame.contentWindow) return;
     const msg = event.data;
     if (!msg || msg.bootToken !== token || (msg.runId != null && msg.runId !== generation)) return;
+    if (msg.type === 'storage') { storageHost?.receive(msg, result => post(result)); return; }
     if (msg.type === 'ready' && state === 'initializing' && payload) {
       post(payload.message, payload.transfer); payload = null;
     } else if (msg.type === 'started' && state === 'initializing') {

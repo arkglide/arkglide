@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useEditorStore } from "../../store/useEditorStore";
 import type { ProjectJSON } from "../../types/project";
+import "../../engine/state-runtime.js";
+import "../../engine/storage-host.js";
 
 // Keep the browsing context, but recycle its realm between plays to release native ES module maps.
 export default function RuntimeFrame() {
@@ -9,6 +11,7 @@ export default function RuntimeFrame() {
   const readyRef = useRef(false);
   const hasRunRef = useRef(false);
   const bootTokenRef = useRef("");
+  const storageHostRef = useRef<ReturnType<typeof ArkGlideStorageHost.create> | null>(null);
   const pendingProjectRef = useRef<ProjectJSON | null>(null);
   // 暂存待发送的模型数据（iframe 未 ready 时）
   const pendingModelDataRef = useRef<Record<string, ArrayBuffer> | null>(null);
@@ -52,6 +55,9 @@ export default function RuntimeFrame() {
 
       if (msg.runId != null && msg.runId !== runIdRef.current) return;
       switch (msg.type) {
+        case "storage":
+          storageHostRef.current?.receive(msg, result => postToIframe({ ...(result as object), runId: runIdRef.current }));
+          break;
         case "ready":
           readyRef.current = true;
           // iframe 就绪后立即获取焦点，确保键盘事件能被捕获
@@ -116,7 +122,7 @@ export default function RuntimeFrame() {
       }
     };
     window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
+    return () => { window.removeEventListener("message", handler); storageHostRef.current?.dispose(); };
   }, [addConsoleLog]);
 
   // 响应 playState 变化：run / pause / resume
@@ -127,6 +133,8 @@ export default function RuntimeFrame() {
 
     if (playState === "playing") {
       if (prev === "stopped") {
+        storageHostRef.current?.dispose();
+        storageHostRef.current = ArkGlideStorageHost.create({namespace:project?.projectId || documentId,getStorage:()=>localStorage});
         runIdRef.current++;
         if (hasRunRef.current && iframeRef.current) {
           readyRef.current = false;
@@ -190,6 +198,8 @@ export default function RuntimeFrame() {
     } else if (playState === "paused") {
       postToIframe({ type: "pause" });
     } else if (playState === "stopped") {
+      storageHostRef.current?.dispose();
+      storageHostRef.current = null;
       pendingProjectRef.current = null;
       pendingModelDataRef.current = null;
       pendingTextureDataRef.current = null;
@@ -213,7 +223,7 @@ export default function RuntimeFrame() {
       <iframe
         ref={iframeRef}
         src="/runtime.html"
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-pointer-lock"
         allow="gamepad *"
         title="ArkGlide Runtime"
         onLoad={handleFocus}

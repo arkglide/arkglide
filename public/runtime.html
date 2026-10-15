@@ -44,6 +44,21 @@
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-prefabs.js"></script>
     <script src="./lib/jolt-physics.js"></script>
+    <script src="./arkglide-spatial.js"></script>
+    <script src="./arkglide-cameras.js"></script>
+    <script src="./arkglide-state.js"></script>
+    <script src="./arkglide-visuals.js"></script>
+    <script src="./arkglide-surfaces.js"></script>
+    <script src="./arkglide-fields.js"></script>
+    <script src="./arkglide-triggers.js"></script>
+    <script src="./arkglide-signals.js"></script>
+    <script src="./arkglide-motion.js"></script>
+    <script src="./arkglide-optics.js"></script>
+    <script src="./arkglide-levels.js"></script>
+    <script src="./arkglide-checkpoints.js"></script>
+    <script src="./arkglide-portal-projection.js"></script>
+    <script src="./arkglide-portals.js"></script>
+    <script src="./arkglide-interaction.js"></script>
     <script src="./arkglide-physics-tools.js"></script>
     <script src="./arkglide-physics.js"></script>
     <script src="./arkglide-input-ui.js"></script>
@@ -135,6 +150,7 @@
           return math;
         },
         {
+          onBeforeMutate: function () { physicsRuntime?.assertMutable(); },
           onBeforeDestroy: function (id) {
             prefabLibrary?.onEntityDestroyed(id);
             session.destroyEntity(id);
@@ -189,10 +205,27 @@
         return ArkGlideLifecycle.createSession({
           onError: reportScriptError,
           onFixedStep: function (dt) {
+            signalsRuntime?.flush();
+            motionRuntime?.step(dt);
+            opticsRuntime?.prune();
             animationRuntime?.fixedUpdate(dt);
-            physicsRuntime?.step(dt);
+            fieldsRuntime?.step(dt);
+            interactionRuntime?.step(dt);
+            if (portalRuntime) portalRuntime.step(dt); else physicsRuntime?.step(dt);
+            triggersRuntime?.step(dt);
+            signalsRuntime?.flush();
           },
         });
+      }
+      var cameraRuntime = null, portalRuntime = null, interactionRuntime = null;
+      var triggersRuntime = null, signalsRuntime = null, motionRuntime = null, opticsRuntime = null;
+      var visualsRuntime = null, surfacesRuntime = null, fieldsRuntime = null, levelsRuntime = null, storageRuntime = null, savesRuntime = null;
+      function initSessionServices() {
+        var serviceOwner = session.owner(null, "engine.services", {scope:true});
+        serviceOwner.attach({});
+        levelsRuntime = ArkGlideLevels.create({scene:sceneAPI,prefabs:prefabLibrary,getPrefab:id=>runtimeContent.prefabs?.[id],createOwner:file=>session.owner(null,file,{scope:true}),onError:reportScriptError});
+        savesRuntime = ArkGlideCheckpoints.create({levels:levelsRuntime,storage:storageRuntime,time,portals:portalRuntime,beforeRestore:()=>{interactionRuntime?.releaseAll();physicsRuntime?.clearForces();},
+          world:ArkGlideCheckpoints.createWorld(BABYLON,{scene:sceneAPI,levels:levelsRuntime,physics:physicsRuntime,physicsAPI:physicsRuntime.forOwner(serviceOwner),getObject:entityAPI.getObject})});
       }
       function attachComponents(nodes) {
         nodes.forEach(function (n) {
@@ -220,11 +253,29 @@
           gravity: runtimeSettings.gravity,
           config: content.physics,
           getObject: function (id) {
-            return sceneAdapter.nodes.get(id);
+            return entityAPI.getObject(id) || sceneAdapter.nodes.get(id);
           },
           find: sceneAPI.find,
           onError: reportScriptError,
         });
+        cameraRuntime = ArkGlideCameras.create(BABYLON, {
+          scene, find: sceneAPI.find, getObject: id => entityAPI.getObject(id) || sceneAdapter.nodes.get(id),
+          getCamera: id => sceneAdapter.resources.get(id), fallback: () => camera,
+          physics: physicsRuntime.forOwner({record:{active:true}}),
+        });
+        portalRuntime = ArkGlidePortals.create(BABYLON, {
+          scene, physics: physicsRuntime, cameras: cameraRuntime, getObject: id => entityAPI.getObject(id) || sceneAdapter.nodes.get(id),
+          find: sceneAPI.find, onError: reportScriptError,
+        });
+        interactionRuntime = ArkGlideInteraction.create(BABYLON, {physics:physicsRuntime, portals:portalRuntime});
+        visualsRuntime = ArkGlideVisuals.create(BABYLON,{scene,find:sceneAPI.find,getObject:entityAPI.getObject,register:entityAPI.register,getTextures:()=>runtimeContent.textures,getTextureBuffers:()=>runtimeTextureData});
+        surfacesRuntime = ArkGlideSurfaces.create(BABYLON,{find:sceneAPI.find,getObject:entityAPI.getObject,visuals:visualsRuntime});
+        fieldsRuntime = ArkGlideFields.create({physics:physicsRuntime,onError:reportScriptError});
+        triggersRuntime = ArkGlideTriggers.create({physics:physicsRuntime,onError:reportScriptError});
+        signalsRuntime = ArkGlideSignals.create({onError:reportScriptError});
+        motionRuntime = ArkGlideMotion.create(BABYLON,{physics:physicsRuntime,find:sceneAPI.find,getObject:entityAPI.getObject,onError:reportScriptError});
+        opticsRuntime = ArkGlideOptics.create(BABYLON,{physics:physicsRuntime,portals:portalRuntime,find:sceneAPI.find});
+        storageRuntime = ArkGlideState.createStorage({send:sendToEditor});
         audioRuntime = ArkGlideAudio.createAudio({
           config: content.mixer,
           find: sceneAPI.find,
@@ -323,6 +374,19 @@
         var stats = Object.assign(
           session.stats(),
           physicsRuntime?.stats(),
+          cameraRuntime?.stats() || {runtimeCameras:0,cameraRigs:0},
+          portalRuntime?.stats() || {portals:0,portalSurfaces:0,portalTravelers:0,portalClones:0,portalViews:0,portalRenderedViews:0,portalTraversals:0},
+          interactionRuntime?.stats() || {physicsGrabs:0},
+          visualsRuntime?.stats() || {visualResources:0},
+          surfacesRuntime?.stats() || {surfacePatches:0},
+          fieldsRuntime?.stats() || {physicsFields:0},
+          triggersRuntime?.stats() || {physicsTriggers:0,triggerMembers:0},
+          signalsRuntime?.stats() || {signalNodes:0,signalListeners:0},
+          motionRuntime?.stats() || {motionControllers:0},
+          opticsRuntime?.stats() || {opticalReflectors:0},
+          levelsRuntime?.stats() || {levelCount:0,levelLoading:false,levelId:null},
+          storageRuntime?.stats() || {storageRequests:0},
+          savesRuntime?.stats() || {checkpointProviders:0,checkpointRestoring:false},
           audioRuntime?.stats(),
           animationRuntime?.stats(),
           inputRuntime?.stats(),
@@ -470,6 +534,7 @@
                 time.deltaTime,
                 Math.min(0.1, engine.getDeltaTime() / 1000),
               );
+              cameraRuntime?.update(time.deltaTime);
               inputRuntime?.setSimulationActive?.(time.timeScale > 0);
             } catch (error) {
               desiredState = "stopped";
@@ -486,6 +551,7 @@
           if (!scene.activeCamera || scene.activeCamera.isDisposed())
             scene.activeCamera = camera;
           var renderStart = performance.now();
+          try { portalRuntime?.updateVisuals(); portalRuntime?.render(); } catch (error) { reportScriptError({hook:"portals.render",error}); }
           scene.render();
           renderMs = performance.now() - renderStart;
           _renderFrames++;
@@ -575,6 +641,19 @@
                   "audio",
                   "ui",
                   "animation",
+                  "cameras",
+                  "portals",
+                  "interaction",
+                  "visuals",
+                  "surfaces",
+                  "fields",
+                  "levels",
+                  "storage",
+                  "saves",
+                  "triggers",
+                  "signals",
+                  "motion",
+                  "optics",
                   code +
                     "\n//# sourceURL=arkglide-script:///" +
                     encodeURIComponent(file),
@@ -599,6 +678,19 @@
                 audioRuntime.forOwner(owner),
                 inputRuntime.forOwner(owner),
                 animationRuntime.forOwner(owner),
+                cameraRuntime.forOwner(owner),
+                portalRuntime.forOwner(owner),
+                interactionRuntime.forOwner(owner),
+                visualsRuntime.forOwner(owner),
+                surfacesRuntime.forOwner(owner),
+                fieldsRuntime.forOwner(owner),
+                levelsRuntime.forOwner(owner),
+                storageRuntime.forOwner(owner),
+                savesRuntime.forOwner(owner),
+                triggersRuntime.forOwner(owner),
+                signalsRuntime.forOwner(owner),
+                motionRuntime.forOwner(owner),
+                opticsRuntime.forOwner(owner),
               ];
               var context = Object.fromEntries(
                 ArkGlideModules.parameters.map(function (name, index) {
@@ -641,6 +733,7 @@
         session = createSession();
         time = session.time;
         lifecycleInstances = session.records;
+        initSessionServices();
         attachComponents(nodes);
         attachEntityScripts(scripts, nodes, legacyCode);
         session.start(runtimeSettings);
@@ -661,8 +754,23 @@
       var runtimeSettings = {};
       function stopRun() {
         running = false;
+        savesRuntime?.dispose();
+        levelsRuntime?.dispose();
+        storageRuntime?.dispose();
         prefabLibrary.stop();
         session.stop();
+        triggersRuntime?.dispose();
+        triggersRuntime = null;
+        signalsRuntime?.dispose(); motionRuntime?.dispose(); opticsRuntime?.dispose();
+        signalsRuntime = motionRuntime = opticsRuntime = null;
+        fieldsRuntime?.dispose();
+        surfacesRuntime?.dispose();
+        visualsRuntime?.dispose();
+        savesRuntime = levelsRuntime = storageRuntime = fieldsRuntime = surfacesRuntime = visualsRuntime = null;
+        interactionRuntime?.dispose();
+        portalRuntime?.dispose();
+        cameraRuntime?.dispose();
+        interactionRuntime = portalRuntime = cameraRuntime = null;
         sceneAPI.destroyAll();
         moduleLoader?.dispose();
         moduleLoader = null;
@@ -690,6 +798,9 @@
         if (!msg || typeof msg !== "object") return;
 
         switch (msg.type) {
+          case "storage-result":
+            if (msg.runId === currentRunId) storageRuntime?.receive(msg);
+            break;
           case "run":
             var generation = ++runGeneration;
             stopRun();

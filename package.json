@@ -22,7 +22,12 @@
     "export:game": "npm run sync:runtime && node scripts/export-static-game.mjs",
     "example:fourth": "node scripts/create-fourth-example.mjs",
     "test:static": "playwright test --config playwright.static.config.ts",
-    "verify:fourth": "node scripts/verify-fourth.mjs"
+    "verify:fourth": "node scripts/verify-fourth.mjs",
+    "example:portals": "node scripts/create-portal-example.mjs",
+    "test:portals:browser": "node --test tests/portal/browser.mjs",
+    "test:foundations:browser": "node --test tests/foundations/browser.mjs",
+    "example:composition": "node scripts/create-composition-example.mjs",
+    "test:composition:browser": "node --test tests/composition/browser.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",

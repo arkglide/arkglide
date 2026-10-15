@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import {readFileSync} from 'node:fs';
+const awaitSource=name=>readFileSync(new URL('../public/'+name,import.meta.url),'utf8');
 import vm from 'node:vm';
 
 const source = await fs.readFile(new URL('../public/standalone-player.js', import.meta.url), 'utf8');
@@ -16,13 +18,16 @@ function player() {
   document.getElementById('stage').prepend=()=>{};
   const project = new TextEncoder().encode('{}');
   const manifest = {format:'arkglide-static-1',settings:{title:'Game'},project:'project.json',resources:[],files:[{path:'project.json',byteLength:project.length}]};
-  const context = vm.createContext({document,URL,AbortController,TextDecoder,Uint8Array,Map,Set,Promise,
+  const context = vm.createContext({document,URL,AbortController,TextDecoder,TextEncoder,Uint8Array,Map,Set,Promise,
     crypto:{randomUUID:()=> 'test-token'},location:{protocol:'http:'},setTimeout,clearTimeout,
     ResizeObserver:class{observe(){}},
     fetch:async url=>({ok:true,arrayBuffer:async()=>url.pathname.endsWith('game-manifest.json')?new TextEncoder().encode(JSON.stringify(manifest)).buffer:project.buffer}),
     addEventListener(type,callback){events.set(type,callback);},
   });
-  context.window=context;vm.runInContext(source,context);
+  context.window=context;
+  vm.runInContext(awaitSource('arkglide-state.js'),context);
+  vm.runInContext(awaitSource('arkglide-storage-host.js'),context);
+  vm.runInContext(source,context);
   const send = msg => events.get('message')({source:frames.at(-1).contentWindow,data:{bootToken:'test-token',...msg}});
   return {api:context.ArkGlidePlayer,document,frames,messages,send,visibility(){documentEvents.get('visibilitychange')();}};
 }

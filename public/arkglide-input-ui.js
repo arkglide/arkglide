@@ -98,6 +98,82 @@
       padButtons = new Set(),
       padList = [],
       binding = null;
+    const buttons = new Set(),
+      buttonPressed = new Set(),
+      buttonReleased = new Set();
+    const lockListeners = new Set();
+    let lockOwner = null,
+      lockPending = null,
+      lockAuthorized = false;
+    function releasePointerLock() {
+      lockAuthorized = false;
+      lockPending?.finish(false);
+      if (doc.pointerLockElement === canvas) doc.exitPointerLock?.();
+      lockOwner = null;
+    }
+    function requestPointerLock(owner) {
+      if (disposed || !allow()) return Promise.resolve(false);
+      if (!canvas.requestPointerLock) return Promise.resolve(false);
+      if (doc.pointerLockElement === canvas) {
+        lockOwner = owner;
+        return Promise.resolve(true);
+      }
+      if (lockPending) return lockPending.promise;
+      let resolve;
+      const promise = new Promise((r) => (resolve = r));
+      const token = {
+        promise,
+        finish(ok) {
+          if (lockPending !== token) return;
+          lockPending = null;
+          clearTimeout(token.timer);
+          resolve(ok);
+          if (!ok) {
+            lockOwner = null;
+            lockAuthorized = false;
+          }
+        },
+      };
+      lockPending = token;
+      lockOwner = owner;
+      lockAuthorized = true;
+      token.timer = setTimeout(() => token.finish(false), 1500);
+      try {
+        const result = canvas.requestPointerLock();
+        result?.catch?.(() => token.finish(false));
+      } catch {
+        token.finish(false);
+      }
+      return promise;
+    }
+    listen(doc, "pointerlockchange", () => {
+      const locked = doc.pointerLockElement === canvas;
+      if (
+        locked &&
+        (!lockAuthorized ||
+          disposed ||
+          !allow() ||
+          (lockOwner && !lockOwner.record.active))
+      ) {
+        releasePointerLock();
+        return;
+      }
+      lockPending?.finish(locked);
+      reset();
+      for (const sub of [...lockListeners]) {
+        if (sub.owner && !sub.owner.record.active) continue;
+        try {
+          sub.fn(locked);
+        } catch (error) {
+          report(error, sub.owner, "input.pointerLock");
+        }
+      }
+      if (!locked) {
+        lockOwner = null;
+        lockAuthorized = false;
+      }
+    });
+    listen(doc, "pointerlockerror", () => lockPending?.finish(false));
     const upper = (k) => String(k || "").toUpperCase(),
       allow = () =>
         active &&
@@ -143,6 +219,9 @@
       list.push(() => target.removeEventListener(name, fn, opts));
     }
     function reset() {
+      buttons.clear();
+      buttonPressed.clear();
+      buttonReleased.clear();
       keys.clear();
       codes.clear();
       keyCodes.clear();
@@ -262,7 +341,9 @@
       let index = list.findIndex((r) => r === focused);
       index =
         index < 0
-          ? (direction < 0 ? list.length - 1 : 0)
+          ? direction < 0
+            ? list.length - 1
+            : 0
           : (index + direction + list.length) % list.length;
       list[index].el.focus?.();
       focused = list[index];
@@ -329,27 +410,40 @@
       });
     });
     listen(canvas, "pointerdown", (e) => {
-      if (!allow() || mouseDown) return;
+      if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0))) return;
       mousePointer = e.pointerId ?? 0;
-      mouseDown = mousePressed = true;
+      const button = e.button ?? 0;
+      if (!buttons.has(button)) buttonPressed.add(button);
+      buttons.add(button);
+      if (!mouseDown) mousePressed = true;
+      mouseDown = true;
       mx = e.clientX;
       my = e.clientY;
-      try {
-        canvas.setPointerCapture?.(e.pointerId);
-      } catch {}
+      try { canvas.setPointerCapture?.(e.pointerId); } catch {}
     });
-    function releaseMouse(e) {
+    function releaseMouse(e, cancel = false) {
       if (!mouseDown || mousePointer !== (e.pointerId ?? 0)) return;
+      if (cancel) {
+        for (const button of buttons) buttonReleased.add(button);
+        buttons.clear();
+      } else {
+        const button = e.button ?? 0;
+        if (buttons.delete(button)) buttonReleased.add(button);
+      }
+      if (buttons.size) return;
       mouseReleased = true;
       mouseDown = false;
       mousePointer = null;
     }
-    listen(win, "pointerup", releaseMouse);
-    listen(canvas, "lostpointercapture", releaseMouse);
-    listen(win, "pointercancel", releaseMouse);
+    listen(win, "pointerup", e => releaseMouse(e));
+    listen(canvas, "lostpointercapture", e => releaseMouse(e, true));
+    listen(win, "pointercancel", e => releaseMouse(e, true));
     listen(canvas, "pointermove", (e) => {
       if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0))) return;
-      if (mouseDown) {
+      if (doc.pointerLockElement === canvas) {
+        dx += Number(e.movementX) || 0;
+        dy += Number(e.movementY) || 0;
+      } else if (mouseDown) {
         dx += e.clientX - mx;
         dy += e.clientY - my;
       }
@@ -357,6 +451,7 @@
       my = e.clientY;
     });
     listen(win, "blur", () => {
+      releasePointerLock();
       if (focused) focused.el.style.outline = "";
       focused = null;
       reset();
@@ -372,6 +467,7 @@
       padButtons.clear();
     });
     listen(doc, "visibilitychange", () => {
+      if (doc.visibilityState === "hidden") releasePointerLock();
       if (doc.visibilityState === "hidden") {
         reset();
         padButtons.clear();
@@ -444,6 +540,13 @@
       wasKeyReleased: (k) => released.has(upper(k)),
       getAxis: (a, b) =>
         allow() ? Number(keys.has(upper(b))) - Number(keys.has(upper(a))) : 0,
+      isPointerLocked: () => doc.pointerLockElement === canvas,
+      requestPointerLock: () => requestPointerLock(null),
+      releasePointerLock,
+      isMouseButtonDown: (button = 0) => allow() && buttons.has(button),
+      wasMouseButtonPressed: (button = 0) =>
+        allow() && buttonPressed.has(button),
+      wasMouseButtonReleased: (button = 0) => buttonReleased.has(button),
       getMousePosition: () => ({ x: mx, y: my }),
       getMouseDelta: () => ({ x: dx, y: dy }),
       isMouseDown: () => mouseDown,
@@ -504,8 +607,7 @@
     function create(def, owner, callback) {
       if (disposed || (owner && !owner.record.active))
         throw Error("HUD session stopped");
-      if (callback && typeof callback !== "function")
-        throw Error("UI回调无效");
+      if (callback && typeof callback !== "function") throw Error("UI回调无效");
       if (
         !def ||
         typeof def.id !== "string" ||
@@ -968,6 +1070,23 @@
             }
             return input[name](...args);
           };
+        copy.requestPointerLock = () => {
+          if (!owner.record.active) throw Error("输入脚本已销毁");
+          return requestPointerLock(owner);
+        };
+        copy.releasePointerLock = () => {
+          if (lockOwner === owner) releasePointerLock();
+        };
+        copy.onPointerLockChange = (fn) => {
+          if (!owner.record.active || typeof fn !== "function")
+            throw Error("无效锁定订阅");
+          const sub = { fn, owner };
+          lockListeners.add(sub);
+          return owner.track(() => lockListeners.delete(sub));
+        };
+        owner.track(() => {
+          if (lockOwner === owner) releasePointerLock();
+        });
         return Object.freeze(copy);
       },
       beginFrame,
@@ -1005,6 +1124,7 @@
       reset,
       setActive(v) {
         active = !!v;
+        if (!active) releasePointerLock();
         reset();
         for (const r of elements.values())
           if (r.def.kind === "button" || r.def.kind === "input")
@@ -1013,10 +1133,13 @@
       setSimulationActive(v) {
         if (simulation !== !!v) {
           simulation = !!v;
+          if (!simulation) releasePointerLock();
           reset();
         }
       },
       endFrame() {
+        buttonPressed.clear();
+        buttonReleased.clear();
         pressed.clear();
         released.clear();
         actionPressed.clear();
@@ -1045,6 +1168,8 @@
         if (disposed) return;
         for (const r of [...elements.values()]) r.handle.destroy();
         disposed = true;
+        releasePointerLock();
+        lockListeners.clear();
         reset();
         binding?.finish(null);
         padList = [];

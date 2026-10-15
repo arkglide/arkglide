@@ -1,0 +1,744 @@
+{
+  "version": "0.6",
+  "name": "ArkGlide · 通用玩法组合验证",
+  "projectId": "arkglide-composition-lab-v1",
+  "scene": {
+    "nodes": [
+      {
+        "id": "WestFloor",
+        "name": "WestFloor",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": -4,
+          "y": -0.2,
+          "z": 1
+        },
+        "scale": {
+          "x": 16,
+          "y": 0.4,
+          "z": 18
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#7c899c",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "EastFloor",
+        "name": "EastFloor",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 10,
+          "y": -0.2,
+          "z": 1
+        },
+        "scale": {
+          "x": 6,
+          "y": 0.4,
+          "z": 18
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#617e98",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "Door",
+        "name": "Door",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 9,
+          "y": 1.5,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.3,
+          "y": 3,
+          "z": 3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#edbd67",
+        "scripts": [],
+        "physics": {
+          "motion": "kinematic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "CorridorNorth",
+        "name": "CorridorNorth",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 10,
+          "y": 1.5,
+          "z": 1.7
+        },
+        "scale": {
+          "x": 6,
+          "y": 3,
+          "z": 0.3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#607488",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "CorridorSouth",
+        "name": "CorridorSouth",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 10,
+          "y": 1.5,
+          "z": -1.7
+        },
+        "scale": {
+          "x": 6,
+          "y": 3,
+          "z": 0.3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#607488",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "EastBoundary",
+        "name": "EastBoundary",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 13.1,
+          "y": 2,
+          "z": 1
+        },
+        "scale": {
+          "x": 0.2,
+          "y": 4,
+          "z": 18
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#607488",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "PortalPanelA",
+        "name": "PortalPanelA",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 3,
+          "y": 2,
+          "z": 2
+        },
+        "scale": {
+          "x": 3,
+          "y": 4,
+          "z": 0.2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#f1f4fa",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "PortalPanelB",
+        "name": "PortalPanelB",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 10,
+          "y": 2,
+          "z": 6
+        },
+        "scale": {
+          "x": 0.2,
+          "y": 4,
+          "z": 4
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#f1f4fa",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "Crate",
+        "name": "Crate",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": -4,
+          "y": 0.45,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.8,
+          "y": 0.8,
+          "z": 0.8
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#f2a34a",
+        "scripts": [],
+        "physics": {
+          "motion": "dynamic",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "Plate",
+        "name": "Plate",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": -2,
+          "y": 0.05,
+          "z": 0
+        },
+        "scale": {
+          "x": 2,
+          "y": 0.1,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#5599cd",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "Mirror",
+        "name": "Mirror",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 0,
+          "y": 1.3,
+          "z": 4
+        },
+        "scale": {
+          "x": 2,
+          "y": 2,
+          "z": 0.2
+        },
+        "rotation": {
+          "x": 0,
+          "y": -0.7853981633974483,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#b6f9f2",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "Receiver",
+        "name": "Receiver",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 5,
+          "y": 1.3,
+          "z": 3.86
+        },
+        "scale": {
+          "x": 0.5,
+          "y": 1,
+          "z": 1
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#e56854",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "GoalMarker",
+        "name": "GoalMarker",
+        "type": "mesh",
+        "primitive": "box",
+        "transform": {
+          "x": 11,
+          "y": 1,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.2,
+          "y": 2,
+          "z": 0.2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "color": "#67e8a4",
+        "scripts": [],
+        "physics": {
+          "motion": "static",
+          "shape": "box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "mass": 2,
+          "friction": 0.6,
+          "restitution": 0,
+          "sensor": false,
+          "lockRotation": false,
+          "linearDamping": 0.05,
+          "angularDamping": 0.05
+        }
+      },
+      {
+        "id": "Player",
+        "name": "Player",
+        "type": "empty",
+        "transform": {
+          "x": -6,
+          "y": 1.1,
+          "z": -2
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visible": true,
+        "scripts": [
+          "main.js"
+        ],
+        "character": {
+          "speed": 4,
+          "jumpSpeed": 5,
+          "radius": 0.3,
+          "height": 1.8,
+          "stepHeight": 0.25,
+          "groundAcceleration": 35,
+          "airAcceleration": 5,
+          "groundFriction": 8,
+          "maxSlope": 45,
+          "movementMode": "inertial"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "main.js": "import { tuning as c } from './config.js';\n\n/** @param {ScriptContext} context */\nexport default function ({ entity, scene, input, physics, cameras, portals, interaction, visuals,\n  triggers, signals, motion, optics, fields, saves, ui }) {\n  const identity = { x: 0, y: 0, z: 0, w: 1 };\n  let ready = false, busy = false, completed = false, error = '', mirrorTurned = false;\n  let rig, controller, door, plate, receiver, unlocked, entry, exit, grab, laserBeam, field;\n  let effects = [], effectMaterial = null, effectActive = false, lastPortalPose = '', crossings = 0, forceVolumes = [];\n  let bridgeSegments = 0, fieldSegments = 0, lastTrace = null;\n  const required = id => { const e = scene.find(id); if (!e) throw Error('Missing composition entity: ' + id); return e; };\n  function rotationY(angle) { return { x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) }; }\n  /** @returns {PhysicsOptions} */\n  function body() { return { motion: 'static', shape: 'convex', size: { x: 1, y: 1, z: 1 }, mass: 1,\n    friction: c.bridge.friction, restitution: 0, sensor: false, lockRotation: false }; }\n  function releaseEffects() {\n    field?.destroy(); field = null;\n    for (const mesh of effects) { if (physics.has(mesh.entity)) physics.remove(mesh.entity); mesh.destroy(); }\n    effectMaterial?.destroy(); effectMaterial = null;\n    effects = []; forceVolumes = []; bridgeSegments = fieldSegments = 0;\n  }\n  function portalPose() { return JSON.stringify([entry.getPose(), exit.getPose(), entry.linked, exit.linked]); }\n  function rebuildEffects(active, force = false) {\n    if (effectActive === active && !force) return;\n    releaseEffects(); effectActive = active; lastPortalPose = portalPose();\n    if (!active) return;\n    try {\n      const bridge = portals.projectVolume({ ...c.bridge, maxHops: c.portal.maxHops });\n      const funnel = portals.projectVolume({ ...c.funnel, maxHops: c.portal.maxHops });\n      if (bridge.truncated || funnel.truncated) throw Error('Projection exhausted configured path budget');\n      effectMaterial = visuals.createMaterial({ color: c.bridge.color, emissive: c.bridge.color, alpha: .75 });\n      for (const segment of bridge.segments) {\n        const mesh = visuals.createMesh(segment.geometry, { material: effectMaterial }); effects.push(mesh); physics.add(mesh.entity, body());\n      }\n      bridgeSegments = bridge.segments.length;\n      forceVolumes = funnel.segments.map(segment => {\n        const points = [];\n        for (let i = 0; i < segment.geometry.positions.length; i += 3)\n          points.push({ x: segment.geometry.positions[i], y: segment.geometry.positions[i + 1], z: segment.geometry.positions[i + 2] });\n        return /** @type {FieldVolume} */ ({ shape: { kind: 'convex', points }, position: { x: 0, y: 0, z: 0 },\n          vector: { x: segment.direction.x * c.funnel.acceleration, y: segment.direction.y * c.funnel.acceleration, z: segment.direction.z * c.funnel.acceleration } });\n      });\n      if (forceVolumes.length) field = fields.create({ mode: 'acceleration', vector: { x: 0, y: 0, z: 0 }, volumes: forceVolumes });\n      fieldSegments = forceVolumes.length;\n      const beam = visuals.createBeam({ segments: funnel.segments.map(segment => ({ origin: segment.origin, end: segment.end })), radius: c.funnel.radius, color: c.funnel.color });\n      effects.push(beam);\n    } catch (failure) { releaseEffects(); effectActive = false; throw failure; }\n  }\n  function turnMirror() {\n    mirrorTurned = !mirrorTurned;\n    physics.setState(required('Mirror'), { rotation: rotationY(c.laser.mirrorYaw[mirrorTurned ? 1 : 0]) });\n  }\n  function updateLaser() {\n    lastTrace = optics.trace({ ...c.laser, filter: { ignore: [entity], sensors: false }, maxPortalHops: c.portal.maxHops });\n    receiver.set(!lastTrace.truncated && lastTrace.hit?.entity === required('Receiver') && lastTrace.energy >= c.laser.minEnergy);\n    if (lastTrace.segments.length) {\n      if (!laserBeam) laserBeam = visuals.createBeam({ segments: lastTrace.segments, radius: c.laser.radius, color: c.laser.color });\n      else laserBeam.update({ segments: lastTrace.segments });\n    }\n  }\n  function status() {\n    return { ready, busy, error, completed, mirrorTurned, plate: plate?.value ?? false,\n      receiver: receiver?.value ?? false, unlocked: unlocked?.value ?? false, door: door?.getState(), crossings,\n      bridgeSegments, fieldSegments, forceVolumes: structuredClone(forceVolumes),\n      laserReflections: lastTrace?.reflections.length ?? 0, laserHit: lastTrace?.hit?.entity.id ?? null,\n      projectionPath: entry?.linked ? ['bridge-entry'] : [] };\n  }\n  async function save() {\n    if (busy || !ready) return false;\n    busy = true;\n    try { await saves.save(c.slot); error = ''; return true; }\n    catch (failure) { error = failure.message; throw failure; }\n    finally { busy = false; }\n  }\n  async function retry() {\n    if (busy || !ready) return false;\n    busy = true; grab?.release(); grab = null; controller.clearInput();\n    try { const loaded = await saves.load(c.slot); if (!loaded) throw Error('Checkpoint is missing'); error = ''; return true; }\n    catch (failure) { error = failure.message; throw failure; }\n    finally { busy = false; }\n  }\n  function command(fn) { void fn().catch(failure => { error = failure.message; }); }\n  return {\n    onStart() {\n      controller = physics.character(entity);\n      rig = cameras.createRig({ target: entity, ...c.camera });\n      plate = signals.create(); receiver = signals.create(); unlocked = signals.gate('and', [plate, receiver]);\n      door = motion.create(required('Door'), { to: { position: c.door.open, rotation: identity }, duration: c.door.duration, easing: 'smoothstep' });\n      signals.onChange(unlocked, event => door.setTarget(event.value ? 1 : 0));\n      signals.onChange(plate, event => rebuildEffects(event.value));\n      portals.addSurface(required('PortalPanelA')); portals.addSurface(required('PortalPanelB'));\n      entry = portals.create({ id: 'bridge-entry', width: c.portal.width, height: c.portal.height });\n      exit = portals.create({ id: 'bridge-exit', width: c.portal.width, height: c.portal.height });\n      const first = entry.place(c.portal.entryOrigin, c.portal.entryRay), second = exit.place(c.portal.exitOrigin, c.portal.exitRay);\n      if (!first.placed || !second.placed) throw Error('Composition portal placement failed: ' + (first.reason || second.reason));\n      entry.link(exit); portals.watch(entity); portals.watch(required('Crate'));\n      portals.onTraverse(event => { if (event.entity === entity || event.entity === required('Crate')) crossings++; });\n      optics.addReflector(required('Mirror'), { reflectivity: c.laser.reflectivity });\n      const plateRegion = triggers.create({ volumes: [{ shape: { kind: 'box', size: c.plate.size }, position: c.plate.position }],\n        filterEntity: e => e === entity || e === required('Crate'), onEnter: () => plate.set(true), onExit: () => plate.set(plateRegion.getEntities().length > 0) });\n      triggers.create({ volumes: [{ shape: { kind: 'box', size: c.goal.size }, position: c.goal.position }], filterEntity: e => e === entity,\n        onEnter: () => { if (unlocked.value) completed = true; } });\n      saves.register('composition', { version: 1,\n        capture: () => ({ plate: plate.value, receiver: receiver.value, completed, mirrorTurned, door: door.getState(), view: rig.camera.getPose().rotation }),\n        validate: state => typeof state.plate === 'boolean' && typeof state.receiver === 'boolean' && typeof state.completed === 'boolean' && typeof state.mirrorTurned === 'boolean',\n        restore(state) {\n          completed = state.completed; mirrorTurned = state.mirrorTurned; door.restore(state.door); rig.setRotation(state.view);\n          controller.clearInput(); plate.set(state.plate); receiver.set(state.receiver); signals.flush(); rebuildEffects(state.plate, true);\n        } });\n      ui.get('saveCheckpoint')?.on('click', () => command(save));\n      ui.get('retryCheckpoint')?.on('click', () => command(retry));\n      ui.get('turnMirror')?.on('click', turnMirror);\n      globalThis.compositionLab = { status, save, retry, turnMirror, rig, entry, exit, player: entity };\n      updateLaser(); signals.flush();\n      void saves.save(c.slot).then(() => { ready = true; }).catch(failure => { error = failure.message; });\n    },\n    onFixedUpdate() {\n      if (!ready || busy) return;\n      controller.move(rig.direction(input.getAction('moveX'), input.getAction('moveZ')));\n      if (input.wasActionPressed('jump')) controller.jump();\n      updateLaser();\n      if (effectActive && lastPortalPose !== portalPose()) rebuildEffects(true, true);\n      if (entity.getWorldPosition().y < c.deathHeight) command(retry);\n    },\n    onUpdate() {\n      if (!rig) return;\n      const delta = input.getMouseDelta();\n      if (input.wasMouseButtonPressed(0) && !input.isPointerLocked()) void input.requestPointerLock();\n      if (input.isPointerLocked()) rig.look(delta.x, delta.y);\n      rig.update();\n      const ray = rig.camera.ray(.5, .5, c.rayRange);\n      if (ready && !busy) {\n        if (input.wasActionPressed('interact')) {\n          if (grab?.active) { grab.release(); grab = null; }\n          else {\n            const hit = portals.raycast(ray.origin, ray.direction, { ignore: [entity], sensors: false }).hit;\n            if (hit && physics.getState(hit.entity).kind === 'dynamic') grab = interaction.grab(hit.entity, { position: hit.point, maxDistance: c.maxHoldDistance });\n          }\n        }\n        if (grab?.active) grab.setRay(ray.origin, ray.direction, c.holdDistance, { ignore: [entity] });\n        if (input.wasActionPressed('mirror')) turnMirror();\n        if (input.wasActionPressed('save')) command(save);\n        if (input.wasActionPressed('retry')) command(retry);\n      }\n      ui.get('status')?.setText(error || (completed ? '验证关卡完成' : `压力区 ${plate.value ? '开启' : '关闭'} · 光接收器 ${receiver.value ? '开启' : '关闭'} · 门 ${Math.round(door.getState().progress * 100)}%`));\n    },\n    onDestroy() { grab?.release(); releaseEffects(); laserBeam?.destroy(); delete globalThis.compositionLab; },\n  };\n}\n",
+    "config.js": "// All puzzle dimensions, speeds, strengths, ranges and interaction tuning live here.\nexport const tuning = {\n  player: { start: { x: -6, y: 1.1, z: -2 }, speed: 4, jumpSpeed: 5, radius: .3, height: 1.8,\n    stepHeight: .25, groundAcceleration: 35, airAcceleration: 5, groundFriction: 8 },\n  camera: { eyeOffset: { x: 0, y: .65, z: 0 }, sensitivity: .002, uprightSpeed: 5,\n    rotation: { x: 0, y: Math.sin(Math.PI / 6), z: 0, w: Math.cos(Math.PI / 6) } },\n  plate: { position: { x: -2, y: .7, z: 0 }, size: { x: 2, y: 1.4, z: 2 } },\n  door: { closed: { x: 9, y: 1.5, z: 0 }, open: { x: 9, y: 5, z: 0 }, duration: .7 },\n  laser: { origin: { x: 0, y: 1.3, z: -3 }, direction: { x: 0, y: 0, z: 15 },\n    radius: .025, color: '#ff654f', minEnergy: .1, reflectivity: .9, mirrorYaw: [-Math.PI / 4, Math.PI / 4] },\n  portal: { width: 1.8, height: 2.6, entryOrigin: { x: 3, y: 1.5, z: 5 }, entryRay: { x: 0, y: 0, z: -6 },\n    exitOrigin: { x: 6, y: 1.5, z: 6 }, exitRay: { x: 8, y: 0, z: 0 }, maxHops: 4 },\n  bridge: { origin: { x: 3, y: .45, z: 5 }, direction: { x: 0, y: 0, z: -12 },\n    profile: [{ x: -.65, y: -.05 }, { x: .65, y: -.05 }, { x: .65, y: .05 }, { x: -.65, y: .05 }],\n    thickness: .01, color: '#5cbbff', friction: .8 },\n  funnel: { origin: { x: 3, y: 1.5, z: 5 }, direction: { x: 0, y: 0, z: -12 },\n    profile: [{ x: -.6, y: -.7 }, { x: .6, y: -.7 }, { x: .6, y: .7 }, { x: -.6, y: .7 }],\n    thickness: .01, acceleration: 3, color: '#b080ff', radius: .045 },\n  goal: { position: { x: 11, y: 1, z: 0 }, size: { x: 1.5, y: 2, z: 2 } },\n  deathHeight: -8, rayRange: 30, holdDistance: 2.5, maxHoldDistance: 8, slot: 'composition-lab',\n};\n"
+  },
+  "activeFileId": "main.js",
+  "modelRefs": [],
+  "settings": {
+    "gravity": {
+      "x": 0,
+      "y": -9.8,
+      "z": 0
+    },
+    "backgroundColor": "#142439",
+    "ambientIntensity": 0.8,
+    "fpsCap": 60,
+    "fixedTimeStep": 0.016666666666666666,
+    "maxSubSteps": 8,
+    "timeScale": 1
+  },
+  "content": {
+    "materials": {},
+    "textures": [],
+    "prefabs": {},
+    "prefabInstances": {},
+    "audio": [],
+    "physics": {
+      "groups": [
+        {
+          "name": "Default",
+          "mask": 1
+        }
+      ],
+      "debug": false
+    },
+    "gameplay": {
+      "captureInput": true,
+      "actions": [
+        {
+          "name": "moveX",
+          "positive": [
+            "KeyD"
+          ],
+          "negative": [
+            "KeyA"
+          ]
+        },
+        {
+          "name": "moveZ",
+          "positive": [
+            "KeyW"
+          ],
+          "negative": [
+            "KeyS"
+          ]
+        },
+        {
+          "name": "jump",
+          "positive": [
+            "Space"
+          ],
+          "negative": []
+        },
+        {
+          "name": "interact",
+          "positive": [
+            "KeyE"
+          ],
+          "negative": []
+        },
+        {
+          "name": "mirror",
+          "positive": [
+            "KeyQ"
+          ],
+          "negative": []
+        },
+        {
+          "name": "save",
+          "positive": [
+            "KeyK"
+          ],
+          "negative": []
+        },
+        {
+          "name": "retry",
+          "positive": [
+            "KeyR"
+          ],
+          "negative": []
+        }
+      ],
+      "hud": [
+        {
+          "id": "title",
+          "kind": "text",
+          "text": "通用玩法组合：放箱压板 → 反射接收 → 穿门光桥 → 出口",
+          "x": 2,
+          "y": 2,
+          "width": 90,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        },
+        {
+          "id": "hint",
+          "kind": "text",
+          "text": "WASD 移动 · 空格跳跃 · 点击锁鼠标 · E 抓取/释放 · Q 旋转反射面 · K 保存 · R 重试",
+          "x": 2,
+          "y": 8,
+          "width": 90,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        },
+        {
+          "id": "status",
+          "kind": "text",
+          "text": "加载中",
+          "x": 2,
+          "y": 14,
+          "width": 90,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        },
+        {
+          "id": "crosshair",
+          "kind": "text",
+          "text": "+",
+          "x": 50,
+          "y": 50,
+          "width": 3,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        },
+        {
+          "id": "saveCheckpoint",
+          "kind": "button",
+          "text": "保存检查点",
+          "x": 2,
+          "y": 90,
+          "width": 18,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        },
+        {
+          "id": "retryCheckpoint",
+          "kind": "button",
+          "text": "重试检查点",
+          "x": 22,
+          "y": 90,
+          "width": 18,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        },
+        {
+          "id": "turnMirror",
+          "kind": "button",
+          "text": "切换反射面",
+          "x": 42,
+          "y": 90,
+          "width": 18,
+          "height": 5,
+          "fontSize": 16,
+          "color": "#ffffff",
+          "background": "#142439"
+        }
+      ]
+    }
+  }
+}

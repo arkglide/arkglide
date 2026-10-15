@@ -50,6 +50,7 @@ function setup() {
     location:{search:""},
     Blob,
     structuredClone,
+    TextEncoder,
     crypto,
   });
   vm.runInContext(
@@ -80,7 +81,7 @@ function setup() {
     ),
     context,
   );
-  for (const name of ["physics", "input-ui", "audio", "animation"])
+  for (const name of ["spatial", "state", "visuals", "surfaces", "fields", "triggers", "signals", "motion", "optics", "levels", "checkpoints", "portal-projection", "cameras", "portals", "interaction", "physics-tools", "physics", "input-ui", "audio", "animation"])
     vm.runInContext(
       fs.readFileSync(
         new URL("../public/arkglide-" + name + ".js", import.meta.url),
@@ -662,4 +663,44 @@ test("early bootstrap resource failures report fatal errors with the current boo
   context.arkglideBootFinished = true;
   handlers.error({target: {tagName: "CANVAS"}, message: "later script error"});
   assert.equal(messages.length, 1);
+});
+
+test('all foundation services are injected and storage responses require the current parent/run',async()=>{
+ const {context,send,handlers,messages}=setup();try{
+  await send({type:'run',runId:27,project:{scene:{nodes:[node]},scripts:{'main.js':`return {onStart(){globalThis.foundationCheck={apis:[visuals,surfaces,fields,levels,storage,saves,triggers,signals,motion,optics].every(Boolean),value:null,error:null};storage.read('probe').then(v=>foundationCheck.value=v).catch(e=>foundationCheck.error=e.message);}};`}}});
+  assert.equal(context.foundationCheck.apis,true);const request=messages.find(m=>m.type==='storage');assert.ok(request);assert.equal(request.runId,27);
+  handlers.message({source:{},data:{type:'storage-result',runId:27,requestId:request.requestId,value:1}});assert.equal(context.foundationCheck.value,null);
+  await send({type:'storage-result',runId:26,requestId:request.requestId,value:2});assert.equal(context.foundationCheck.value,null);
+  await send({type:'storage-result',runId:27,requestId:request.requestId,value:{chapter:3}});assert.equal(context.foundationCheck.value.chapter,3);assert.equal(context.storageRuntime.stats().storageRequests,0);
+  await send({type:'stop'});assert.equal(context.session.stats().scripts,0);assert.equal(context.visualsRuntime,null);assert.equal(context.savesRuntime,null);
+ }finally{await send({type:'stop'});context.engine.dispose();}
+});
+
+test('legacy-script triggers sample the completed physics step and release telemetry on stop', async () => {
+  const { context, send, tick } = setup();
+  try {
+    await send({ type: 'run', project: { settings: { gravity: { x: 0, y: 0, z: 0 } },
+      scene: { nodes: [node] }, scripts: { 'main.js': `
+        physics.add(entity,{motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:1,friction:0,restitution:0,sensor:false,lockRotation:false,linearDamping:0,angularDamping:0});
+        physics.teleport(entity,{x:2,y:0,z:0});
+        physics.setVelocity(entity,{x:-60,y:0,z:0});
+        globalThis.triggerPhases=[];
+        triggers.create({volumes:[{shape:{kind:'sphere',radius:.1},position:{x:1.3,y:0,z:0}}],onEnter:e=>{triggerPhases.push(e.phase);physics.setVelocity(e.entity,{x:0,y:0,z:0});},onStay:e=>triggerPhases.push(e.phase)});
+        return {};` } } });
+    assert.deepEqual(Array.from(context.triggerPhases), []);
+    tick(0); // The first render initializes the simulation timestamp.
+    tick(20);
+    assert.deepEqual(Array.from(context.triggerPhases), ['enter']);
+    assert.equal(context.triggersRuntime.stats().physicsTriggers, 1);
+    context.time.timeScale = 0;
+    tick(20);
+    assert.deepEqual(Array.from(context.triggerPhases), ['enter']);
+    context.time.timeScale = 1;
+    tick(20);
+    assert.deepEqual(Array.from(context.triggerPhases), ['enter', 'stay']);
+    await send({ type: 'stop' });
+    assert.equal(context.triggersRuntime, null);
+    const telemetry = context.session.stats();
+    assert.equal(telemetry.scripts, 0);
+  } finally { await send({ type: 'stop' }); context.engine.dispose(); }
 });

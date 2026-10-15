@@ -1,0 +1,45 @@
+
+> arkglide@0.0.1 test:browser
+> playwright test --project=editor --reporter=list
+
+[WebServer] (node:3659) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:3672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:3693) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 23 tests using 1 worker
+
+(node:3743) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [editor] › tests/browser/editor.spec.ts:3:1 › editor roadmap: model authoring, persistence, runtime, isolation and WASM (20.1s)
+  ✓   2 [editor] › tests/browser/editor.spec.ts:235:1 › Delete in editable content preserves scene selection (3.7s)
+  ✓   3 [editor] › tests/browser/editor.spec.ts:248:1 › text undo shortcuts preserve scene history (4.0s)
+  ✓   4 [editor] › tests/browser/editor.spec.ts:265:1 › project settings apply with existing material references (5.1s)
+  ✓   5 [editor] › tests/browser/editor.spec.ts:280:1 › invalid project settings show an error inside the open dialog (6.4s)
+  ✓   6 [editor] › tests/browser/editor.spec.ts:292:1 › gravity fields support typing negative values through intermediate input states (5.8s)
+  ✓   7 [editor] › tests/browser/editor.spec.ts:304:1 › time scale fields retain decimal input until settings are applied (5.0s)
+  ✓   8 [editor] › tests/browser/editor.spec.ts:316:1 › inspector position retains signed decimal typing (4.2s)
+  ✓   9 [editor] › tests/browser/editor.spec.ts:324:1 › script creation stays locked during playback and pause (4.9s)
+  ✓  10 [editor] › tests/browser/editor.spec.ts:337:1 › scene tree range selection excludes nodes hidden by search (4.5s)
+  ✓  11 [editor] › tests/browser/editor.spec.ts:348:1 › scene tree range selection follows displayed hierarchy rather than storage order (4.7s)
+  ✓  12 [editor] › tests/browser/editor.spec.ts:358:1 › modal dialog keyboard input does not delete or undo the background scene (6.5s)
+  ✓  13 [editor] › tests/browser/editor.spec.ts:370:1 › popup menu focus isolates scene editing shortcuts (5.9s)
+  ✓  14 [editor] › tests/browser/editor.spec.ts:378:1 › repeated Shift selection retains the original scene tree anchor (4.3s)
+  ✓  15 [editor] › tests/browser/editor.spec.ts:389:1 › unchanged inspector coordinates preserve redo for single and multiple selections (4.2s)
+  ✓  16 [editor] › tests/browser/editor.spec.ts:405:1 › scene tree renders a deep hierarchy without recursive stack overflow (1.6m)
+  ✓  17 [editor] › tests/browser/editor.spec.ts:417:1 › failed clipboard shortcuts show the scene error without an uncaught exception (4.3s)
+  ✓  18 [editor] › tests/browser/editor.spec.ts:439:1 › project switching clears scene tree rename and search drafts (4.1s)
+  ✓  19 [editor] › tests/browser/editor.spec.ts:451:1 › cancelled scene drags do not reparent nodes during a later external drop (4.4s)
+  ✓  20 [editor] › tests/browser/editor.spec.ts:471:1 › dropping a scene node onto Scene restores it to the root hierarchy (4.0s)
+  ✓  21 [editor] › tests/browser/editor.spec.ts:485:1 › scene search retains shared nonmatching ancestors and hides unrelated branches (4.2s)
+  ✓  22 [editor] › tests/browser/editor.spec.ts:497:1 › scene rename waits for IME composition confirmation before committing Enter (6.8s)
+  ✓  23 [editor] › tests/browser/editor.spec.ts:510:1 › save project waits for IME confirmation before submitting its name (6.1s)
+
+  23 passed (3.7m)
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

@@ -52,3 +52,24 @@ F11 已接入 Jolt WASM 进阶物理；F13 已支持独立静态游戏导出。F
 停止运行后打开「菜单 → 导出独立游戏…」，下载可部署在根路径或子目录的游戏 ZIP。已导出的示例位于 `examples/fourth-static-game/`，可使用 `node scripts/serve-static.mjs examples/fourth-static-game 8080` 启动普通静态服务器。
 
 CLI：`npm run export:game -- examples/fourth-static.arkglide 空输出目录`。资源规则和使用方法见 [第四批交付说明](docs/fourth-batch.md)，[变更记录](docs/fourth-batch-changes.md)与[验收记录](docs/fourth-batch-verification.md)提供交付详情。`npm run test:static` 验证无编辑器运行；`npm run verify:fourth` 串行执行单测、静态部署、生产构建和编辑器回归。真实手柄与实体目标设备人工验收仍待完成。
+
+## 通用视角与传送门 API
+
+新增鼠标锁定、多模式相机 rig、惯性角色、世界位姿/角速度、物理抓取和配对传送门。自动开孔适用于注册静态盒形平板，递归视图、跨门射线与动量转换共用于编辑器和独立包。导入 `examples/portal-lab.arkglide` 进行验收；完整接口、运行方法和物理边界见 [通用视角与传送门 API](docs/view-and-portals-api.md)。
+
+## 通用玩法基础 API
+
+新增接触材质规则、运行时物理/角色配置、稳定 ID 碰撞体更新、关节电机控制、动态视觉资源、表面涂层、有限体积穿门投射、力场、区域触发器、预制体关卡与检查点存档。接口和参数均保持通用；游戏脚本负责具体机关规则。使用方法和边界见 [玩法基础 API](docs/gameplay-foundations-api.md)，实际验证范围见 [完整性检查](docs/gameplay-foundations-verification.md)。
+
+日常接口修改优先使用轻量验证，无需生产构建：
+
+```sh
+npm run sync:runtime
+node --test --test-reporter=tap --test-concurrency=1 tests/*.test.mjs
+node node_modules/typescript/bin/tsc --noEmit --pretty false
+# 系统 Chromium 可通过 PLAYWRIGHT_CHROMIUM_EXECUTABLE 指定
+npm run test:foundations:browser
+npm run test:composition:browser
+```
+
+通用信号逻辑、可逆运动机构和原生反射查询已加入。可导入 `examples/composition-lab.arkglide` 体验压板、反射接收、运动门、穿门光桥/牵引场和检查点重试的组合；游戏参数位于 `examples/composition-lab-scripts/config.js`。穿门控制与接口边界统一见上述 API 文档。

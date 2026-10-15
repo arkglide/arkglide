@@ -8,6 +8,11 @@ export interface PhysicsConfig {
   debug: boolean;
 }
 export interface CharacterComponent {
+  mass?: number;
+  movementMode?: "direct" | "inertial";
+  groundAcceleration?: number;
+  airAcceleration?: number;
+  groundFriction?: number;
   radius: number;
   height: number;
   stepHeight: number;

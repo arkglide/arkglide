@@ -1,0 +1,21 @@
+// All puzzle dimensions, speeds, strengths, ranges and interaction tuning live here.
+export const tuning = {
+  player: { start: { x: -6, y: 1.1, z: -2 }, speed: 4, jumpSpeed: 5, radius: .3, height: 1.8,
+    stepHeight: .25, groundAcceleration: 35, airAcceleration: 5, groundFriction: 8 },
+  camera: { eyeOffset: { x: 0, y: .65, z: 0 }, sensitivity: .002, uprightSpeed: 5,
+    rotation: { x: 0, y: Math.sin(Math.PI / 6), z: 0, w: Math.cos(Math.PI / 6) } },
+  plate: { position: { x: -2, y: .7, z: 0 }, size: { x: 2, y: 1.4, z: 2 } },
+  door: { closed: { x: 9, y: 1.5, z: 0 }, open: { x: 9, y: 5, z: 0 }, duration: .7 },
+  laser: { origin: { x: 0, y: 1.3, z: -3 }, direction: { x: 0, y: 0, z: 15 },
+    radius: .025, color: '#ff654f', minEnergy: .1, reflectivity: .9, mirrorYaw: [-Math.PI / 4, Math.PI / 4] },
+  portal: { width: 1.8, height: 2.6, entryOrigin: { x: 3, y: 1.5, z: 5 }, entryRay: { x: 0, y: 0, z: -6 },
+    exitOrigin: { x: 6, y: 1.5, z: 6 }, exitRay: { x: 8, y: 0, z: 0 }, maxHops: 4 },
+  bridge: { origin: { x: 3, y: .45, z: 5 }, direction: { x: 0, y: 0, z: -12 },
+    profile: [{ x: -.65, y: -.05 }, { x: .65, y: -.05 }, { x: .65, y: .05 }, { x: -.65, y: .05 }],
+    thickness: .01, color: '#5cbbff', friction: .8 },
+  funnel: { origin: { x: 3, y: 1.5, z: 5 }, direction: { x: 0, y: 0, z: -12 },
+    profile: [{ x: -.6, y: -.7 }, { x: .6, y: -.7 }, { x: .6, y: .7 }, { x: -.6, y: .7 }],
+    thickness: .01, acceleration: 3, color: '#b080ff', radius: .045 },
+  goal: { position: { x: 11, y: 1, z: 0 }, size: { x: 1.5, y: 2, z: 2 } },
+  deathHeight: -8, rayRange: 30, holdDistance: 2.5, maxHoldDistance: 8, slot: 'composition-lab',
+};

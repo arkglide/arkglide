@@ -39,6 +39,8 @@
       if (!prefab) throw new Error("预制体不存在: " + id);
       if (!settings || typeof settings !== "object")
         throw new TypeError("预制体生成参数必须是对象");
+      if (settings.deferScripts !== undefined && typeof settings.deferScripts !== "boolean") throw Error("Invalid prefab deferScripts");
+      if (settings.visible !== undefined && typeof settings.visible !== "boolean") throw Error("Invalid prefab visibility");
       const scene = options.sceneAPI,
         parent = settings.parent;
       if (parent && (parent.destroyed || scene.find(parent.id) !== parent))
@@ -73,6 +75,7 @@
           copy.rotation = rotation;
           copy.scale = scale;
           copy.parentId = parent?.id || null;
+          if (settings.visible !== undefined) copy.visible = settings.visible;
         }
         return copy;
       });
@@ -121,7 +124,14 @@
         const rootEntity = scene.find(nodeMap[prefab.rootId]);
         if (!rootEntity || nodes.some((n) => !scene.find(n.id)))
           throw abortError();
-        options.attachScripts(nodes);
+        let scriptsStarted = false;
+        function startScripts() {
+          if (scriptsStarted) return;
+          if (generation !== options.getGeneration() || !options.isRunning() || rootEntity.destroyed || (owner && (!owner.record.active || owner.record.destroying))) throw abortError();
+          scriptsStarted = true;
+          options.attachScripts(nodes);
+        }
+        if (!settings.deferScripts) startScripts();
         if (
           !token.live ||
           generation !== options.getGeneration() ||
@@ -140,6 +150,7 @@
           find: (localId) => scene.find(nodeMap[localId]) || null,
           findByName: (name) =>
             entities.find((e) => !e.destroyed && e.name === name) || null,
+          startScripts,
           destroy: () => rootEntity.destroy(),
         });
       } catch (error) {
