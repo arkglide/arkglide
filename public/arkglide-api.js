@@ -24,10 +24,10 @@
       for (const axis of ['x', 'y', 'z']) {
         Object.defineProperty(view, axis, {
           enumerable: true,
-          get() { return meshOf(entity)[field][axis]; },
+          get() { return copyVector(entity, field)[axis]; },
           set(value) {
             if (!Number.isFinite(value)) throw new TypeError('Expected a finite number');
-            meshOf(entity)[field][axis] = value;
+            setVector(entity, field, { ...copyVector(entity, field), [axis]: value });
           },
         });
       }
@@ -44,7 +44,9 @@
       mesh[field].set(value.x, value.y, value.z);
     }
     function copyVector(entity, field) {
-      const value = meshOf(entity)[field];
+      const mesh = meshOf(entity);
+      const value = field === 'rotation' && mesh.rotationQuaternion
+        ? mesh.rotationQuaternion.toEulerAngles() : mesh[field];
       return { x: value.x, y: value.y, z: value.z };
     }
 
@@ -110,16 +112,30 @@
         const mesh = handle.mesh;
         if (handle.destroying) return;
         handle.destroying = true;
+        let failure, failed = false;
+        const captureFailure = (error) => {
+          if (!failed) { failed = true; failure = error; }
+        };
         // Destroy descendant scripts while their handles are still valid.
         for (const child of mesh.getDescendants?.() || []) {
           const id = child.metadata?.arkglideId;
           const entity = entities.get(id);
-          if (entity && entity !== this) entity.destroy();
+          if (entity && entity !== this) {
+            try { entity.destroy(); } catch (error) { captureFailure(error); }
+          }
         }
-        options.onBeforeDestroy?.(handle.id);
-        mesh.dispose(false, true);
-        handle.mesh = null;
-        entities.delete(handle.id);
+        try {
+          options.onBeforeDestroy?.(handle.id);
+        } catch (error) {
+          captureFailure(error);
+        } finally {
+          try { mesh.dispose(false, true); }
+          finally {
+            handle.mesh = null;
+            if (entities.get(handle.id) === this) entities.delete(handle.id);
+          }
+        }
+        if (failed) throw failure;
       }
     }
 
@@ -130,7 +146,18 @@
         mesh.rotationQuaternion = null;
       }
       const entity = new EntityHandle(mesh, id, name);
-      mesh.onDisposeObservable?.add(() => { options.onBeforeDestroy?.(id); handles.get(entity).mesh = null; entities.delete(id); });
+      mesh.onDisposeObservable?.add(() => {
+        const handle = handles.get(entity);
+        try {
+          if (!handle.destroying) {
+            handle.destroying = true;
+            options.onBeforeDestroy?.(id);
+          }
+        } finally {
+          handle.mesh = null;
+          if (entities.get(id) === entity) entities.delete(id);
+        }
+      });
       entities.set(id, entity);
       return entity;
     }
@@ -157,7 +184,14 @@
         return register(builders[type](), id, id);
       },
       destroy(id) { entities.get(id)?.destroy(); },
-      destroyAll() { for (const entity of [...entities.values()]) entity.destroy(); },
+      destroyAll() {
+        let failed = false, failure;
+        for (const entity of [...entities.values()]) {
+          try { entity.destroy(); }
+          catch (error) { if (!failed) { failed = true; failure = error; } }
+        }
+        if (failed) throw failure;
+      },
       getEntityCount() { return entities.size; },
     };
     // The editor/runtime alone receives register and the map. User scripts get

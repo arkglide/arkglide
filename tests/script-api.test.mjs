@@ -87,3 +87,83 @@ test('imported quaternion roots respond to the Euler rotation API', () => {
     assert.equal(mesh.rotation.y, 1);
   } finally { engine.dispose(); }
 });
+
+test('Euler rotation views read and edit quaternion-backed entities without losing other axes',()=>{
+ const {sceneAPI,scene,engine}=setup();
+ try {
+  const entity=sceneAPI.create('box','quaternion-model'),mesh=scene.getMeshByName('quaternion-model');
+  mesh.rotationQuaternion=Quaternion.FromEulerAngles(0.2,0.4,0.1);
+  assert.ok(Math.abs(entity.getRotation().y-0.4)<1e-6);
+  assert.ok(Math.abs(entity.rotation.x-0.2)<1e-6);
+  entity.rotation.y=0.7;
+  assert.equal(mesh.rotationQuaternion,null);
+  assert.ok(Math.abs(mesh.rotation.x-0.2)<1e-6);assert.ok(Math.abs(mesh.rotation.z-0.1)<1e-6);
+  assert.equal(mesh.rotation.y,0.7);
+ } finally {engine.dispose();}
+});
+
+test('entity destruction notifies lifecycle cleanup once for explicit and native disposal',()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),calls=[];
+ const api=ArkGlideRuntime.createEntityAPI({MeshBuilder},()=>scene,()=>null,{onBeforeDestroy:id=>calls.push(id)});
+ try {
+  const first=api.sceneAPI.create('box','first');first.destroy();first.destroy();
+  assert.deepEqual(calls,['first']);
+  api.sceneAPI.create('box','native');scene.getMeshByName('native').dispose();
+  assert.deepEqual(calls,['first','native']);
+ } finally {engine.dispose();}
+});
+
+test('entity disposal completes when lifecycle notification throws',()=>{
+ const engine=new NullEngine(),scene=new Scene(engine);
+ const api=ArkGlideRuntime.createEntityAPI({MeshBuilder},()=>scene,()=>null,{onBeforeDestroy(){throw Error('cleanup failed');}});
+ try {
+  const entity=api.sceneAPI.create('box','failed-cleanup');
+  assert.throws(()=>entity.destroy(),/cleanup failed/);
+  assert.equal(entity.destroyed,true);assert.equal(api.sceneAPI.find('failed-cleanup'),null);
+  assert.equal(scene.getMeshByName('failed-cleanup'),null);assert.doesNotThrow(()=>entity.destroy());
+ } finally {engine.dispose();}
+});
+
+test('native disposal unregisters the entity even when lifecycle reporting fails',()=>{
+ const engine=new NullEngine(),scene=new Scene(engine);
+ const api=ArkGlideRuntime.createEntityAPI({MeshBuilder},()=>scene,()=>null,{onBeforeDestroy(){throw Error('native cleanup failed');}});
+ const entity=api.sceneAPI.create('box','native-failure'),mesh=scene.getMeshByName('native-failure');
+ try {
+  assert.throws(()=>mesh.dispose(),/native cleanup failed/);
+  assert.equal(entity.destroyed,true);assert.equal(api.sceneAPI.find('native-failure'),null);
+ } finally {mesh.onDisposeObservable.clear();mesh.dispose();engine.dispose();}
+});
+
+test('descendant cleanup failures do not prevent the rest of an entity subtree from disposing',()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),calls=[];
+ const api=ArkGlideRuntime.createEntityAPI({MeshBuilder},()=>scene,()=>null,{onBeforeDestroy(id){calls.push(id);if(id==='child')throw Error('child cleanup failed');}});
+ try {
+  const parent=api.sceneAPI.create('box','parent');
+  for(const id of ['child','sibling']){api.sceneAPI.create('box',id);const mesh=scene.getMeshByName(id);mesh.metadata={arkglideId:id};mesh.parent=scene.getMeshByName('parent');}
+  assert.throws(()=>parent.destroy(),/child cleanup failed/);
+  assert.equal(api.entities.size,0);assert.equal(scene.meshes.length,0);
+  assert.deepEqual([...calls].sort(),['child','parent','sibling']);
+ } finally {engine.dispose();}
+});
+
+test('entity teardown preserves falsy thrown values while completing cleanup',()=>{
+ for(const thrown of [null,undefined,false,0,'']){
+  const engine=new NullEngine(),scene=new Scene(engine);
+  const api=ArkGlideRuntime.createEntityAPI({MeshBuilder},()=>scene,()=>null,{onBeforeDestroy(){throw thrown;}});
+  try {
+   const entity=api.sceneAPI.create('box','falsy');let caught=false;
+   try {entity.destroy();}catch(error){caught=true;assert.equal(error,thrown);}
+   assert.equal(caught,true);assert.equal(entity.destroyed,true);assert.equal(api.entities.size,0);
+  } finally {engine.dispose();}
+ }
+});
+
+test('destroyAll completes unrelated entity cleanup before rethrowing the first failure',()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),calls=[];
+ const api=ArkGlideRuntime.createEntityAPI({MeshBuilder},()=>scene,()=>null,{onBeforeDestroy(id){calls.push(id);if(id==='first')throw Error('first failed');}});
+ try {
+  api.sceneAPI.create('box','first');api.sceneAPI.create('box','second');
+  assert.throws(()=>api.sceneAPI.destroyAll(),/first failed/);
+  assert.equal(api.entities.size,0);assert.equal(scene.meshes.length,0);assert.deepEqual(calls,['first','second']);
+ } finally {engine.dispose();}
+});
