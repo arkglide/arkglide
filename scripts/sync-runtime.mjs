@@ -1,5 +1,5 @@
 import "./sync-wasm.mjs";
-import { copyFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 copyFileSync(
   new URL("../src/engine/scene-runtime.js", import.meta.url),
   new URL("../public/arkglide-scene.js", import.meta.url),
@@ -43,4 +43,7 @@ copyFileSync(
 
 // Licenses must travel with independent static games.
 copyFileSync(new URL("../LICENSE", import.meta.url), new URL("../public/lib/arkglide-LICENSE.txt", import.meta.url));
-copyFileSync(new URL("../node_modules/@babylonjs/core/license.md", import.meta.url), new URL("../public/lib/babylon-LICENSE.md", import.meta.url));
+writeFileSync(
+  new URL("../public/lib/babylon-LICENSE.md", import.meta.url),
+  readFileSync(new URL("../node_modules/@babylonjs/core/license.md", import.meta.url), "utf8").replace(/\r\n/g, "\n"),
+);
