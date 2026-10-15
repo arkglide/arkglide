@@ -100,6 +100,9 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  sceneBackend?:string;lifecycleBackend?:string;
+  nativeEntities?:number;nativeSceneSlots?:number;nativeMatrixUpdates?:number;
+  nativeOwners?:number;nativeTimers?:number;coreWasmHeapBytes?:number;
   state: string;
   mathBackend: string;
   fps: number;

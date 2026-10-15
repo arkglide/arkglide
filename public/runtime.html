@@ -62,6 +62,7 @@
     <script src="./arkglide-interaction.js"></script>
     <script src="./arkglide-physics-tools.js"></script>
     <script src="./arkglide-physics.js"></script>
+    <script src="./arkglide-ui-styles.js"></script>
     <script src="./arkglide-input-ui.js"></script>
     <script src="./arkglide-audio-stretch.js"></script>
     <script src="./arkglide-audio.js"></script>
@@ -123,11 +124,13 @@
       var initialized = false; // Babylon 是否已初始化
 
       // Script API adapter owns renderer details; scripts receive only handles.
-      var math = null;
+      var math = null,coreModule=null,logicalWorld=null;
       var mathReady =
         typeof createArkGlideMath === "function"
           ? createArkGlideMath().then(function (module) {
               math = ArkGlideMath.createMathAPI(module);
+              if(!module.RuntimeWorld||!module.RuntimeClock)throw Error('WASM logical runtime core is missing; rebuild the runtime library');
+              coreModule=module;logicalWorld=new module.RuntimeWorld();
             })
           : Promise.resolve();
       var joltModule = null,
@@ -153,6 +156,7 @@
           return math;
         },
         {
+          getWorld:()=>logicalWorld,
           onBeforeMutate: function () { physicsRuntime?.assertMutable(); },
           onBeforeDestroy: function (id) {
             prefabLibrary?.onEntityDestroyed(id);
@@ -245,6 +249,7 @@
       }
       function createSession() {
         return ArkGlideLifecycle.createSession({
+          nativeModule:coreModule,
           onError: reportScriptError,
           onFixedStep: function (dt) {
             signalsRuntime?.flush();
@@ -270,6 +275,7 @@
           world:ArkGlideCheckpoints.createWorld(BABYLON,{scene:sceneAPI,levels:levelsRuntime,physics:physicsRuntime,physicsAPI:physicsRuntime.forOwner(serviceOwner),getObject:entityAPI.getObject})});
       }
       function attachComponents(nodes) {
+        entityAPI.sync();
         nodes.forEach(function (n) {
           physicsRuntime?.add(n);
         });
@@ -415,6 +421,7 @@
         _lastTelemetry = now;
         var stats = Object.assign(
           session.stats(),
+          entityAPI.stats(),
           packageRuntime?.stats() || {packageResources:0,packageGroups:0,packageIndexes:0,packageModules:0},
           physicsRuntime?.stats(),
           cameraRuntime?.stats() || {runtimeCameras:0,cameraRigs:0},
@@ -440,6 +447,7 @@
             errors: scriptErrors,
             state: desiredState,
             mathBackend: math && math.backend,
+            coreWasmHeapBytes:coreModule?.HEAPU8?.byteLength||0,
             fps: measuredFps,
             frameMs: frameMs,
             peakFrameMs: peakFrameMs,
@@ -820,6 +828,7 @@
         cameraRuntime?.dispose();
         interactionRuntime = portalRuntime = cameraRuntime = null;
         sceneAPI.destroyAll();
+        logicalWorld?.clear();
         moduleLoader?.dispose();
         moduleLoader = null;
         sceneAdapter?.clear();
@@ -888,6 +897,7 @@
               .then(function () {
                 if (generation !== runGeneration || desiredState === "stopped")
                   return;
+                entityAPI.sync();
                 scene.activeCamera = sceneAdapter.activeCamera() || camera;
                 return initGameplay(runtimeContent, msg.audioData).then(
                   function () {

@@ -27,6 +27,7 @@ export const RUNTIME_FILES = [
   "arkglide-prefabs.js",
   "arkglide-physics-tools.js",
   "arkglide-physics.js",
+  "arkglide-ui-styles.js",
   "arkglide-input-ui.js",
   "arkglide-audio-stretch.js",
   "arkglide-audio.js",

@@ -52,9 +52,78 @@ export interface InputAction {
   positive: string[];
   negative: string[];
 }
+export interface UIStyle {
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  outlineColor?: string;
+  borderWidth?: number;
+  borderRadius?: number | string;
+  borderStyle?: "none" | "solid" | "dashed" | "dotted" | "double";
+  padding?: number;
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  opacity?: number;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: number | "normal" | "bold" | "lighter" | "bolder";
+  fontStyle?: "normal" | "italic" | "oblique";
+  textAlign?: "left" | "center" | "right" | "start" | "end" | "justify";
+  lineHeight?: number;
+  letterSpacing?: number;
+  alignItems?:
+    | "start"
+    | "end"
+    | "center"
+    | "stretch"
+    | "baseline"
+    | "flex-start"
+    | "flex-end";
+  justifyContent?:
+    | "start"
+    | "end"
+    | "center"
+    | "space-between"
+    | "space-around"
+    | "space-evenly"
+    | "flex-start"
+    | "flex-end";
+  whiteSpace?: "normal" | "pre" | "pre-wrap" | "nowrap";
+  overflow?: "visible" | "hidden" | "clip" | "auto";
+  textOverflow?: "clip" | "ellipsis";
+  objectFit?: "contain" | "cover" | "fill" | "none" | "scale-down";
+  mixBlendMode?:
+    | "normal"
+    | "multiply"
+    | "screen"
+    | "overlay"
+    | "darken"
+    | "lighten"
+    | "difference"
+    | "exclusion";
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  boxShadow?: string;
+  textShadow?: string;
+  outlineWidth?: number;
+  outlineOffset?: number;
+}
+export type UIState = "hover" | "focus" | "pressed" | "disabled";
+export type UIStyleDefinition = Partial<Record<"base" | UIState, UIStyle>>;
 export interface HUDItem {
   id: string;
+  classes?: string[];
+  style?: UIStyle;
+  stateStyles?: UIStyleDefinition;
+  positionUnit?: "px" | "percent";
+  sizeUnit?: "px" | "percent";
+  shape?: "rect" | "ellipse";
   kind:
+    | "shape"
     | "text"
     | "button"
     | "container"
@@ -95,6 +164,7 @@ export interface HUDItem {
   action?: string;
 }
 export interface GameplayConfig {
+  styles?: Record<string, UIStyleDefinition>;
   defaults?: InputAction[];
   actions: InputAction[];
   hud: HUDItem[];

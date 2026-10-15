@@ -15,15 +15,15 @@
 | F9 WASM 最小验证    | ✅                                   | C++ Vector3 运算，实际输出 (5,7,9)                                                                               |
 | F10 WASM 数学库     | 🔄 接入完成，性能优化待做            | Vector3/Matrix4/Quaternion；脚本 math、实体增量运算和世界矩阵使用 WASM；CLI/浏览器基准                           |
 | F11 物理引擎        | ✅ 第三批进阶实现/自动验收           | Jolt、碰撞分组、调试、模型凸包/静态网格、查询、胶囊角色、常用关节、固定步与清理                                  |
-| F12 场景图迁移      | ⏳                                   | 尚未把场景、生命周期和实体管理迁到 C++                                                                           |
-| F13 静态导出        | ✅ 第四批实现/自动验收                | 独立游戏 ZIP、依赖校验、本地运行时/WASM、启动进度、停止重启、子目录、编辑器入口；目标设备人工验收待做             |
+| F12 场景图迁移      | 🚧 首批逻辑内核完成                    | C++ 实体/名称索引、父子矩阵缓存、模拟时钟、生命周期所有者和定时器；后续组件/批量同步                                                                           |
+| F13 静态导出        | ✅ 第四批实现/自动验收                | 二进制分块/按需资源、构建 Worker、自动进入游戏/终端日志、代码保护、子目录；目标设备人工验收待做             |
 | F14 Network Adapter | ⏳                                   | 尚未实现 Mock/Local/Relay Adapter                                                                                |
 | F15 材质与贴图      | ✅                                   | PBR 材质编辑、三类贴图、UV、共享/独立材质、模型整体与分部件/子材质槽覆盖、完整持久化                             |
 | F16 Prefab          | ✅ 本阶段目标                        | 实体子树与模型模板、嵌套关联、独立实例、逐轴/逐槽覆盖、依赖传播、运行时异步生成、取消与清理                      |
 | F17 时间与生命周期  | ✅                                   | 固定步、时间缩放、启动/销毁顺序、实例拥有的计时器与事件清理                                                      |
 | F18 动画系统        | ✅ 第三批进阶实现/自动验收           | 控制器资源、独立参数、1D/2D 混合、事件、根运动、显式映射与参考姿势重定向                                         |
 | F19 音频系统        | ✅ 第三批进阶实现/自动验收           | 总线、快照、ducking、流式媒体、淡入淡出、优先级并发限制、媒体保调与 AudioWorklet WSOLA                           |
-| F20 游戏 UI 与输入  | 🔄 实现/自动验收完成，真实手柄待验收 | UI 树/布局/画布、图片/富文本、焦点与事件、多点摇杆、手柄映射/死区、重绑定/导航                                   |
+| F20 游戏 UI 与输入  | 🔄 实现/自动验收完成，真实手柄待验收 | UI 树/大画布、共享/状态样式、混合单位与图形/准心、图片/富文本、焦点、多点摇杆、手柄映射/重绑定                                   |
 | F21 运行诊断与性能  | 🔄 基础诊断完成                      | 错误文件/运行行跳转、CPU 帧耗时、资源计数、20 次组合运行与 CDP 内存记录、构建体积报告；更广泛设备/长期分析待后续 |
 | F22 项目恢复与兼容  | ✅                                   | 独立自动恢复副本、启动恢复列表、0.6 格式/0.1～0.5 迁移、缺失资源提示、坏文件原子拒绝                             |
 
@@ -41,7 +41,7 @@
 
 ## F10 的具体范围
 
-WASM 接管 ArkGlide 脚本 API 的数学计算：`math.vec3`、`math.mat4`、`math.quat`、实体的 `translate/rotate` 与 `getWorldMatrix/getWorldPosition`。返回普通数值对象；内部 Embind 对象由适配层释放。Babylon 的渲染器内部运算与场景图仍归 Babylon，属于后续 F12 的范围。
+WASM 接管 ArkGlide 脚本 API 的数学计算：`math.vec3`、`math.mat4`、`math.quat`、实体的 `translate/rotate` 与 `getWorldMatrix/getWorldPosition`。返回普通数值对象；内部 Embind 对象由适配层释放。Babylon 的渲染器内部运算和渲染节点仍归 Babylon；F12 已接入独立 C++ 逻辑场景、实体注册和生命周期时钟，边界见 [内核与 UI 设计](runtime-core-and-ui.md)。
 
 `npm run benchmark:math` 与菜单「数学性能基准」比较同一 API 边界：预热、5 次采样中位数，计入参数检查、跨 WASM 调用、分配、结果复制和释放。当前小粒度调用可能明显慢于 JS；没有声称 WASM 必然更快。批量内存接口与减少跨边界调用是后续优化方向。
 
@@ -86,3 +86,5 @@ npm run build
 ## 第四批交付
 
 F13 使用当前 JS/Babylon 场景运行时，不等待 F12。导出器、资源规则和独立部署示例见 [fourth-batch.md](fourth-batch.md)，开工前任务单见 [fourth-batch-tasklist.md](fourth-batch-tasklist.md)，最新实际验收见 [fourth-batch-verification.md](fourth-batch-verification.md)。`npm run build` 仍构建编辑器；游戏导出使用「导出独立游戏」或 `npm run export:game`。真实手柄与实体移动设备人工验收仍未完成。
+
+F12 首批迁移和 UI 样式设计的实施范围、后续计划与验证见 [runtime-core-and-ui.md](runtime-core-and-ui.md)。

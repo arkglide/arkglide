@@ -1,4 +1,4 @@
-import { exportSettings } from '../export/export-settings.mjs';
+import { exportSettings } from "../export/export-settings.mjs";
 import { validateAdvancedReferences } from "./advancedGameplayValidation";
 import {
   validateComponents,
@@ -13,16 +13,26 @@ export const PROJECT_VERSION = "0.6";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 
 export function assertScriptPath(name: string): void {
-  if (!name || !name.endsWith(".js") || /[\\\u0000?#:]/.test(name) ||
-      name.startsWith("/") ||
-      name.split("/").some((part) => !part || part === "." || part === ".."))
+  if (
+    !name ||
+    !name.endsWith(".js") ||
+    /[\\\u0000?#:]/.test(name) ||
+    name.startsWith("/") ||
+    name.split("/").some((part) => !part || part === "." || part === "..")
+  )
     throw new Error("无效脚本文件路径");
 }
 
 export function assertModelPath(name: string): void {
-  if (typeof name !== "string" || !name || !/\.(?:glb|gltf)$/i.test(name) ||
-      name.includes("\\") || name.includes(":") || name.startsWith("/") ||
-      name.split("/").some((part) => !part || part === "." || part === ".."))
+  if (
+    typeof name !== "string" ||
+    !name ||
+    !/\.(?:glb|gltf)$/i.test(name) ||
+    name.includes("\\") ||
+    name.includes(":") ||
+    name.startsWith("/") ||
+    name.split("/").some((part) => !part || part === "." || part === "..")
+  )
     throw new Error("无效模型文件路径");
 }
 
@@ -68,7 +78,11 @@ export function validateProject(data: any): {
     )
       throw new Error("项目中包含无效或重复节点");
     ids.add(n.id);
-    if (n.parentId !== undefined && n.parentId !== null && typeof n.parentId !== "string")
+    if (
+      n.parentId !== undefined &&
+      n.parentId !== null &&
+      typeof n.parentId !== "string"
+    )
       throw new Error("无效父节点引用");
     validateComponents(n);
     if (
@@ -146,7 +160,8 @@ export function validateProject(data: any): {
     gravity: vector(data.settings?.gravity, DEFAULT_SETTINGS.gravity),
   };
 
-  if(settings.build!==undefined)settings.build=exportSettings(settings.build);
+  if (settings.build !== undefined)
+    settings.build = exportSettings(settings.build);
   if (
     ![settings.ambientIntensity, settings.fpsCap].every(Number.isFinite) ||
     settings.ambientIntensity < 0 ||
@@ -164,7 +179,11 @@ export function validateProject(data: any): {
     settings.maxSubSteps > 32 ||
     !Number.isFinite(settings.timeScale) ||
     settings.timeScale < 0 ||
-    settings.timeScale > 100
+    settings.timeScale > 100 ||
+    (settings.maxFrameDelta !== undefined &&
+      (!Number.isFinite(settings.maxFrameDelta) ||
+        settings.maxFrameDelta <= 0 ||
+        settings.maxFrameDelta > 10))
   )
     throw new Error("无效时间设置");
   const content = validateContent(data.content, nodes, scripts, settings);

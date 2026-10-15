@@ -3,6 +3,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 export default defineConfig({
   // Keep worker/browser isolation identical for CI and custom local Chromium.
   projects: [
+    { name: "core-ui", testMatch: "**/core-ui.spec.ts" },
     { name: "editor", testMatch: "**/editor.spec.ts" },
     { name: "batch1", testMatch: "**/batch1.spec.ts" },
     { name: "batch2", testMatch: "**/batch2.spec.ts" },
@@ -12,8 +13,13 @@ export default defineConfig({
     { name: "third-full", testMatch: "**/third-full.spec.ts" },
     { name: "f13-export", testMatch: "**/f13-export.spec.ts" },
   ],
-  reporter: [["list"], ["html", { open: "never" }], ["json", { outputFile: "docs/verification/f13-editor-browser.json" }]],
+  reporter: [
+    ["list"],
+    ["html", { open: "never" }],
+    ["json", { outputFile: "docs/verification/f13-editor-browser.json" }],
+  ],
   testDir: "./tests/browser",
+  outputDir: "./test-results/editor-browser",
   timeout: 120000,
   workers: 1,
   use: {

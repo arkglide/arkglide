@@ -1,3 +1,4 @@
+import { validateHUDStyles } from "./uiStyles";
 import {
   validateAdvancedComponents,
   validateAdvancedContent,
@@ -114,18 +115,23 @@ export function validateGameplayContent(content: ProjectContent) {
         "richtext",
         "input",
         "joystick",
+        "shape",
       ].includes(h.kind) ||
       typeof h.text !== "string" ||
       h.text.length > 10000 ||
-      ![h.x, h.y].every((v) => finite(v, 0, h.unit === "px" ? 10000 : 100)) ||
+      ![h.x, h.y].every((v) =>
+        finite(v, 0, (h.positionUnit || h.unit) === "px" ? 10000 : 100),
+      ) ||
       !finite(h.fontSize, 8, 128) ||
-      !/^#[0-9a-f]{6}$/i.test(h.color) ||
-      !/^#[0-9a-f]{6}$/i.test(h.background) ||
+      (!/^#[0-9a-f]{6}$/i.test(h.color) && h.color !== "transparent") ||
+      (!/^#[0-9a-f]{6}$/i.test(h.background) &&
+        h.background !== "transparent") ||
       (h.action !== undefined && !names.has(h.action)) ||
       (h.direction !== undefined && ![1, -1].includes(h.direction))
     )
       throw new Error("无效HUD元素");
     hud.add(h.id);
   }
+  validateHUDStyles(g);
   validateAdvancedContent(content);
 }

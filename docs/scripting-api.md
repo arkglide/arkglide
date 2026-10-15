@@ -56,7 +56,7 @@ this.entity.rotate(0, Math.PI * time.deltaTime, 0);
 ```
 
 句柄使用 WeakMap 保存渲染器引用，不提供 Babylon mesh/vector 对象。
-渲染适配器仍使用 Babylon；实体增量和世界矩阵数学已接入 WASM，场景图与实体生命周期的 C++ 迁移属于 F12。
+渲染适配器继续使用 Babylon。F12 首批迁移已将逻辑实体注册、父子关系和世界矩阵缓存，以及模拟时钟/所有权/定时器调度接入 C++/WASM；脚本回调仍由 JS 适配层执行，现有 API 保持兼容。详见 [内核迁移边界](runtime-core-and-ui.md)。
 
 ## Scene
 
@@ -128,3 +128,5 @@ return defineScript({
 ## 运行时预制体
 
 `prefabs.list/findByName/instantiate` 支持带模型与嵌套内容的动态生成。`instantiate` 返回 Promise，完成后可使用根实体、实例内查找和销毁接口。参数、生命周期、取消与完整示例见 [第二批补齐说明](second-batch-completion.md#运行时生成-api)。
+
+UI 的共享样式、图形、混合单位和 `getStyle/setStyle/setClasses/setLayout` 用法见 [UI 样式设计](runtime-core-and-ui.md#脚本接口)。

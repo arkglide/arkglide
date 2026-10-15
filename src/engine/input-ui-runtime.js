@@ -25,7 +25,9 @@
       else if (token) stack.at(-1).el.appendChild(doc.createTextNode(token));
     }
   }
-  function layoutStyle(d, parent) {
+  function layoutStyle(d, parent, sheet, state) {
+    if (root.ArkGlideUIStyles)
+      return root.ArkGlideUIStyles.layout(d, parent, sheet, state);
     const unit = d.unit === "px" ? "px" : "%",
       flow = parent && parent.layout && parent.layout !== "absolute";
     return {
@@ -69,6 +71,7 @@
       config = structuredClone(
         options.config || { actions: [], hud: [], captureInput: true },
       );
+    root.ArkGlideUIStyles?.validateSheet(config.styles);
     const defaults = structuredClone(config.defaults || config.actions),
       keys = new Set(),
       codes = new Set(),
@@ -321,6 +324,7 @@
           if (ids.has(r.def.parentId)) ids.add(r.def.id);
       for (const id of ids) elements.get(id)?.reset();
       if (focused && ids.has(focused.def.id)) {
+        focused.clearVisualFocus();
         focused.el.blur?.();
         focused = null;
       }
@@ -410,7 +414,8 @@
       });
     });
     listen(canvas, "pointerdown", (e) => {
-      if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0))) return;
+      if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0)))
+        return;
       mousePointer = e.pointerId ?? 0;
       const button = e.button ?? 0;
       if (!buttons.has(button)) buttonPressed.add(button);
@@ -419,7 +424,9 @@
       mouseDown = true;
       mx = e.clientX;
       my = e.clientY;
-      try { canvas.setPointerCapture?.(e.pointerId); } catch {}
+      try {
+        canvas.setPointerCapture?.(e.pointerId);
+      } catch {}
     });
     function releaseMouse(e, cancel = false) {
       if (!mouseDown || mousePointer !== (e.pointerId ?? 0)) return;
@@ -435,11 +442,12 @@
       mouseDown = false;
       mousePointer = null;
     }
-    listen(win, "pointerup", e => releaseMouse(e));
-    listen(canvas, "lostpointercapture", e => releaseMouse(e, true));
-    listen(win, "pointercancel", e => releaseMouse(e, true));
+    listen(win, "pointerup", (e) => releaseMouse(e));
+    listen(canvas, "lostpointercapture", (e) => releaseMouse(e, true));
+    listen(win, "pointercancel", (e) => releaseMouse(e, true));
     listen(canvas, "pointermove", (e) => {
-      if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0))) return;
+      if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0)))
+        return;
       if (doc.pointerLockElement === canvas) {
         dx += Number(e.movementX) || 0;
         dy += Number(e.movementY) || 0;
@@ -452,7 +460,8 @@
     });
     listen(win, "blur", () => {
       releasePointerLock();
-      if (focused) focused.el.style.outline = "";
+      focused?.clearVisualFocus();
+      if (focused && !root.ArkGlideUIStyles) focused.el.style.outline = "";
       focused = null;
       reset();
       padButtons.clear();
@@ -622,6 +631,7 @@
           "richtext",
           "input",
           "joystick",
+          "shape",
         ].includes(def.kind)
       )
         throw Error("HUD ID重复或配置无效");
@@ -640,14 +650,16 @@
         ![def.x, def.y, def.fontSize].every(Number.isFinite) ||
         def.x < 0 ||
         def.y < 0 ||
-        def.x > (def.unit === "px" ? 10000 : 100) ||
-        def.y > (def.unit === "px" ? 10000 : 100) ||
+        def.x > ((def.positionUnit || def.unit) === "px" ? 10000 : 100) ||
+        def.y > ((def.positionUnit || def.unit) === "px" ? 10000 : 100) ||
         def.fontSize < 8 ||
         def.fontSize > 128 ||
-        !/^#[0-9a-f]{6}$/i.test(def.color) ||
-        !/^#[0-9a-f]{6}$/i.test(def.background)
+        (!/^#[0-9a-f]{6}$/i.test(def.color) && def.color !== "transparent") ||
+        (!/^#[0-9a-f]{6}$/i.test(def.background) &&
+          def.background !== "transparent")
       )
         throw Error("HUD位置/字号/颜色无效");
+      root.ArkGlideUIStyles?.validateItem(def, config.styles);
       if (def.action) action(def.action);
       if (def.kind === "joystick") {
         const j = def.joystick;
@@ -677,7 +689,23 @@
       el.dataset.hudId = def.id;
       el.style.cssText =
         "border:0;border-radius:8px;padding:8px 12px;font-family:system-ui,sans-serif;";
-      Object.assign(el.style, layoutStyle(def, parent?.def));
+      const visualState = {
+        hover: false,
+        focus: false,
+        pressed: false,
+        disabled: !!def.disabled || !active,
+      };
+      let appliedKeys = [];
+      function applyStyle() {
+        for (const key of appliedKeys) el.style[key] = "";
+        visualState.disabled =
+          !!def.disabled || !active || !!(parent && !enabled(parent));
+        const css = layoutStyle(def, parent?.def, config.styles, visualState);
+        Object.assign(el.style, css);
+        appliedKeys = Object.keys(css);
+        if (def.visible === false) el.style.display = "none";
+      }
+      applyStyle();
       el.tabIndex =
         def.tabIndex ??
         (def.kind === "button" || def.kind === "input" ? 0 : -1);
@@ -691,7 +719,8 @@
         else if (
           def.kind !== "image" &&
           def.kind !== "joystick" &&
-          def.kind !== "container"
+          def.kind !== "container" &&
+          def.kind !== "shape"
         )
           el.textContent = def.text;
       }
@@ -712,7 +741,7 @@
             entityId: def.id,
             error: Error("图片资源无法解码: " + asset.name),
           });
-        el.style.objectFit = "contain";
+        if (!root.ArkGlideUIStyles) el.style.objectFit = "contain";
       } else text(def.text);
       const local = [],
         tokens = new Set(),
@@ -724,8 +753,10 @@
         thumb,
         base;
       if (def.kind === "joystick") {
-        el.style.backgroundColor = "transparent";
-        el.style.padding = "0";
+        if (!root.ArkGlideUIStyles) {
+          el.style.backgroundColor = "transparent";
+          el.style.padding = "0";
+        }
         base = doc.createElement("div");
         Object.assign(base.style, {
           position: "absolute",
@@ -757,6 +788,13 @@
       const r = {
         def,
         el,
+        applyStyle,
+        clearVisualFocus() {
+          visualState.focus = false;
+          visualState.hover = false;
+          visualState.pressed = false;
+          applyStyle();
+        },
         emit(type, value) {
           if (!live || !enabled(r)) return;
           for (const s of [...listeners])
@@ -765,8 +803,10 @@
               enabled(r) &&
               listeners.has(s) &&
               s.type === type &&
-              (!s.owner || (s.owner.record.active && !s.owner.record.destroying &&
-                !s.owner.record.entity?.destroyed))
+              (!s.owner ||
+                (s.owner.record.active &&
+                  !s.owner.record.destroying &&
+                  !s.owner.record.entity?.destroyed))
             ) {
               try {
                 s.fn({ id: def.id, type, value: value ?? def.text });
@@ -782,6 +822,8 @@
             virtual.delete(token + ":y");
           }
           tokens.clear();
+          visualState.pressed = false;
+          applyStyle();
           blockers.delete(def.id);
           joystickPointer = null;
           origin = null;
@@ -794,6 +836,8 @@
       function end(e) {
         const token = def.id + ":" + e.pointerId;
         if (!tokens.has(token)) return;
+        visualState.pressed = false;
+        applyStyle();
         mutate(() => {
           tokens.delete(token);
           virtual.delete(token);
@@ -852,6 +896,8 @@
             el.setPointerCapture?.(e.pointerId);
           } catch {}
           const token = def.id + ":" + e.pointerId;
+          visualState.pressed = true;
+          applyStyle();
           tokens.add(token);
           if (def.kind !== "joystick" && def.blockInput)
             mutate(() => {
@@ -918,8 +964,11 @@
         el,
         "focus",
         () => {
+          if (focused && focused !== r) focused.clearVisualFocus();
           focused = r;
-          el.style.outline = "2px solid #90caf9";
+          visualState.focus = true;
+          applyStyle();
+          if (!root.ArkGlideUIStyles) el.style.outline = "2px solid #90caf9";
           reset();
           blockers.add(def.id);
           r.emit("focus");
@@ -931,7 +980,9 @@
         el,
         "blur",
         () => {
-          el.style.outline = "";
+          visualState.focus = false;
+          applyStyle();
+          if (!root.ArkGlideUIStyles) el.style.outline = "";
           if (focused === r) focused = null;
           reset();
           r.emit("blur");
@@ -953,6 +1004,20 @@
         undefined,
         local,
       );
+      for (const [type, hover] of [
+        ["pointerenter", true],
+        ["pointerleave", false],
+      ])
+        listen(
+          el,
+          type,
+          () => {
+            visualState.hover = hover;
+            applyStyle();
+          },
+          undefined,
+          local,
+        );
       function subscribe(type, fn, subscriberOwner) {
         if (
           !live ||
@@ -987,19 +1052,78 @@
           guard();
           text(value);
         },
+        getStyle() {
+          guard();
+          return structuredClone(def.style || {});
+        },
+        setStyle(patch) {
+          guard();
+          const next = patch === null ? {} : { ...def.style, ...patch };
+          if (!root.ArkGlideUIStyles) throw Error("UI style runtime missing");
+          root.ArkGlideUIStyles.validateStyle(next);
+          def.style = structuredClone(next);
+          applyStyle();
+        },
+        setClasses(classes) {
+          guard();
+          const next = { ...def, classes };
+          root.ArkGlideUIStyles.validateItem(next, config.styles);
+          def.classes = structuredClone(classes);
+          applyStyle();
+        },
+        setLayout(patch) {
+          guard();
+          const allowed = new Set([
+            "x",
+            "y",
+            "width",
+            "height",
+            "positionUnit",
+            "sizeUnit",
+            "unit",
+            "anchorX",
+            "anchorY",
+            "zIndex",
+            "gap",
+            "margin",
+          ]);
+          if (
+            !patch ||
+            typeof patch !== "object" ||
+            Object.keys(patch).some((k) => !allowed.has(k))
+          )
+            throw Error("Invalid UI layout patch");
+          const next = { ...def, ...patch };
+          root.ArkGlideUIStyles?.validateItem(next, config.styles);
+          for (const k of ["x", "y", "width", "height", "gap", "margin"])
+            if (
+              next[k] !== undefined &&
+              (!Number.isFinite(next[k]) || next[k] < 0 || next[k] > 10000)
+            )
+              throw Error("Invalid UI layout dimension");
+          for (const k of ["anchorX", "anchorY"])
+            if (
+              next[k] !== undefined &&
+              (!Number.isFinite(next[k]) || next[k] < 0 || next[k] > 1)
+            )
+              throw Error("Invalid UI layout anchor");
+          if (next.zIndex !== undefined && !Number.isInteger(next.zIndex))
+            throw Error("Invalid UI zIndex");
+          Object.assign(def, structuredClone(patch));
+          applyStyle();
+        },
         setVisible(value) {
           guard();
           def.visible = !!value;
           el.hidden = !value;
-          el.style.display = value
-            ? layoutStyle(def, parent?.def).display
-            : "none";
+          applyStyle();
           if (!value) mutate(() => clearTree(def.id));
         },
         setDisabled(value) {
           guard();
           def.disabled = !!value;
           el.disabled = !!value || !active;
+          applyStyle();
           if (value) mutate(() => clearTree(def.id));
         },
         focus() {
@@ -1058,7 +1182,11 @@
         const copy = { ...input };
         for (const name of ["rebind", "resetBindings", "captureBinding"])
           copy[name] = (...args) => {
-            if (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed)
+            if (
+              !owner.record.active ||
+              owner.record.destroying ||
+              owner.record.entity?.destroyed
+            )
               throw Error("输入脚本已销毁");
             if (name === "captureBinding") {
               const result = input[name](...args),
@@ -1105,6 +1233,10 @@
             };
             for (const name of [
               "setText",
+              "getStyle",
+              "setStyle",
+              "setClasses",
+              "setLayout",
               "setVisible",
               "setDisabled",
               "focus",
@@ -1126,9 +1258,11 @@
         active = !!v;
         if (!active) releasePointerLock();
         reset();
-        for (const r of elements.values())
+        for (const r of elements.values()) {
+          r.applyStyle();
           if (r.def.kind === "button" || r.def.kind === "input")
             r.el.disabled = !active || !!r.def.disabled;
+        }
       },
       setSimulationActive(v) {
         if (simulation !== !!v) {

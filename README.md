@@ -27,7 +27,7 @@ npm run benchmark:math
 ```
 
 `npm run dev/build/build:wasm` 会同步共享场景脚本及 iframe 使用的经典脚本 WASM 版本。
-F11 已接入 Jolt WASM 进阶物理；F13 已支持独立静态游戏导出。F12 C++ 场景图与 F14 联机仍待实现。
+F11 已接入 Jolt WASM 进阶物理；F13 已支持独立静态游戏导出。F12 已完成首批 C++ 逻辑场景、实体与生命周期内核迁移，后续继续组件与批量同步；F14 联机仍待实现。
 
 ### 第一批可靠性功能
 
@@ -73,3 +73,9 @@ npm run test:composition:browser
 ```
 
 通用信号逻辑、可逆运动机构和原生反射查询已加入。可导入 `examples/composition-lab.arkglide` 体验压板、反射接收、运动门、穿门光桥/牵引场和检查点重试的组合；游戏参数位于 `examples/composition-lab-scripts/config.js`。穿门控制与接口边界统一见上述 API 文档。
+
+## C++ 逻辑内核与 UI 样式
+
+编辑器预览和独立包默认使用 C++/WASM 管理逻辑实体、父子矩阵缓存、模拟时钟和定时器；脚本 API 保持兼容，运行诊断可以检查后端。Babylon 渲染、Jolt 物理和浏览器资源继续通过适配层协作。
+
+UI 画布新增大画布编辑模式、共享/状态样式、元素覆盖、独立定位与尺寸单位、矩形/椭圆及可编辑准心预设。接口、迁移边界和使用示例见 [C++ 内核与 UI 设计](docs/runtime-core-and-ui.md)。

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import "../src/engine/ui-style-runtime.js";
 import "../src/engine/input-ui-runtime.js";
 import "../src/engine/lifecycle-runtime.js";
 class Element {
@@ -44,7 +45,7 @@ class Element {
     return this.tag === "input" ? this : null;
   }
 }
-function fixture(hud = []) {
+function fixture(hud = [], styles = {}) {
   const window = new Element(),
     document = new Element(),
     canvas = new Element(),
@@ -76,7 +77,7 @@ function fixture(hud = []) {
     document,
     canvas,
     layer,
-    config: { actions, hud, captureInput: true },
+    config: { actions, hud, styles, captureInput: true },
   });
   return {
     window,
@@ -104,24 +105,32 @@ const def = (id, kind = "button", extra = {}) => ({
   background: "#222222",
   ...extra,
 });
-test('losing canvas pointer capture releases held mouse input',()=>{
- const t=fixture();
- try {
-  t.canvas.emit('pointerdown',{pointerId:1,clientX:10,clientY:10});
-  assert.equal(t.ui.input.isMouseDown(),true);
-  t.canvas.emit('lostpointercapture',{pointerId:1});
-  assert.equal(t.ui.input.isMouseDown(),false);assert.equal(t.ui.input.wasMouseReleased(),true);
- } finally {t.done();}
+test("losing canvas pointer capture releases held mouse input", () => {
+  const t = fixture();
+  try {
+    t.canvas.emit("pointerdown", { pointerId: 1, clientX: 10, clientY: 10 });
+    assert.equal(t.ui.input.isMouseDown(), true);
+    t.canvas.emit("lostpointercapture", { pointerId: 1 });
+    assert.equal(t.ui.input.isMouseDown(), false);
+    assert.equal(t.ui.input.wasMouseReleased(), true);
+  } finally {
+    t.done();
+  }
 });
-test('unrelated pointer release does not end the active canvas drag',()=>{
- const t=fixture();
- try {
-  t.canvas.emit('pointerdown',{pointerId:1,clientX:10,clientY:10});
-  t.window.emit('pointerup',{pointerId:2});
-  assert.equal(t.ui.input.isMouseDown(),true);assert.equal(t.ui.input.wasMouseReleased(),false);
-  t.canvas.emit('lostpointercapture',{pointerId:2});assert.equal(t.ui.input.isMouseDown(),true);
-  t.window.emit('pointerup',{pointerId:1});assert.equal(t.ui.input.isMouseDown(),false);
- } finally {t.done();}
+test("unrelated pointer release does not end the active canvas drag", () => {
+  const t = fixture();
+  try {
+    t.canvas.emit("pointerdown", { pointerId: 1, clientX: 10, clientY: 10 });
+    t.window.emit("pointerup", { pointerId: 2 });
+    assert.equal(t.ui.input.isMouseDown(), true);
+    assert.equal(t.ui.input.wasMouseReleased(), false);
+    t.canvas.emit("lostpointercapture", { pointerId: 2 });
+    assert.equal(t.ui.input.isMouseDown(), true);
+    t.window.emit("pointerup", { pointerId: 1 });
+    assert.equal(t.ui.input.isMouseDown(), false);
+  } finally {
+    t.done();
+  }
 });
 test("gamepad deadzones, opposing keyboard input, disconnect and zero-time reset; remap conflicts and defaults", () => {
   const t = fixture();
@@ -292,16 +301,24 @@ test("window blur clears menu blockers and unfocused gamepad polling cannot acti
     let hasFocus = true;
     t.document.hasFocus = () => hasFocus;
     let clicks = 0;
-    t.ui.forOwner(t.owner).get("menu").on("click", () => clicks++);
+    t.ui
+      .forOwner(t.owner)
+      .get("menu")
+      .on("click", () => clicks++);
     t.layer.children[0].focus();
     hasFocus = false;
     t.window.emit("blur");
     t.ui.setActive(false);
-    t.pads.push({ index: 0, id: "stub", axes: [], buttons: [
-      { value: 1, pressed: true },
-      ...Array.from({ length: 11 }, () => ({ value: 0, pressed: false })),
-      { value: 1, pressed: true },
-    ] });
+    t.pads.push({
+      index: 0,
+      id: "stub",
+      axes: [],
+      buttons: [
+        { value: 1, pressed: true },
+        ...Array.from({ length: 11 }, () => ({ value: 0, pressed: false })),
+        { value: 1, pressed: true },
+      ],
+    });
     t.ui.beginFrame();
     t.pads[0].buttons[0] = { value: 0, pressed: false };
     t.ui.beginFrame();
@@ -369,24 +386,32 @@ test("invalid captured bindings reject promptly without escaping the keyboard ha
   }
 });
 
-test("disposed input sessions reject binding mutations and new captures",async()=>{
- const t=fixture();
- try {
-  const pending=t.ui.input.captureBinding("moveX");t.ui.dispose();
-  assert.equal((await pending).cancelled,true);
-  const before=t.ui.input.bindings();
-  assert.throws(()=>t.ui.input.captureBinding("moveX"),/已停止/);
-  assert.throws(()=>t.ui.input.rebind("moveX",{positive:["KeyL"]}),/已停止/);
-  assert.throws(()=>t.ui.input.resetBindings(),/已停止/);
-  assert.deepEqual(t.ui.input.bindings(),before);assert.equal(t.ui.stats().inputCaptures,0);
- } finally {t.done();}
+test("disposed input sessions reject binding mutations and new captures", async () => {
+  const t = fixture();
+  try {
+    const pending = t.ui.input.captureBinding("moveX");
+    t.ui.dispose();
+    assert.equal((await pending).cancelled, true);
+    const before = t.ui.input.bindings();
+    assert.throws(() => t.ui.input.captureBinding("moveX"), /已停止/);
+    assert.throws(
+      () => t.ui.input.rebind("moveX", { positive: ["KeyL"] }),
+      /已停止/,
+    );
+    assert.throws(() => t.ui.input.resetBindings(), /已停止/);
+    assert.deepEqual(t.ui.input.bindings(), before);
+    assert.equal(t.ui.stats().inputCaptures, 0);
+  } finally {
+    t.done();
+  }
 });
 
 test("UI subscriptions canceled inside a callback do not fire in the same dispatch", () => {
   const t = fixture([def("button")]);
   try {
     const handle = t.ui.forOwner(t.owner).get("button");
-    let cancel, called = 0;
+    let cancel,
+      called = 0;
     handle.on("click", () => cancel());
     cancel = handle.on("click", () => called++);
     t.layer.children[0].emit("click");
@@ -419,9 +444,13 @@ test("hiding a UI element inside an event prevents subsequent callbacks until sh
 test("invalid button callbacks fail without leaving window listeners or HUD elements", () => {
   const t = fixture();
   try {
-    const count = () => [...t.window.listeners.values()].reduce((n, list) => n + list.size, 0);
+    const count = () =>
+      [...t.window.listeners.values()].reduce((n, list) => n + list.size, 0);
     const before = count();
-    assert.throws(() => t.ui.forOwner(t.owner).createButton(def("invalid"), 42), /回调|订阅无效/);
+    assert.throws(
+      () => t.ui.forOwner(t.owner).createButton(def("invalid"), 42),
+      /回调|订阅无效/,
+    );
     assert.equal(count(), before);
     assert.equal(t.layer.children.length, 0);
     const button = t.ui.forOwner(t.owner).createButton(def("valid"), () => {});
@@ -509,9 +538,13 @@ test("blocking HUD interaction releases mouse state and pending mouse movement",
 });
 
 test("input events under disabled parents preserve their text and do not emit changes", () => {
-  const t = fixture([def("panel", "container", { disabled: true }), def("field", "input", { parentId: "panel", text: "original" })]);
+  const t = fixture([
+    def("panel", "container", { disabled: true }),
+    def("field", "input", { parentId: "panel", text: "original" }),
+  ]);
   try {
-    const api = t.ui.forOwner(t.owner), field = api.get("field");
+    const api = t.ui.forOwner(t.owner),
+      field = api.get("field");
     let changes = 0;
     field.on("change", () => changes++);
     const el = t.layer.children[0].children[0];
@@ -530,74 +563,252 @@ test("input events under disabled parents preserve their text and do not emit ch
   }
 });
 
-test('rebinding keys preserves the action identity when passed an action descriptor',()=>{
- const t=fixture();
- try {
-  const mapping={...t.ui.input.bindings()[0],name:'jump',positive:['KeyL']};
-  assert.equal(t.ui.input.rebind('moveX',mapping,true).applied,true);
-  assert.equal(t.ui.input.bindings().filter(a=>a.name==='jump').length,1);
-  t.window.emit('keydown',{key:'l',code:'KeyL'});
-  assert.equal(t.ui.input.getAction('moveX'),1);
- } finally {t.done();}
+test("rebinding keys preserves the action identity when passed an action descriptor", () => {
+  const t = fixture();
+  try {
+    const mapping = {
+      ...t.ui.input.bindings()[0],
+      name: "jump",
+      positive: ["KeyL"],
+    };
+    assert.equal(t.ui.input.rebind("moveX", mapping, true).applied, true);
+    assert.equal(
+      t.ui.input.bindings().filter((a) => a.name === "jump").length,
+      1,
+    );
+    t.window.emit("keydown", { key: "l", code: "KeyL" });
+    assert.equal(t.ui.input.getAction("moveX"), 1);
+  } finally {
+    t.done();
+  }
 });
 
-test('resetting an unknown action rejects without clearing held input or valid bindings',()=>{
- const t=fixture();
- try {
-  t.ui.input.rebind('moveX',{positive:['KeyL']});
-  t.window.emit('keydown',{key:'l',code:'KeyL'});
-  const before=t.ui.input.bindings();
-  assert.throws(()=>t.ui.input.resetBindings('missing'),/输入动作不存在/);
-  assert.equal(t.ui.input.getAction('moveX'),1);assert.deepEqual(t.ui.input.bindings(),before);
- } finally {t.done();}
+test("resetting an unknown action rejects without clearing held input or valid bindings", () => {
+  const t = fixture();
+  try {
+    t.ui.input.rebind("moveX", { positive: ["KeyL"] });
+    t.window.emit("keydown", { key: "l", code: "KeyL" });
+    const before = t.ui.input.bindings();
+    assert.throws(() => t.ui.input.resetBindings("missing"), /输入动作不存在/);
+    assert.equal(t.ui.input.getAction("moveX"), 1);
+    assert.deepEqual(t.ui.input.bindings(), before);
+  } finally {
+    t.done();
+  }
 });
 
-test('HUD events skip subscribers whose owner entity is destroyed',()=>{
- const t=fixture([def('button')]);
- try {
-  const entity={id:'subscriber',destroyed:false};t.owner.record.entity=entity;
-  let clicks=0;t.ui.forOwner(t.owner).get('button').on('click',()=>clicks++);
-  t.layer.children[0].emit('click');assert.equal(clicks,1);
-  entity.destroyed=true;t.layer.children[0].emit('click');assert.equal(clicks,1);
- } finally {t.done();}
+test("HUD events skip subscribers whose owner entity is destroyed", () => {
+  const t = fixture([def("button")]);
+  try {
+    const entity = { id: "subscriber", destroyed: false };
+    t.owner.record.entity = entity;
+    let clicks = 0;
+    t.ui
+      .forOwner(t.owner)
+      .get("button")
+      .on("click", () => clicks++);
+    t.layer.children[0].emit("click");
+    assert.equal(clicks, 1);
+    entity.destroyed = true;
+    t.layer.children[0].emit("click");
+    assert.equal(clicks, 1);
+  } finally {
+    t.done();
+  }
 });
 
-test('input mutations from an owner being destroyed preserve existing action mappings',()=>{
- const t=fixture();
- try {
-  const input=t.ui.inputForOwner(t.owner),before=input.bindings();
-  t.owner.record.entity={id:'owner'};
-  t.owner.attach({onDestroy(){
-   assert.throws(()=>input.rebind('moveX',{positive:['KeyL']}),/销毁/);
-   assert.throws(()=>input.resetBindings(),/销毁/);
-   assert.throws(()=>input.captureBinding('moveX'),/销毁/);
-  }});
-  t.session.destroyEntity('owner');
-  assert.equal(t.session.stats().errors,0);assert.deepEqual(t.ui.input.bindings(),before);
-  assert.equal(t.ui.stats().inputCaptures,0);
- } finally {t.done();}
+test("input mutations from an owner being destroyed preserve existing action mappings", () => {
+  const t = fixture();
+  try {
+    const input = t.ui.inputForOwner(t.owner),
+      before = input.bindings();
+    t.owner.record.entity = { id: "owner" };
+    t.owner.attach({
+      onDestroy() {
+        assert.throws(
+          () => input.rebind("moveX", { positive: ["KeyL"] }),
+          /销毁/,
+        );
+        assert.throws(() => input.resetBindings(), /销毁/);
+        assert.throws(() => input.captureBinding("moveX"), /销毁/);
+      },
+    });
+    t.session.destroyEntity("owner");
+    assert.equal(t.session.stats().errors, 0);
+    assert.deepEqual(t.ui.input.bindings(), before);
+    assert.equal(t.ui.stats().inputCaptures, 0);
+  } finally {
+    t.done();
+  }
 });
 
-test('pointer lock consumes relative motion without dragging, tracks buttons and releases on pause',async()=>{
- const f=fixture();try{const api=f.ui.inputForOwner(f.owner),changes=[];api.onPointerLockChange(value=>changes.push(value));
-  f.canvas.requestPointerLock=()=>{f.document.pointerLockElement=f.canvas;f.document.emit('pointerlockchange');};
-  f.document.exitPointerLock=()=>{f.document.pointerLockElement=null;f.document.emit('pointerlockchange');};
-  assert.equal(await api.requestPointerLock(),true);assert.equal(api.isPointerLocked(),true);
-  f.canvas.emit('pointermove',{clientX:1,clientY:1,movementX:7,movementY:-3});assert.deepEqual(api.getMouseDelta(),{x:7,y:-3});
-  f.canvas.emit('pointerdown',{button:2,clientX:1,clientY:1});assert.equal(api.wasMouseButtonPressed(2),true);assert.equal(api.isMouseButtonDown(2),true);
-  f.canvas.emit('pointerdown',{button:0,clientX:1,clientY:1});assert.equal(api.isMouseButtonDown(0),true);
-  f.canvas.emit('pointerdown',{pointerId:7,button:1,clientX:1,clientY:1});assert.equal(api.isMouseButtonDown(1),false);
-  f.window.emit('pointerup',{pointerId:7,button:2});assert.equal(api.isMouseButtonDown(2),true);
-  f.window.emit('pointerup',{button:2});assert.equal(api.wasMouseButtonReleased(2),true);f.ui.endFrame();assert.equal(api.wasMouseButtonPressed(2),false);assert.deepEqual(api.getMouseDelta(),{x:0,y:0});
-  assert.equal(api.isMouseButtonDown(0),true);assert.equal(api.isMouseDown(),true);
-  f.canvas.emit('lostpointercapture',{});assert.equal(api.isMouseDown(),false);assert.equal(api.wasMouseButtonReleased(0),true);
-  f.ui.setActive(false);assert.equal(api.isPointerLocked(),false);assert.deepEqual(changes,[true,false]);
- }finally{f.done();}
+test("pointer lock consumes relative motion without dragging, tracks buttons and releases on pause", async () => {
+  const f = fixture();
+  try {
+    const api = f.ui.inputForOwner(f.owner),
+      changes = [];
+    api.onPointerLockChange((value) => changes.push(value));
+    f.canvas.requestPointerLock = () => {
+      f.document.pointerLockElement = f.canvas;
+      f.document.emit("pointerlockchange");
+    };
+    f.document.exitPointerLock = () => {
+      f.document.pointerLockElement = null;
+      f.document.emit("pointerlockchange");
+    };
+    assert.equal(await api.requestPointerLock(), true);
+    assert.equal(api.isPointerLocked(), true);
+    f.canvas.emit("pointermove", {
+      clientX: 1,
+      clientY: 1,
+      movementX: 7,
+      movementY: -3,
+    });
+    assert.deepEqual(api.getMouseDelta(), { x: 7, y: -3 });
+    f.canvas.emit("pointerdown", { button: 2, clientX: 1, clientY: 1 });
+    assert.equal(api.wasMouseButtonPressed(2), true);
+    assert.equal(api.isMouseButtonDown(2), true);
+    f.canvas.emit("pointerdown", { button: 0, clientX: 1, clientY: 1 });
+    assert.equal(api.isMouseButtonDown(0), true);
+    f.canvas.emit("pointerdown", {
+      pointerId: 7,
+      button: 1,
+      clientX: 1,
+      clientY: 1,
+    });
+    assert.equal(api.isMouseButtonDown(1), false);
+    f.window.emit("pointerup", { pointerId: 7, button: 2 });
+    assert.equal(api.isMouseButtonDown(2), true);
+    f.window.emit("pointerup", { button: 2 });
+    assert.equal(api.wasMouseButtonReleased(2), true);
+    f.ui.endFrame();
+    assert.equal(api.wasMouseButtonPressed(2), false);
+    assert.deepEqual(api.getMouseDelta(), { x: 0, y: 0 });
+    assert.equal(api.isMouseButtonDown(0), true);
+    assert.equal(api.isMouseDown(), true);
+    f.canvas.emit("lostpointercapture", {});
+    assert.equal(api.isMouseDown(), false);
+    assert.equal(api.wasMouseButtonReleased(0), true);
+    f.ui.setActive(false);
+    assert.equal(api.isPointerLocked(), false);
+    assert.deepEqual(changes, [true, false]);
+  } finally {
+    f.done();
+  }
 });
-test('denied and late pointer lock grants are canceled without orphaning a destroyed owner',async()=>{
- const f=fixture();try{const api=f.ui.inputForOwner(f.owner);f.canvas.requestPointerLock=()=>{};f.document.exitPointerLock=()=>{f.document.pointerLockElement=null;f.document.emit('pointerlockchange');};
-  const denied=api.requestPointerLock();f.document.emit('pointerlockerror');assert.equal(await denied,false);
-  const pending=api.requestPointerLock();f.owner.abort();assert.equal(await pending,false);
-  f.document.pointerLockElement=f.canvas;f.document.emit('pointerlockchange');assert.equal(f.document.pointerLockElement,null);
- }finally{f.done();}
+test("denied and late pointer lock grants are canceled without orphaning a destroyed owner", async () => {
+  const f = fixture();
+  try {
+    const api = f.ui.inputForOwner(f.owner);
+    f.canvas.requestPointerLock = () => {};
+    f.document.exitPointerLock = () => {
+      f.document.pointerLockElement = null;
+      f.document.emit("pointerlockchange");
+    };
+    const denied = api.requestPointerLock();
+    f.document.emit("pointerlockerror");
+    assert.equal(await denied, false);
+    const pending = api.requestPointerLock();
+    f.owner.abort();
+    assert.equal(await pending, false);
+    f.document.pointerLockElement = f.canvas;
+    f.document.emit("pointerlockchange");
+    assert.equal(f.document.pointerLockElement, null);
+  } finally {
+    f.done();
+  }
+});
+
+test("shared styles, state precedence and dynamic overrides restore correctly without retaining held input", () => {
+  const t = fixture([def("styled", "button", { classes: ["control"] })], {
+    control: {
+      base: {
+        padding: 0,
+        backgroundColor: "transparent",
+        borderWidth: 2,
+        borderColor: "#FFFFFF",
+      },
+      hover: { opacity: 0.7 },
+      pressed: { opacity: 0.4 },
+      focus: { borderColor: "#00FF00" },
+      disabled: { opacity: 0.2 },
+    },
+  });
+  try {
+    const el = t.layer.children[0],
+      h = t.ui.forOwner(t.owner).get("styled");
+    assert.equal(el.style.backgroundColor, "transparent");
+    assert.equal(el.style.padding, "0px");
+    el.emit("pointerenter");
+    assert.equal(el.style.opacity, "0.7");
+    el.emit("pointerdown", { pointerId: 1 });
+    assert.equal(el.style.opacity, "0.4");
+    el.emit("pointerup", { pointerId: 1 });
+    assert.equal(el.style.opacity, "0.7");
+    h.setStyle({ rotation: 45, borderRadius: "50%" });
+    assert.ok(el.style.transform.includes("rotate(45deg)"));
+    assert.equal(el.style.borderRadius, "50%");
+    const copy = h.getStyle();
+    copy.rotation = 90;
+    assert.equal(h.getStyle().rotation, 45);
+    h.setStyle(null);
+    assert.ok(!el.style.transform.includes("rotate"));
+    assert.equal(el.style.borderRadius, "8px");
+    h.setDisabled(true);
+    assert.equal(el.style.opacity, "0.2");
+    t.ui.setActive(false);
+    t.ui.setActive(true);
+    assert.equal(el.style.opacity, "0.2");
+    assert.throws(() => h.setStyle({ position: "fixed" }), /样式属性/);
+    assert.throws(() => h.setClasses(["absent"]), /样式类/);
+  } finally {
+    t.done();
+  }
+});
+test("crosshair composition uses percent position and pixel sizes, stays input-transparent and supports runtime layout", () => {
+  const hud = ArkGlideUIStyles.crosshair("aim", {
+      size: 30,
+      gap: 8,
+      thickness: 2,
+    }),
+    t = fixture(hud);
+  try {
+    const el = t.layer.children[0],
+      h = t.ui.forOwner(t.owner).get("aim");
+    assert.equal(el.style.left, "50%");
+    assert.equal(el.style.width, "30px");
+    assert.equal(el.style.backgroundColor, "transparent");
+    assert.equal(el.style.pointerEvents, "none");
+    assert.equal(el.children.length, 4);
+    assert.equal(el.children[0].style.height, "2px");
+    h.setLayout({ width: 40, height: 40 });
+    assert.equal(el.style.width, "40px");
+    h.setVisible(false);
+    h.setStyle({ opacity: 0.5 });
+    assert.equal(el.style.display, "none");
+    h.setVisible(true);
+    assert.equal(el.style.opacity, "0.5");
+    h.destroy();
+    assert.equal(t.ui.stats().hudElements, 0);
+    assert.equal(t.layer.children.length, 0);
+  } finally {
+    t.done();
+  }
+});
+test("style schema rejects unsupported properties, CSS resource URLs and missing classes", () => {
+  for (const style of [
+    { opacity: 2 },
+    { backgroundImage: "url(https://example.com/a.png)" },
+    { fontFamily: "url(remote)" },
+    { boxShadow: "var(--external)" },
+    { borderRadius: "999%" },
+    { color: "url(file)" },
+  ])
+    assert.throws(() => ArkGlideUIStyles.validateStyle(style));
+  assert.throws(() =>
+    ArkGlideUIStyles.validateSheet({ control: { active: { opacity: 0.5 } } }),
+  );
+  assert.throws(() =>
+    ArkGlideUIStyles.validateItem({ classes: ["missing"] }, {}),
+  );
 });

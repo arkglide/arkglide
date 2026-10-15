@@ -64,3 +64,6 @@ playwright-report/
 
 # Chunked package verification deployments
 .package-browser-test/
+
+# Native core / styled HUD browser fixture
+.core-ui-browser-test/

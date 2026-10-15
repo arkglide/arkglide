@@ -554,7 +554,7 @@ interface InputAPI {
   ): Promise<InputBindingResult>;
 }
 type UIKind =
-  "text" | "button" | "container" | "image" | "richtext" | "input" | "joystick";
+  "text" | "button" | "container" | "image" | "richtext" | "input" | "joystick" | "shape";
 interface HUDOptions {
   parentId?: string | null;
   width?: number;
@@ -1096,3 +1096,78 @@ interface ResourceLease { readonly kind: string; readonly id: string; readonly a
 interface AssetsAPI { load(kind: 'model' | 'texture' | 'audio' | 'prefab' | 'materials' | 'animationControllers' | 'retargetProfiles', id: string): Promise<ResourceLease>; }
 declare const assets: AssetsAPI;
 interface ScriptContext { assets: AssetsAPI; }
+
+interface UIStyle {
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  outlineColor?: string;
+  borderWidth?: number;
+  borderRadius?: number | string;
+  borderStyle?: "none" | "solid" | "dashed" | "dotted" | "double";
+  padding?: number;
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  opacity?: number;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: number | "normal" | "bold" | "lighter" | "bolder";
+  fontStyle?: "normal" | "italic" | "oblique";
+  textAlign?: "left" | "center" | "right" | "start" | "end" | "justify";
+  lineHeight?: number;
+  letterSpacing?: number;
+  alignItems?:
+    | "start"
+    | "end"
+    | "center"
+    | "stretch"
+    | "baseline"
+    | "flex-start"
+    | "flex-end";
+  justifyContent?:
+    | "start"
+    | "end"
+    | "center"
+    | "space-between"
+    | "space-around"
+    | "space-evenly"
+    | "flex-start"
+    | "flex-end";
+  whiteSpace?: "normal" | "pre" | "pre-wrap" | "nowrap";
+  overflow?: "visible" | "hidden" | "clip" | "auto";
+  textOverflow?: "clip" | "ellipsis";
+  objectFit?: "contain" | "cover" | "fill" | "none" | "scale-down";
+  mixBlendMode?:
+    | "normal"
+    | "multiply"
+    | "screen"
+    | "overlay"
+    | "darken"
+    | "lighten"
+    | "difference"
+    | "exclusion";
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  boxShadow?: string;
+  textShadow?: string;
+  outlineWidth?: number;
+  outlineOffset?: number;
+}
+type UIState = "hover" | "focus" | "pressed" | "disabled";
+type UIStyleDefinition = Partial<Record<"base" | UIState, UIStyle>>;
+
+interface HUDOptions {
+  classes?:string[];style?:UIStyle;stateStyles?:UIStyleDefinition;
+  positionUnit?:'px'|'percent';sizeUnit?:'px'|'percent';shape?:'rect'|'ellipse';
+}
+interface HUDHandle {
+  getStyle():UIStyle;
+  /** Merge inline overrides. Pass null to remove all inline overrides. */
+  setStyle(patch:UIStyle|null):void;
+  setClasses(classes:string[]):void;
+  setLayout(patch:Partial<Pick<HUDOptions,'x'|'y'|'width'|'height'|'unit'|'positionUnit'|'sizeUnit'|'anchorX'|'anchorY'|'zIndex'|'gap'|'margin'>>):void;
+}

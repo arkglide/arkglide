@@ -7,6 +7,18 @@ export default function DiagnosticsPanel() {
   const rows = stats
     ? [
         ["状态 / 数学后端", `${stats.state} / ${stats.mathBackend}`],
+        [
+          "场景 / 生命周期后端",
+          `${stats.sceneBackend || "—"} / ${stats.lifecycleBackend || "—"}`,
+        ],
+        [
+          "原生实体 / 所有者 / 定时器",
+          `${stats.nativeEntities || 0} / ${stats.nativeOwners || 0} / ${stats.nativeTimers || 0}`,
+        ],
+        [
+          "原生矩阵更新 / 核心堆",
+          `${stats.nativeMatrixUpdates || 0} / ${((stats.coreWasmHeapBytes || 0) / 1048576).toFixed(1)} MiB`,
+        ],
         ["FPS", stats.fps.toFixed(1)],
         [
           "本帧 CPU / 峰值",

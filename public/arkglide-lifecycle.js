@@ -2,6 +2,13 @@
 (function (root) {
   "use strict";
   function createSession(options = {}) {
+    const nativeEnabled = !!options.nativeModule;
+    let native = nativeEnabled ? new options.nativeModule.RuntimeClock() : null;
+    let clockView = native?.view();
+    const nativeView = () => {
+      if (native && !clockView.buffer.byteLength) clockView = native.view();
+      return clockView;
+    };
     const records = [],
       scopes = new Set(),
       scheduled = new Map(),
@@ -27,8 +34,28 @@
       fixedFrameCount: 0,
       interpolationAlpha: 0,
     };
+    if (native)
+      for (const [key, index] of Object.entries({
+        deltaTime: 0,
+        unscaledDeltaTime: 1,
+        totalTime: 2,
+        unscaledTotalTime: 3,
+        frameCount: 4,
+        fixedDeltaTime: 5,
+        fixedTotalTime: 6,
+        fixedFrameCount: 7,
+        interpolationAlpha: 8,
+      }))
+        Object.defineProperty(time, key, {
+          enumerable: true,
+          get: () => nativeView()[index],
+          set: (value) => {
+            nativeView()[index] = value;
+          },
+        });
     let scale = 1,
-      maxSubSteps = 8;
+      maxSubSteps = 8,
+      maxFrameDelta = 0.25;
     Object.defineProperty(time, "timeScale", {
       enumerable: true,
       get: () => scale,
@@ -36,24 +63,35 @@
         if (!Number.isFinite(value) || value < 0 || value > 100)
           throw new RangeError("timeScale must be between 0 and 100");
         scale = value;
+        native?.scale(value);
       },
     });
     function report(record, hook, error) {
       errors++;
       try {
         options.onError?.({
-        file: record?.file,
-        entityId: record?.entity?.id,
-        hook,
-        error,
+          file: record?.file,
+          entityId: record?.entity?.id,
+          hook,
+          error,
         });
       } catch (reportError) {
-        root.console?.error("Lifecycle error reporting failed", reportError, error);
+        root.console?.error(
+          "Lifecycle error reporting failed",
+          reportError,
+          error,
+        );
       }
     }
     function call(record, hook, callback, args = []) {
-      if (!record.active || ((record.destroying || record.entity?.destroyed) && hook !== "onDestroy") ||
-          typeof callback !== "function") return;
+      if (
+        (native && !native.ownerState(record.nativeId)) ||
+        !record.active ||
+        ((record.destroying || record.entity?.destroyed) &&
+          hook !== "onDestroy") ||
+        typeof callback !== "function"
+      )
+        return;
       const started = now();
       try {
         callback.apply(record.instance, args);
@@ -78,9 +116,11 @@
     }
     function release(record) {
       if (!record.active || record.destroying) return;
+      native?.beginDestroy(record.nativeId);
       record.destroying = true;
       call(record, "onDestroy", record.instance?.onDestroy);
       record.active = false;
+      native?.removeOwner(record.nativeId);
       cleanup(record);
       const index = records.indexOf(record);
       if (index >= 0) records.splice(index, 1);
@@ -89,6 +129,7 @@
       const record = {
         entity,
         file,
+        nativeId: native?.addOwner() || 0,
         instance: null,
         active: !stopping,
         started: false,
@@ -97,7 +138,8 @@
         failed: new Set(),
       };
       if (record.active) {
-        if (options.scope) scopes.add(record); else records.push(record);
+        if (options.scope) scopes.add(record);
+        else records.push(record);
       }
       const allowed = () =>
         record.active &&
@@ -125,7 +167,9 @@
           typeof callback !== "function"
         )
           throw new TypeError("Expected a delay in seconds and a function");
-        const id = ++nextId;
+        const id = native
+          ? native.schedule(record.nativeId, seconds, interval)
+          : ++nextId;
         const item = {
           id,
           record,
@@ -133,7 +177,10 @@
           due: time.totalTime + seconds,
           interval: interval ? seconds : 0,
         };
-        item.cancel = track(() => scheduled.delete(id));
+        item.cancel = track(() => {
+          scheduled.delete(id);
+          native?.cancel(id);
+        });
         if (allowed()) scheduled.set(id, item);
         return item.cancel;
       }
@@ -245,6 +292,7 @@
         },
         abort() {
           record.active = false;
+          native?.removeOwner(record.nativeId);
           cleanup(record);
           const index = records.indexOf(record);
           if (index >= 0) records.splice(index, 1);
@@ -263,9 +311,16 @@
         !Number.isInteger(substeps) ||
         substeps < 1 ||
         substeps > 32 ||
-        !Number.isFinite(nextScale) || nextScale < 0 || nextScale > 100
+        !Number.isFinite(nextScale) ||
+        nextScale < 0 ||
+        nextScale > 100
       )
         throw new RangeError("Invalid fixed time step settings");
+      const maxDelta = settings.maxFrameDelta ?? 0.25;
+      if (!Number.isFinite(maxDelta) || maxDelta <= 0 || maxDelta > 10)
+        throw new RangeError("Invalid frame delta budget");
+      maxFrameDelta = maxDelta;
+      native?.configure(step, substeps, nextScale, maxDelta);
       time.fixedDeltaTime = step;
       maxSubSteps = substeps;
       time.timeScale = nextScale;
@@ -283,6 +338,7 @@
           release(record);
           continue;
         }
+        native?.startOwner(record.nativeId);
         record.started = true;
         call(record, "onStart", record.instance?.onStart);
       }
@@ -296,28 +352,34 @@
     function tick(timestamp) {
       scriptMs = 0;
       if (!active) return;
-      const raw = last === null ? 0 : Math.max(0, (timestamp - last) / 1000);
-      last = timestamp;
-      const clamped = Math.min(raw, 0.25);
-      time.unscaledDeltaTime = clamped;
-      time.deltaTime = clamped * scale;
-      time.unscaledTotalTime += clamped;
-      time.totalTime += time.deltaTime;
-      time.frameCount++;
-      droppedTime += Math.max(0, raw - clamped) * scale;
+      if (native) native.beginFrame(timestamp);
+      else {
+        const raw = last === null ? 0 : Math.max(0, (timestamp - last) / 1000);
+        last = timestamp;
+        const clamped = Math.min(raw, maxFrameDelta);
+        time.unscaledDeltaTime = clamped;
+        time.deltaTime = clamped * scale;
+        time.unscaledTotalTime += clamped;
+        time.totalTime += time.deltaTime;
+        time.frameCount++;
+        droppedTime += Math.max(0, raw - clamped) * scale;
+      }
       for (const record of [...records])
         if (record.entity?.destroyed) release(record);
       if (!active) return;
-      accumulator += time.deltaTime;
+      if (!native) accumulator += time.deltaTime;
       let steps = 0;
       while (
-        accumulator + 1e-10 >= time.fixedDeltaTime &&
-        steps < maxSubSteps
+        native
+          ? native.nextFixed()
+          : accumulator + 1e-10 >= time.fixedDeltaTime && steps < maxSubSteps
       ) {
-        accumulator -= time.fixedDeltaTime;
-        steps++;
-        time.fixedTotalTime += time.fixedDeltaTime;
-        time.fixedFrameCount++;
+        if (!native) {
+          accumulator -= time.fixedDeltaTime;
+          steps++;
+          time.fixedTotalTime += time.fixedDeltaTime;
+          time.fixedFrameCount++;
+        }
         for (const record of [...records]) {
           if (!active) return;
           if (record.started && !record.failed.has("onFixedUpdate"))
@@ -328,26 +390,45 @@
         if (!active) return;
       }
       // Physics consumes the velocities/forces set by this fixed script batch.
-      if (accumulator >= time.fixedDeltaTime) {
-        const discarded =
-          Math.floor(accumulator / time.fixedDeltaTime) * time.fixedDeltaTime;
-        droppedTime += discarded;
-        accumulator -= discarded;
+      if (native) native.finishFixed();
+      else {
+        if (accumulator >= time.fixedDeltaTime) {
+          const discarded =
+            Math.floor(accumulator / time.fixedDeltaTime) * time.fixedDeltaTime;
+          droppedTime += discarded;
+          accumulator -= discarded;
+        }
+        time.interpolationAlpha = Math.max(
+          0,
+          accumulator / time.fixedDeltaTime,
+        );
       }
-      time.interpolationAlpha = Math.max(0, accumulator / time.fixedDeltaTime);
       // At most one callback per repeating timer per rendered frame; missed intervals are coalesced.
-      for (const item of [...scheduled.values()]) {
-        if (!active) return;
-        if (
-          !scheduled.has(item.id) ||
-          item.due > time.totalTime + 1e-10 ||
-          scale === 0
-        )
-          continue;
-        if (!item.interval) item.cancel();
-        else item.due = time.totalTime + item.interval;
-        if (call(item.record, "timer:" + item.id, item.callback) === false)
-          item.cancel();
+      if (native) {
+        native.beginTimers();
+        let id;
+        while ((id = native.nextTimer())) {
+          if (!active) return;
+          const item = scheduled.get(id);
+          if (!item) continue;
+          if (!item.interval) item.cancel();
+          if (call(item.record, "timer:" + item.id, item.callback) === false)
+            item.cancel();
+        }
+      } else {
+        for (const item of [...scheduled.values()]) {
+          if (!active) return;
+          if (
+            !scheduled.has(item.id) ||
+            item.due > time.totalTime + 1e-10 ||
+            scale === 0
+          )
+            continue;
+          if (!item.interval) item.cancel();
+          else item.due = time.totalTime + item.interval;
+          if (call(item.record, "timer:" + item.id, item.callback) === false)
+            item.cancel();
+        }
       }
       for (const record of [...records]) {
         if (!active) return;
@@ -356,6 +437,7 @@
       }
     }
     function pause() {
+      native?.pause();
       active = false;
       last = null;
       time.deltaTime = 0;
@@ -363,12 +445,14 @@
     }
     function resume() {
       if (stopping) return;
+      native?.resume();
       active = true;
       last = null;
     }
     function stop() {
       if (stopping) return;
       stopping = true;
+      native?.beginStop();
       active = false;
       // Reverse registration order gives child scripts a chance to release first.
       for (const record of [...records].reverse()) release(record);
@@ -377,6 +461,12 @@
       records.length = 0;
       scheduled.clear();
       subscriptions.clear();
+      if (native) {
+        native.finishStop();
+        clockView = Float64Array.from(nativeView());
+        native.delete();
+        native = null;
+      }
       last = null;
       accumulator = 0;
       for (const key of [
@@ -393,12 +483,15 @@
     }
     function stats() {
       return {
+        lifecycleBackend: nativeEnabled ? "cpp-wasm" : "javascript",
+        nativeOwners: native?.ownerCount() || 0,
+        nativeTimers: native?.timerCount() || 0,
         scripts: records.filter((r) => r.active).length,
         timers: scheduled.size,
         subscriptions: subscriptions.size,
         listeners: nativeListeners.size,
         scriptMs,
-        droppedTime,
+        droppedTime: nativeEnabled ? nativeView()[9] : droppedTime,
         errors,
         fixedSteps: time.fixedFrameCount,
         timeScale: scale,
