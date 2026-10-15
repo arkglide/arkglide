@@ -33,7 +33,7 @@ node scripts/serve-static.mjs portal-game 8080
 
 `cameras.create(options)` 创建脚本拥有的相机，`get(entityIdOrRuntimeId)` 取得已有相机，`active()` 取得当前相机，`setActive(handleOrId)` 切换。取得的已有相机句柄不拥有它；`destroy()` 仅销毁创建者拥有的相机。
 
-句柄提供 `getPose/setPose/lookAt/getLens/setLens/ray/destroy`。`ray(x=.5,y=.5,length=1000)` 的 x/y 为归一化屏幕坐标，direction 的长度是射程。它遵循相机镜头和朝向。
+句柄提供 `getPose/setPose/lookAt/getLens/setLens/ray/destroy`。`ray(x=.5,y=.5,length=1000)` 的 x/y 为归一化屏幕坐标，direction 的长度是射程。它遵循相机镜头和朝向；透视相机的射线从眼睛发出，避免门面进入近平面后射线漏过传送门。
 
 `createRig(options)` 支持：
 
@@ -46,7 +46,7 @@ node scripts/serve-static.mjs portal-game 8080
 
 第二人称观察与控制使用 observer：游戏仍控制自己的玩家实体，镜头可以属于另一个角色。不会把“被控制对象”和“镜头所在对象”绑定为同一个实体。
 
-`target/viewpoint` 是 Entity。`offset` 是初始模式的简写；`eyeOffset/followOffset/observerOffset` 可分别设置模式偏移，`pivotOffset` 是跟随相机的世界支点偏移。firstPerson 的眼睛偏移使用世界直立坐标；observer 偏移使用观察者局部坐标。
+`target/viewpoint` 是 Entity。`offset` 是初始模式的简写；`eyeOffset/followOffset/observerOffset` 可分别设置模式偏移，`pivotOffset` 是跟随相机的世界支点偏移。firstPerson 的初始眼睛偏移使用世界直立坐标，穿越时同步转换，启用 uprightSpeed 后平滑回正；observer 偏移使用观察者局部坐标。
 
 句柄提供 `look(dx,dy)`、`direction(strafe,forward)`、`setRotation(quaternion)`、`setMode(mode)`、`update()`、`destroy()`。direction 返回世界 X/Z 上的单位移动意图；look 不自行读取输入。相机更新在渲染前自动执行；交互前可显式 update。`sensitivity` 为弧度/像素，`pitchLimit` 为度。
 
@@ -120,7 +120,7 @@ a.link(b);
 
 ## 穿越、部分穿越与递归视图
 
-`portals.watch(entity,{keepUpright=true})` 注册角色、dynamic 或 kinematic 运动实体。注册物体才能穿门；句柄 destroy 取消注册。物体销毁或运动组件移除会清理注册。角色通常保持世界直立，刚体旋转、线速度及角速度按门变换转换。
+`portals.watch(entity,{keepUpright=true,visualMargin=.5})` 注册角色、dynamic 或 kinematic 运动实体。注册物体才能穿门；句柄 destroy 取消注册。物体销毁或运动组件移除会清理注册。角色通常保持世界直立，刚体旋转、线速度及角速度按门变换转换。visualMargin（0..100，世界单位）让裁剪材质在接触门面前提前准备；源侧和出口侧分别裁剪。第一人称眼睛独立判断所在门侧，眼偏移随穿越旋转，并按 uprightSpeed 平滑回正。门面在相机近平面内保持投影，避免临近穿越时提前消失。
 
 `onTraverse(callback)` 返回取消函数。事件包括 entity、source、destination、position、velocity、matrix。matrix 为列主序，供自己的系统同步坐标。
 
@@ -130,7 +130,7 @@ a.link(b);
 - 出口半物体用实际 native shape 扫掠检查，静态障碍阻止进入，dynamic 障碍接收接触点冲量与力矩，并使用世界惯量计算有效质量及库仑摩擦。该接触桥不是新增的 native 刚体约束；跨门多接触求解与接触事件不宣称与商用引擎逐帧等价。关节组合采用下述整组穿越策略。
 - 关闭/换位时将注册的边界物体推出将恢复的墙体。
 
-`setQuality({depth=2,scale=.75,maxViews=24})` 控制递归深度（1..5）、尺寸比例（.1..2）与总视图预算（1..64）。每个视图使用转换后的相机与出口裁剪；终端层采用门底色。调整质量会释放旧 RT。停止清理所有相机、RT、克隆、订阅和材质。
+`setQuality({depth=2,scale=1,recursiveScale=.75,samples=4,maxViews=24})` 控制递归深度（1..5）、首层尺寸比例（.1..2）、逐层尺寸比例（.1..1）、MSAA 样本数（1/2/4/8）与总视图预算（1..64）。首层默认匹配主画面的实际渲染分辨率，较深层逐级降采样；所有尺寸受显卡纹理上限约束，抗锯齿受显卡能力限制。samples=1 可关闭 MSAA，recursiveScale=1 可保持递归层清晰度。每个视图使用转换后的相机与出口裁剪；终端层采用门底色。调整质量会释放旧 RT。停止清理所有相机、RT、克隆、订阅和材质。
 
 ## 穿门射线与抓取
 
@@ -138,9 +138,9 @@ a.link(b);
 
 `mapPoint/mapVector/mapRotation` 按等距门变换映射，可用于激光、发射器、音源或其他逻辑；不凭射线实现刚体碰撞。
 
-`interaction.grab(entity,{position?,rotation?,stiffness?,damping?,maxForce?,maxDistance?})` 对 dynamic 刚体施加受限弹簧力。句柄支持 active、setTarget(worldPoint,rotation?)、setRay(origin,direction,distance=2.5,{segment?,ignore?})、release。
+`interaction.grab(entity,{position?,rotation?,stiffness?,damping?,maxForce?,maxDistance?,path?,holder?})` 对 dynamic 刚体施加受限弹簧力。句柄支持 active、setTarget(worldPoint,rotation?)、setRay(origin,direction,distance=2.5,{segment?,ignore?})、release。
 
-setRay 沿穿门射线求目标，按物体离哪个射线段最近选择所在坐标空间，然后将目标逆映射到这一段。重叠空间/复杂拓扑可显式指定 segment；也可以用 setTarget 完全自行控制。射线忽略被抓物及所属脚本实体；extra ignore 用于独立控制器。物体穿越时目标和指定旋转也转换，避免中间固定步把物体拉回旧空间。应同时用 watch 注册可穿门的被抓物。
+拾取时建议传入 `path: trace.path`（从持有者到物体的入口门 ID 序列）；即使持物点还在入口之前，也会在物体当前门侧施力，使物体经拾取时所见的门拉回。未传 path 时，首次 setRay 使用 maxDistance 范围的射线推断物体所在段，此后保留路径。物体或持有者穿越会更新路径，临时移开准星也不会改成跨房间直拉；持有者默认所属脚本实体，独立控制器可传 holder。重叠空间/外部瞬移可显式指定 segment 重新选择坐标空间；也可以用 setTarget 完全自行控制并重置路径。射线忽略被抓物、持有者及所属脚本实体；extra ignore 用于其它过滤。物体穿越时目标和指定旋转也转换，避免中间固定步把物体拉回旧空间；路径门关闭或失效时释放。碰撞继续由原生物理处理，真实路径上的墙仍然阻挡物体。应同时用 watch 注册可穿门的被抓物。
 
 抓取没有箱子/武器/剧情类型判断，不依赖 firstPerson 相机。超出最大距离、释放、实体销毁或脚本停止结束抓取。
 

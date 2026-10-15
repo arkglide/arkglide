@@ -782,12 +782,12 @@ interface PortalsAPI {
   ): PortalSurfaceHandle;
   watch(
     entity: Entity,
-    options?: { keepUpright?: boolean },
+    options?: { keepUpright?: boolean; visualMargin?: number },
   ): { entity: Entity; destroy(): void };
   /** Atomic whole-island transport; requires dynamic members without world anchors. */
   watchAssembly(
     entity: Entity,
-    options?: { keepUpright?: boolean; maxBodies?: number },
+    options?: { keepUpright?: boolean; maxBodies?: number; visualMargin?: number },
   ): { readonly entities: readonly Entity[]; destroy(): void };
   raycast(
     origin: Vec3,
@@ -799,6 +799,8 @@ interface PortalsAPI {
   setQuality(options: {
     depth?: number;
     scale?: number;
+    recursiveScale?: number;
+    samples?: 1 | 2 | 4 | 8;
     maxViews?: number;
   }): void;
 }
@@ -824,6 +826,10 @@ interface InteractionAPI {
       damping?: number;
       maxForce?: number;
       maxDistance?: number;
+      /** Entrance portal IDs from holder to picked object; pass PortalTrace.path. */
+      path?: string[];
+      /** Defaults to the owning script's entity. */
+      holder?: Entity;
     },
   ): GrabHandle;
 }

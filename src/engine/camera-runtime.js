@@ -6,7 +6,8 @@
       records = new Map(),
       rigs = new Set();
     let disposed = false,
-      serial = 0;
+      serial = 0,
+      viewResolver = null;
     const vector = (p) => {
       S.vec(p);
       return new B.Vector3(p.x, p.y, p.z);
@@ -97,7 +98,9 @@
             camera,
           );
           return {
-            origin: S.plain(ray.origin),
+            // A perspective ray starts at the eye. Starting on the near plane
+            // can skip an aperture immediately in front of the camera.
+            origin: S.plain(camera.mode === B.Camera.PERSPECTIVE_CAMERA ? S.pose(B, camera).position : ray.origin),
             direction: S.plain(ray.direction.scale(length)),
           };
         },
@@ -202,6 +205,7 @@
         100,
         "Invalid upright speed",
       );
+      const transportedEye = eyeOffset.clone();
       const sensitivity = S.number(
           config.sensitivity ?? 0.002,
           0,
@@ -227,16 +231,20 @@
       const r = {
         target: config.target,
         camera: cam,
+        viewPath: [],
         warp(matrix) {
           const scale = new B.Vector3(),
             q = new B.Quaternion(),
             p = new B.Vector3();
           matrix.decompose(scale, q, p);
           rotation = q.multiply(rotation).normalize();
+          transportedEye.copyFrom(B.Vector3.TransformNormal(transportedEye, matrix));
         },
         update(dt = 0) {
           if (!live) return;
+          r.viewPath = [];
           if (uprightSpeed && dt > 0) {
+            B.Vector3.LerpToRef(transportedEye, eyeOffset, 1 - Math.exp(-uprightSpeed * dt), transportedEye);
             const forward = B.Vector3.TransformNormal(
               B.Axis.Z,
               B.Matrix.Compose(B.Vector3.One(), rotation, B.Vector3.Zero()),
@@ -293,7 +301,7 @@
           if (!target) throw Error("Following camera needs target");
           const p = vector(target.getWorldPosition());
           let position;
-          if (mode === "firstPerson") position = p.add(offset);
+          if (mode === "firstPerson") position = p.add(transportedEye);
           else {
             const anchor = p.add(
                 vector(config.pivotOffset || { x: 0, y: 0.7, z: 0 }),
@@ -316,7 +324,11 @@
                 );
             }
           }
-          S.write(B, cam, S.plain(position), S.plainQ(rotation));
+          // The eye can cross an aperture before or after the body's center.
+          // Resolve its view independently without changing the physical body.
+          const view = mode === "firstPerson" && viewResolver?.(target, position, rotation);
+          r.viewPath = view?.path || [];
+          S.write(B, cam, S.plain(view?.position || position), S.plainQ(view?.rotation || rotation));
         },
         destroy() {
           if (!live) return;
@@ -443,6 +455,17 @@
       update(dt = 0) {
         for (const r of [...rigs]) r.update(dt);
       },
+      setViewResolver(resolve) { viewResolver = resolve; },
+      getViewPath(entity, origin) {
+        for (const r of rigs) if (r.target === entity && r.camera === scene.activeCamera) {
+          // Picking rays start on the near plane, rather than at the eye.
+          const camera = r.camera, span = camera.minZ * (1 + Math.tan(camera.fov / 2) *
+            Math.max(1, scene.getEngine().getAspectRatio(camera)) * Math.SQRT2);
+          if (B.Vector3.DistanceSquared(S.pose(B, camera).position, vector(origin)) <= Math.max(1e-6, span * span))
+            return r.viewPath;
+        }
+        return [];
+      },
       warp(entity, matrix) {
         for (const r of rigs) if (r.target === entity) r.warp(matrix);
       },
@@ -452,6 +475,7 @@
         for (const r of [...rigs]) r.destroy();
         for (const r of [...records.values()]) r.destroy();
         disposed = true;
+        viewResolver = null;
       },
     };
   }

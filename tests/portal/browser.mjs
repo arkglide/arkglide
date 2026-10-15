@@ -7,6 +7,7 @@ import { serveStatic } from "../../scripts/serve-static.mjs";
 const root = new URL("../../", import.meta.url),
   fixture = new URL(".portal-browser-test/", root);
 await fs.rm(fixture, { recursive: true, force: true });
+await fs.rm(new URL('.portal-browser-test.zip', root), { force: true });
 execFileSync(process.execPath, ["scripts/create-portal-example.mjs"], {
   cwd: root,
 });
@@ -52,6 +53,7 @@ test(
     page.on("console", (m) => {
       if (m.type() === "error") logs.push(m.text());
     });
+    await page.route('**/favicon.ico', route => route.fulfill({ status: 204 }));
     try {
       await page.goto(url);
       await page.locator("#start").click();
@@ -118,19 +120,21 @@ test(
       await page.locator("#pause").click();
       await frame.waitForFunction(() => running);
       await canvas.click({ position: { x: 300, y: 300 } });
-      await page.keyboard.press("f");
-      await frame.waitForFunction(() =>
-        document
-          .querySelector('[data-hud-id="mode"]')
-          .textContent.includes("thirdPerson"),
-      );
-      await page.keyboard.press("f");
-      await frame.waitForFunction(() =>
-        document
-          .querySelector('[data-hud-id="mode"]')
-          .textContent.includes("observer"),
-      );
-      await page.keyboard.press("f");
+      await frame.waitForFunction(() => document.pointerLockElement === document.getElementById('renderCanvas'));
+      await frame.evaluate(() => { globalThis.__modeKeys = []; window.addEventListener('keydown', e => __modeKeys.push([e.code, e.target.tagName])); });
+      async function switchMode(mode) {
+        await page.keyboard.down('f');
+        try {
+          await frame.waitForFunction(mode => document.querySelector('[data-hud-id="mode"]').textContent.includes(mode), mode, { timeout: 5000 });
+        } catch (error) {
+          throw Error(mode + ': ' + JSON.stringify(await frame.evaluate(() => ({ keys: __modeKeys, active: document.activeElement.tagName, running, errors: scriptErrors, mode: document.querySelector('[data-hud-id="mode"]').textContent, key: inputRuntime.isKeyDown('f') }))), { cause: error });
+        } finally { await page.keyboard.up('f'); }
+        const rendered = await frame.evaluate(() => _renderFrames);
+        await frame.waitForFunction(before => _renderFrames > before, rendered);
+      }
+      await switchMode('thirdPerson');
+      await switchMode('observer');
+      await switchMode('firstPerson');
       await frame.evaluate(() => {
         portalDemo.pair(true);
         portalDemo.physics.setState(portalDemo.player, {
@@ -288,3 +292,84 @@ test(
     }
   },
 );
+
+test('portal stays rendered inside the camera near plane and uses native resolution with configurable MSAA', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+  try {
+    await page.goto(url); await page.locator('#start').click();
+    await page.waitForFunction(() => document.body.dataset.state === 'playing');
+    const frame = page.frames().find(f => f.url().includes('runtime.html?boot='));
+    await frame.waitForFunction(() => globalThis.portalDemo && portalRuntime.stats().portalRenderedViews > 0);
+    const result = await frame.evaluate(async () => {
+      engine.stopRenderLoop();
+      const B = BABYLON, a = portalDemo.blue, b = portalDemo.orange;
+      portalDemo.portals.setQuality({ depth: 1, scale: 1, samples: 4 });
+      const pa = a.getPose(), pb = b.getPose();
+      const matrix = pose => B.Matrix.Compose(B.Vector3.One(), new B.Quaternion(pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w), new B.Vector3(pose.position.x, pose.position.y, pose.position.z));
+      const na = B.Vector3.TransformNormal(B.Axis.Z, matrix(pa)), nb = B.Vector3.TransformNormal(B.Axis.Z, matrix(pb));
+      const marker = B.MeshBuilder.CreatePlane('near-plane-marker', { size: 30, sideOrientation: B.Mesh.DOUBLESIDE }, scene);
+      marker.position.copyFrom(new B.Vector3(pb.position.x, pb.position.y, pb.position.z).add(nb.scale(3)));
+      marker.rotationQuaternion = new B.Quaternion(pb.rotation.x, pb.rotation.y, pb.rotation.z, pb.rotation.w);
+      const material = new B.StandardMaterial('near-plane-red', scene);
+      material.disableLighting = true; material.emissiveColor = new B.Color3(1, 0, 0); marker.material = material;
+      for (const mesh of scene.meshes) if (mesh !== marker && !mesh.name.includes(':view') && !mesh.name.includes(':rim')) mesh.setEnabled(false);
+      const camera = scene.activeCamera, rotation = ArkGlideSpatial.look(B, na.negate(), Math.abs(na.y) > .9 ? B.Axis.Z : B.Axis.Y);
+      camera.minZ = .1;
+      const measurements = [];
+      for (const distance of [.3, .08, .01, .002, .0002]) {
+        ArkGlideSpatial.write(B, camera, new B.Vector3(pa.position.x, pa.position.y, pa.position.z).add(na.scale(distance)), rotation);
+        for (let i = 0; i < 5; i++) { portalRuntime.render(); scene.render(); await new Promise(r => setTimeout(r, 16)); }
+        const pixels = await engine.readPixels(Math.floor(engine.getRenderWidth() / 2) - 4, Math.floor(engine.getRenderHeight() / 2) - 4, 8, 8);
+        let red = 0; for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 180 && pixels[i + 1] < 50 && pixels[i + 2] < 50) red++;
+        measurements.push({ distance, red });
+      }
+      const target = scene.getMeshByName('blue:view').material.getActiveTextures()[0];
+      const native = { size: target.getSize(), samples: target.samples, width: engine.getRenderWidth(true), height: engine.getRenderHeight(true), maxSamples: engine.getCaps().maxMSAASamples };
+      portalDemo.portals.setQuality({ scale: .5, samples: 1 }); portalRuntime.render(); scene.render();
+      const lower = scene.getMeshByName('blue:view').material.getActiveTextures()[0];
+      return { measurements, native, lower: { size: lower.getSize(), samples: lower.samples }, errors: scriptErrors };
+    });
+    for (const sample of result.measurements) assert.equal(sample.red, 64, `exit remains visible at eye distance ${sample.distance}`);
+    assert.equal(result.native.size.width, result.native.width); assert.equal(result.native.size.height, result.native.height);
+    assert.equal(result.native.samples, Math.min(4, result.native.maxSamples));
+    assert.equal(result.lower.size.width, Math.round(result.native.width * .5));
+    assert.equal(result.lower.samples, 1); assert.equal(result.errors, 0);
+  } finally { await page.close(); }
+});
+
+test('a rendered body stays visible on every sampled frame as its source and ghost swap sides', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
+  try {
+    await page.goto(url); await page.locator('#start').click();
+    await page.waitForFunction(() => document.body.dataset.state === 'playing');
+    const frame = page.frames().find(f => f.url().includes('runtime.html?boot='));
+    await frame.waitForFunction(() => globalThis.portalDemo && portalRuntime.stats().portalRenderedViews > 0);
+    const result = await frame.evaluate(async () => {
+      engine.stopRenderLoop();
+      const B = BABYLON, a = portalDemo.blue, b = portalDemo.orange, api = portalDemo.physics;
+      portalDemo.portals.setQuality({ depth: 1, samples: 1 }); a.unlink();
+      a.setPose({ position: { x: 0, y: 20, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } });
+      b.setPose({ position: { x: 8, y: 20, z: 0 }, rotation: B.Quaternion.RotationAxis(B.Axis.Y, -Math.PI / 2) }); a.link(b);
+      const e = sceneAPI.find('Crate1'), mesh = entityAPI.getObject(e.id);
+      for (const other of scene.meshes) if (other !== mesh && !other.name.includes(':view') && !other.name.includes(':rim')) other.setEnabled(false);
+      const material = new B.StandardMaterial('crossing-red', scene);
+      material.disableLighting = true; material.emissiveColor = new B.Color3(1, 0, 0); mesh.material = material;
+      ArkGlideSpatial.write(B, scene.activeCamera, { x: 0, y: 20, z: 3 }, B.Quaternion.RotationAxis(B.Axis.Y, Math.PI));
+      api.setState(e, { position: { x: 0, y: 20, z: .8 }, velocity: { x: 0, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } });
+      for (let i = 0; i < 6; i++) { portalRuntime.updateVisuals(); portalRuntime.render(); scene.render(); await new Promise(r => setTimeout(r, 16)); }
+      api.setState(e, { position: { x: 0, y: 20, z: .3 }, velocity: { x: 0, y: 0, z: -2 } });
+      const samples = [], before = portalRuntime.stats().portalTraversals;
+      for (let i = 0; i < 16; i++) {
+        const velocity = api.getState(e).velocity;
+        api.setState(e, { velocity: { ...velocity, y: 0 } });
+        portalRuntime.step(1 / 60); portalRuntime.updateVisuals(); portalRuntime.render(); scene.render();
+        const pixels = await engine.readPixels(Math.floor(engine.getRenderWidth() / 2) - 4, Math.floor(engine.getRenderHeight() / 2) - 4, 8, 8);
+        let red = 0; for (let j = 0; j < pixels.length; j += 4) if (pixels[j] > 180 && pixels[j + 1] < 50 && pixels[j + 2] < 50) red++;
+        samples.push(red); await new Promise(r => setTimeout(r, 16));
+      }
+      return { samples, crossed: portalRuntime.stats().portalTraversals - before, errors: scriptErrors };
+    });
+    assert.equal(result.crossed, 1); assert.equal(result.errors, 0);
+    result.samples.forEach((red, i) => assert.equal(red, 64, `body remains visible on frame ${i}`));
+  } finally { await page.close(); }
+});

@@ -15,7 +15,7 @@
       serial = 0,
       rendering = false,
       renderCount = 0;
-    let quality = { depth: 2, scale: 0.75, maxViews: 24 };
+    let quality = { depth: 2, scale: 1, recursiveScale: 0.75, samples: 4, maxViews: 24 };
     let traversalLimits = { maxSubSteps: 128, maxStepTime: 1 / 240, maxTravelDistance: 0.15 };
     const V = (p) => {
         S.vec(p);
@@ -428,7 +428,7 @@
     }
     const shader = {
       vertexSource:
-        "precision highp float; attribute vec3 position; uniform mat4 world; uniform mat4 worldViewProjection; varying vec4 screenPosition; varying vec3 worldPosition; void main(){vec4 p=vec4(position,1.0);screenPosition=worldViewProjection*p;worldPosition=(world*p).xyz;gl_Position=screenPosition;}",
+        "precision highp float; attribute vec3 position; uniform mat4 world; uniform mat4 worldViewProjection; varying vec4 screenPosition; varying vec3 worldPosition; void main(){vec4 p=vec4(position,1.0);screenPosition=worldViewProjection*p;worldPosition=(world*p).xyz;gl_Position=screenPosition;if(gl_Position.w>0.0)gl_Position.z=max(gl_Position.z,-gl_Position.w);}",
       fragmentSource:
         "precision highp float; varying vec4 screenPosition; varying vec3 worldPosition; uniform sampler2D portalView; uniform vec3 fallback; uniform vec4 clipping; uniform float clipEnabled; uniform float hasView; uniform vec2 portalSize; uniform float ellipse; uniform mat4 worldInverse; void main(){if(clipEnabled>0.5&&dot(vec4(worldPosition,1.0),clipping)>0.0)discard;vec3 p=(worldInverse*vec4(worldPosition,1.0)).xyz;if(ellipse>0.5&&dot(p.xy/portalSize*2.0,p.xy/portalSize*2.0)>1.0)discard;vec2 uv=screenPosition.xy/screenPosition.w*0.5+0.5;gl_FragColor=hasView>0.5?texture2D(portalView,uv):vec4(fallback,1.0);}",
     };
@@ -475,6 +475,9 @@
         samplers: ["portalView"],
       });
       material.backFaceCulling = false;
+      // Bias depth instead of shifting the aperture ahead of its traversal plane.
+      // A geometric offset leaves a visible gap just before the eye crosses.
+      material.zOffset = -1;
       material.setColor3(
         "fallback",
         B.Color3.FromHexString(options.color || "#236CFF"),
@@ -518,7 +521,7 @@
       portals.set(id, p);
       let off;
       function sync() {
-        mesh.position.copyFrom(p.position.add(normal(p).scale(epsilon)));
+        mesh.position.copyFrom(p.position);
         mesh.rotationQuaternion = p.rotation.clone();
         mesh.setEnabled(p.enabled);
         material.setMatrix(
@@ -854,6 +857,7 @@
       if (!["dynamic", "character", "kinematic"].includes(state.kind))
         throw Error("Portal traveler needs moving physics");
       if (actors.has(e.id)) throw Error("Traveler already registered");
+      S.number(config.visualMargin ?? 0.5, 0, 100, "Invalid portal visual margin");
       const r = {
         entity: e,
         owner,
@@ -1030,7 +1034,7 @@
             const point = local(p, V(state.position));
             if (
               point.z >= -epsilon &&
-              point.z < extent(state, normal(p)) + epsilon &&
+              point.z < extent(state, normal(p)) + (r.config.visualMargin ?? 0.5) + epsilon &&
               fits(p, state, point)
             ) {
               candidate = p;
@@ -1064,6 +1068,7 @@
                 source.push({ mesh, original, material });
               }
             }
+          const ghostMaterials = new Set();
           for (const mesh of [clone, ...clone.getChildMeshes()]) {
             mesh.isPickable = false;
             mesh.metadata = null;
@@ -1075,9 +1080,10 @@
                 textures,
               );
               mesh.material = material;
+              ghostMaterials.add(material);
             }
           }
-          r.visual = { clone, source, materials, textures };
+          r.visual = { clone, source, materials, textures, ghostMaterials };
         }
         const v = r.visual,
           m = mapping(candidate),
@@ -1112,7 +1118,7 @@
           } else m.clipPlane = p;
         };
         for (const item of v.source) assign(item.material, sourcePlane);
-        for (const material of v.materials) assign(material, exitPlane);
+        for (const material of v.ghostMaterials) assign(material, exitPlane);
       }
     }
     function exitContacts(r, state, dt) {
@@ -1510,6 +1516,7 @@
         texture.activeCamera = camera;
         texture.ignoreCameraViewport = true;
         texture.renderParticles = false;
+        texture.samples = Math.min(quality.samples, Math.max(1, scene.getEngine().getCaps().maxMSAASamples || 1));
         v = { camera, texture, width, height };
         views[index] = v;
       }
@@ -1533,14 +1540,10 @@
       renderCount = 0;
       const main = scene.activeCamera,
         engine = scene.getEngine(),
-        width = Math.max(
-          64,
-          Math.round(engine.getRenderWidth() * quality.scale),
-        ),
-        height = Math.max(
-          64,
-          Math.round(engine.getRenderHeight() * quality.scale),
-        ),
+        // Read the main framebuffer size before recursive RTTs bind their own.
+        width = engine.getRenderWidth(true) * quality.scale,
+        height = engine.getRenderHeight(true) * quality.scale,
+        maxSize = engine.getCaps().maxTextureSize || 4096,
         oldClip = scene.clipPlane,
         oldClip2 = scene.clipPlane2;
       function visit(camera, depth, exit) {
@@ -1550,11 +1553,12 @@
           if (
             active(p) &&
             p !== exit &&
-            B.Vector3.Dot(pose.position.subtract(p.position), normal(p)) >
-              epsilon
+            B.Vector3.Dot(pose.position.subtract(p.position), normal(p)) > 0
           ) {
             if (renderCount >= quality.maxViews) break;
-            const view = target(renderCount++, width, height),
+            const levelScale = Math.pow(quality.recursiveScale, quality.depth - depth),
+              sizeScale = Math.min(levelScale, maxSize / width, maxSize / height),
+              view = target(renderCount++, Math.max(1, Math.round(width * sizeScale)), Math.max(1, Math.round(height * sizeScale))),
               m = mapping(p),
               rotation = B.Quaternion.Identity(),
               scale = new B.Vector3(),
@@ -1567,6 +1571,7 @@
               S.plainQ(rotation.multiply(pose.rotation)),
             );
             view.camera.fov = camera.fov;
+            view.camera.fovMode = camera.fovMode;
             view.camera.minZ = Math.min(camera.minZ, 0.01);
             view.camera.maxZ = camera.maxZ;
             const children =
@@ -1616,6 +1621,22 @@
         rendering = false;
       }
     }
+    o.cameras?.setViewResolver?.((entity, position, rotation) => {
+      if (disposed || !actors.has(entity.id)) return null;
+      let state;
+      try { state = physics.getState(entity); }
+      catch { actors.get(entity.id)?.destroy(); return null; }
+      const center = V(state.position);
+      for (const p of portals.values()) if (active(p)) {
+        const a = local(p, center), b = local(p, position);
+        if (a.z < -epsilon || b.z >= 0 || a.z - b.z <= epsilon) continue;
+        if (!inside(p, B.Vector3.Lerp(a, b, a.z / (a.z - b.z)))) continue;
+        const m = mapping(p), q = new B.Quaternion();
+        m.decompose(new B.Vector3(), q, new B.Vector3());
+        return { position: B.Vector3.TransformCoordinates(position, m), rotation: q.multiply(rotation).normalize(), path: [p.id] };
+      }
+      return null;
+    });
     const projection = root.ArkGlidePortalProjection?.create(B,{S,V,Q,guard,portals,physics,mapping,active,local,transform,contour,inside,fits,extent,normal,tolerance:epsilon});
     function captureState(key) {
       for(const s of surfaces.values())syncSurface(s);
@@ -1642,6 +1663,7 @@
     }
     return {
       captureState,validateState,restoreState,
+      viewPath: (entity, origin) => o.cameras?.getViewPath?.(entity, origin) || [],
       forOwner(owner) {
         guard(owner);
         return Object.freeze({
@@ -1701,6 +1723,9 @@
               throw Error("Portal quality needs integer budgets");
             S.number(next.depth, 1, 5, "Invalid recursion depth");
             S.number(next.scale, 0.1, 2, "Invalid render scale");
+            S.number(next.recursiveScale, 0.1, 1, "Invalid recursive render scale");
+            if (!Number.isInteger(next.samples) || ![1, 2, 4, 8].includes(next.samples))
+              throw Error("Invalid portal sample count");
             S.number(next.maxViews, 1, 64, "Invalid view budget");
             quality = next;
             for (const p of portals.values()) setView(p, null);
@@ -1729,6 +1754,7 @@
       }),
       dispose() {
         if (disposed) return;
+        o.cameras?.setViewResolver?.(null);
         for (const r of actors.values()) releaseVisual(r);
         for (const p of [...portals.values()]) p.handle.destroy();
         for (const s of [...surfaces.values()]) s.destroy();

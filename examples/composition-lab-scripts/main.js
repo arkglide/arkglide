@@ -133,8 +133,8 @@ export default function ({ entity, scene, input, physics, cameras, portals, inte
         if (input.wasActionPressed('interact')) {
           if (grab?.active) { grab.release(); grab = null; }
           else {
-            const hit = portals.raycast(ray.origin, ray.direction, { ignore: [entity], sensors: false }).hit;
-            if (hit && physics.getState(hit.entity).kind === 'dynamic') grab = interaction.grab(hit.entity, { position: hit.point, maxDistance: c.maxHoldDistance });
+            const trace = portals.raycast(ray.origin, ray.direction, { ignore: [entity], sensors: false }), hit = trace.hit;
+            if (hit && physics.getState(hit.entity).kind === 'dynamic') grab = interaction.grab(hit.entity, { position: hit.point, maxDistance: c.maxHoldDistance, path: trace.path });
           }
         }
         if (grab?.active) grab.setRay(ray.origin, ray.direction, c.holdDistance, { ignore: [entity] });

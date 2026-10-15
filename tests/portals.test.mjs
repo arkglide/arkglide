@@ -680,7 +680,8 @@ test("holding through a portal applies force in the object current segment and u
     near(state.velocity.x, 0);
     assert.ok(state.velocity.z < 0, "pull toward source aperture");
     s.p.setState(e, { position: vec(7.6, 0, 0), velocity: vec(0, 0, 0) });
-    h.setRay(vec(0, 0, 3), vec(0, 0, -6), 3.5);
+    // An external teleport did not emit onTraverse; explicitly select its frame.
+    h.setRay(vec(0, 0, 3), vec(0, 0, -6), 3.5, { segment: 1 });
     system.step(0.01);
     state = s.p.getState(e);
     assert.ok(state.velocity.x < 0, "pull in destination coordinates");
@@ -1077,4 +1078,108 @@ test("observer movement directions follow its actual viewpoint rather than a pre
   } finally {
     s.done();
   }
+});
+
+test('straddling source and ghost keep different clip planes across the transport frame', () => {
+  const s = setup();
+  try {
+    const [a, b] = s.pair(), e = s.entity('clip-body', vec(0, 0, .22), vec(.4, .4, .4), 'dynamic');
+    const mesh = s.objects.get(e.id), original = new B.StandardMaterial('clip-original', s.scene);
+    mesh.material = original; s.api.watch(e); s.portals.updateVisuals();
+    const source = mesh.material, ghost = s.scene.getMeshByName('__portal:clone:' + e.id);
+    assert.ok(source.clipPlane.signedDistanceTo(new B.Vector3(0, 0, .3)) < 0, 'source front survives');
+    assert.ok(source.clipPlane.signedDistanceTo(new B.Vector3(0, 0, -.1)) > 0, 'source back is clipped');
+    assert.ok(ghost.material.clipPlane.signedDistanceTo(new B.Vector3(7.6, 0, 0)) < 0, 'exit front survives');
+    assert.ok(ghost.material.clipPlane.signedDistanceTo(new B.Vector3(8.1, 0, 0)) > 0, 'exit back is clipped');
+    s.p.setVelocity(e, vec(0, 0, -2));
+    for (let i = 0; i < 10 && !s.portals.stats().portalTraversals; i++) s.portals.step(1 / 60);
+    assert.equal(s.portals.stats().portalTraversals, 1);
+    s.portals.updateVisuals();
+    assert.equal(mesh.material, source, 'reuse ready materials during crossing');
+    assert.ok(source.clipPlane.signedDistanceTo(new B.Vector3(7.6, 0, 0)) < 0);
+    assert.ok(ghost.material.clipPlane.signedDistanceTo(new B.Vector3(0, 0, .3)) < 0);
+    b.setEnabled(false); s.portals.updateVisuals();
+    assert.equal(mesh.material, original);
+  } finally { s.done(); }
+});
+
+test('remote grab before the entrance pulls through the selected doorway and ignores a wall on the unrelated straight path', () => {
+  for (const explicit of [false, true]) {
+    const s = setup(), system = ArkGlideInteraction.create(B, { physics: s.physics, portals: s.portals });
+    try {
+      const [a] = s.pair(), e = s.entity('remote-held', vec(6.8, 0, 0), vec(.3, .3, .3), 'dynamic');
+      s.entity('unrelated-wall', vec(4, 0, 0), vec(.2, 6, 6));
+      s.api.watch(e); const events = []; s.api.onTraverse(event => events.push(event));
+      const pick = s.api.raycast(vec(0, 0, 5), vec(0, 0, -10));
+      assert.equal(pick.hit.entity, e); assert.deepEqual(pick.path, ['A']);
+      const h = system.forOwner(s.owner).grab(e, { maxDistance: 15, ...(explicit ? { path: pick.path } : {}) });
+      h.setRay(vec(0, 0, 5), vec(0, 0, -1), 2.5); system.step(1 / 60);
+      assert.ok(s.p.getState(e).velocity.x > 0, 'pull towards B to emerge from A');
+      near(s.p.getState(e).velocity.z, 0);
+      for (let i = 0; i < 240; i++) {
+        h.setRay(vec(0, 0, 5), vec(0, 0, -1), 2.5); system.step(1 / 120); s.portals.step(1 / 120);
+      }
+      assert.equal(h.active, true); assert.equal(events.length, 1);
+      assert.equal(events[0].source.id, 'B'); assert.equal(events[0].destination.id, 'A');
+      const state = s.p.getState(e); near(state.position.x, 0, .01); near(state.position.z, 2.5, .02);
+      // A closed route must release before applying another force.
+      h.release(); s.p.setState(e, { position: vec(6.8, 0, 0), velocity: vec(0, 0, 0) });
+      const next = system.forOwner(s.owner).grab(e, { path: ['A'], maxDistance: 15 });
+      next.setRay(vec(0, 0, 5), vec(0, 0, -1), 2.5); a.setEnabled(false); system.step(1 / 60);
+      assert.equal(next.active, false); near(s.p.getState(e).velocity.x, 0);
+    } finally { system.dispose(); s.done(); }
+  }
+});
+
+test('first-person eye resolves either side of a floor portal independently and stays continuous when the body center warps', () => {
+  const s = setup();
+  try {
+    const a = s.api.create({ id: 'floor-view', rotation: B.Quaternion.RotationAxis(B.Axis.X, -Math.PI / 2) });
+    const b = s.api.create({ id: 'wall-view', position: vec(10, 0, 0), rotation: B.Quaternion.RotationAxis(B.Axis.Y, -Math.PI / 2) }); a.link(b);
+    const player = s.entity('eye-body', vec(0, .05, 0), vec(.3, .3, .3), 'dynamic'); s.api.watch(player);
+    const rig = s.c.createRig({ target: player, eyeOffset: vec(0, .7, 0), uprightSpeed: 0 });
+    const before = rig.camera.getPose();
+    s.p.setVelocity(player, vec(0, -1, 0)); s.portals.step(.1); s.cameras.update();
+    const after = rig.camera.getPose();
+    near(after.position.x, before.position.x); near(after.position.y, before.position.y - .1); near(after.position.z, before.position.z);
+    for (const k of ['x', 'y', 'z', 'w']) near(after.rotation[k], before.rotation[k]);
+    for (let i = 0; i < 48; i++) s.portals.step(1 / 60);
+    s.cameras.update();
+    assert.ok(rig.camera.getPose().position.x < 10, 'eye now emerged at the wall exit');
+    // An offset looking down crosses before the physical body, too.
+    const eye = s.c.createRig({ target: player, eyeOffset: vec(1, 0, 0), uprightSpeed: 0 });
+    s.p.setState(player, { position: vec(9.8, 0, 0), velocity: vec(0, 0, 0) }); s.cameras.update();
+    assert.ok(eye.camera.getPose().position.y > 0, 'early eye is on floor side');
+  } finally { s.done(); }
+});
+
+test('held target remains in the correct frame while the body has crossed but the first-person eye has not', () => {
+  const s = setup(), system = ArkGlideInteraction.create(B, { physics: s.physics, portals: s.portals });
+  try {
+    const a = s.api.create({ id: 'floor-hold', rotation: B.Quaternion.RotationAxis(B.Axis.X, -Math.PI / 2) });
+    const b = s.api.create({ id: 'wall-hold', position: vec(10, 0, 0), rotation: B.Quaternion.RotationAxis(B.Axis.Y, -Math.PI / 2) }); a.link(b);
+    const holder = s.entity('holder', vec(0, .05, 0), vec(.3, .3, .3), 'dynamic');
+    const e = s.entity('hold-eye-crate', vec(0, 1.2, 0), vec(.2, .2, .2), 'dynamic');
+    s.api.watch(holder); s.api.watch(e);
+    const rig = s.c.createRig({ target: holder, eyeOffset: vec(0, .7, 0), uprightSpeed: 0 });
+    const h = system.forOwner(s.owner).grab(e, { path: [], holder, maxDistance: 15 });
+    h.setRay(rig.camera.ray().origin, vec(0, 1, 0), 2.5);
+    s.p.setVelocity(holder, vec(0, -1, 0)); s.portals.step(.1); s.cameras.update();
+    assert.ok(rig.camera.getPose().position.y > .6, 'eye is still above the floor entry');
+    const origin = rig.camera.ray().origin;
+    h.setRay(origin, vec(0, 1, 0), 2.5); system.step(.01);
+    const velocity = s.p.getState(e).velocity;
+    near(velocity.x, 0); near(velocity.z, origin.z); near(velocity.y, origin.y + 2.5 - 1.2, .01);
+    assert.equal(h.active, true);
+  } finally { system.dispose(); s.done(); }
+});
+
+test('perspective picking rays start at the eye so a portal inside the near plane is still traced', () => {
+  const s = setup();
+  try {
+    s.pair(); const e = s.entity('near-ray-target', vec(6.8, 0, 0), vec(.3, .3, .3), 'dynamic');
+    const camera = s.c.create({ position: vec(0, 0, .12), rotation: B.Quaternion.RotationAxis(B.Axis.Y, Math.PI), near: .5 });
+    const ray = camera.ray(.5, .5, 10), trace = s.api.raycast(ray.origin, ray.direction);
+    near(ray.origin.z, .12); assert.deepEqual(trace.path, ['A']); assert.equal(trace.hit.entity, e);
+  } finally { s.done(); }
 });

@@ -166,6 +166,7 @@ export default function ({
             grab = interaction.grab(trace.hit.entity, {
               position: trace.hit.point,
               maxDistance: 15,
+              path: trace.path,
             });
         }
       }
