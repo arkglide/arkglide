@@ -6,7 +6,7 @@ import {createServer} from 'vite';
 import {RUNTIME_FILES, createStaticGame, validateScriptGraph, exportSettings} from '../src/export/static-game.mjs';
 let project,maps,runtime,server;
 before(async()=>{
-  server=await createServer({server:{middlewareMode:true},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]}});
+  server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]}});
   const {normalizeProject}=await server.ssrLoadModule('/src/utils/projectValidation.ts');
   const archive=unzipSync(new Uint8Array(await fs.readFile(new URL('../examples/fourth-static.arkglide',import.meta.url))));
   project=normalizeProject(JSON.parse(strFromU8(archive['project.json'])));
@@ -73,6 +73,42 @@ test('GLB binary chunks must be complete and satisfy embedded buffer lengths',()
 test('self-contained glTF with data URIs can be packaged',()=>{
  const models=new Map(maps.models);models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'data:application/octet-stream;base64,AAAA',byteLength:3}]})).buffer);
  assert.ok(build(project,{...maps,models}).files['project.json']);
+});
+test('JSON glTF cannot declare a binary buffer without a resource URI',()=>{
+ for(const uri of [undefined,null,'',42]){
+ const models=new Map(maps.models);
+ models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri,byteLength:4}]})));
+ assert.throws(()=>build(project,{...maps,models}),/缓冲区.*URI/);
+ }
+});
+test('embedded glTF buffers require a positive integer byte length',()=>{
+ for(const byteLength of [undefined,null,0,-1,1.5,'3']){
+  const models=new Map(maps.models);
+  models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'data:application/octet-stream;base64,AQID',byteLength}]})));
+  assert.throws(()=>build(project,{...maps,models}),/缓冲区.*大小|大小不一致/);
+ }
+});
+test('embedded glTF buffers may contain extra bytes beyond the declared buffer length',()=>{
+ const models=new Map(maps.models);
+ models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri:'data:application/octet-stream;base64,AQIDAA==',byteLength:3}]})));
+ assert.doesNotThrow(()=>build(project,{...maps,models}));
+});
+test('self-contained glTF rejects malformed or mismatched data URI buffers',()=>{
+ for(const uri of ['data:application/octet-stream;base64,%%%%','data:application/octet-stream;base64,AAAA']){
+  const models=new Map(maps.models);
+  models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri,byteLength:uri.endsWith('AAAA')?4:3}]})).buffer);
+  assert.throws(()=>build(project,{...maps,models}),/data URI|大小不一致/);
+ }
+});
+test('embedded buffers accept percent-encoded bytes and reject invalid base64 padding',()=>{
+ const check=(uri,byteLength)=>{
+  const models=new Map(maps.models);
+  models.set(project.modelRefs[0].assetId,new TextEncoder().encode(JSON.stringify({asset:{version:'2.0'},buffers:[{uri,byteLength}]})));
+  return ()=>build(project,{...maps,models});
+ };
+ assert.doesNotThrow(check('data:application/octet-stream,%00%FF%80',3));
+ for(const payload of ['A===','AA=A','AAAA=','A'])
+  assert.throws(check('data:application/octet-stream;base64,'+payload,3),/data URI|大小不一致/);
 });
 test('literal import(), static imports and reexports all appear in the graph',()=>{
  const graph=validateScriptGraph({'main.js':"import {x} from './bridge.js';return {onStart(){import('./later.js')}}",'bridge.js':"export {x} from './tools.js'",'tools.js':'export const x=1','later.js':'export const y=2'},[{scripts:['main.js']}]);

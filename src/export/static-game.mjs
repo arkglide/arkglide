@@ -61,10 +61,11 @@ function bytes(value, label, expected) {
   return result;
 }
 function validateModel(raw, label) {
-  let gltf;
+  let gltf, binaryContainer = false;
   try {
     const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
     if (raw.length >= 12 && view.getUint32(0, true) === 0x46546c67) {
+      binaryContainer = true;
       if (view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== raw.length || raw.length < 20 || view.getUint32(16, true) !== 0x4e4f534a)
         throw Error('无效 GLB 头部');
       const size = view.getUint32(12, true);
@@ -91,8 +92,40 @@ function validateModel(raw, label) {
     } else gltf = JSON.parse(new TextDecoder().decode(raw));
   } catch (error) { throw Error('模型不是有效 GLB/glTF: ' + label + '；' + error.message); }
   if (gltf.asset?.version !== '2.0') throw Error('仅支持 glTF 2.0: ' + label);
-  for (const ref of [...(gltf.buffers || []), ...(gltf.images || [])])
-    if (ref.uri && !/^data:/i.test(ref.uri)) throw Error('模型包含未打包的外部资源: ' + label + ' → ' + ref.uri + '；请重新挂载整个资源文件夹');
+  for (const buffer of gltf.buffers || []) {
+    if (!Number.isInteger(buffer.byteLength) || buffer.byteLength <= 0)
+      throw Error('模型缓冲区声明大小无效: ' + label);
+    if ((!binaryContainer || buffer.uri !== undefined) &&
+        (typeof buffer.uri !== 'string' || !buffer.uri))
+      throw Error('模型缓冲区缺少有效 URI: ' + label);
+  }
+  for (const ref of [...(gltf.buffers || []), ...(gltf.images || [])]) {
+    if (ref.uri && !/^data:/i.test(ref.uri))
+      throw Error('模型包含未打包的外部资源: ' + label + ' → ' + ref.uri + '；请重新挂载整个资源文件夹');
+    if (ref.uri && /^data:/i.test(ref.uri)) {
+      const match = ref.uri.match(/^data:([^,]*),(.*)$/is);
+      if (!match) throw Error('模型包含无效 data URI: ' + label);
+      let decoded = '';
+      for (let i = 0; i < match[2].length; i++) {
+        if (match[2][i] === '%') {
+          const hex = match[2].slice(i + 1, i + 3);
+          if (!/^[0-9a-f]{2}$/i.test(hex)) throw Error('模型包含无效 data URI: ' + label);
+          decoded += String.fromCharCode(parseInt(hex, 16)); i += 2;
+        } else decoded += match[2][i];
+      }
+      let length;
+      if (/;base64$/i.test(match[1])) {
+        try { length = atob(decoded).length; }
+        catch { throw Error('模型包含无效 data URI: ' + label); }
+      } else {
+        if (/[^\x00-\x7f]/.test(match[2].replace(/%[0-9a-f]{2}/gi, '')))
+          throw Error('模型包含无效 data URI: ' + label);
+        length = decoded.length;
+      }
+      if (ref.byteLength !== undefined && (!Number.isInteger(ref.byteLength) || ref.byteLength <= 0 || ref.byteLength > length))
+        throw Error('模型内嵌资源大小不一致: ' + label);
+    }
+  }
   const unsupported = new Set(['KHR_draco_mesh_compression', 'EXT_meshopt_compression', 'KHR_texture_basisu']);
   for (const extension of new Set([...(gltf.extensionsUsed || []), ...(gltf.extensionsRequired || [])]))
     if (unsupported.has(extension)) throw Error('独立包未内置该解码器: ' + label + ' → ' + extension);
