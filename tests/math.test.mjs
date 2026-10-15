@@ -34,3 +34,35 @@ test('WASM quaternion facade uses shortest path and keeps slerp endpoints',()=>{
  close(wasm.quat.slerp(a,near,0.25),js.quat.slerp(a,near,0.25));
  close(wasm.quat.toMatrix(b),js.quat.toMatrix(b));
 });
+
+test('vector normalization remains finite for nonzero vectors across float magnitudes',()=>{
+ for(const api of [js,wasm])for(const magnitude of [1e-30,1e30,1e-320]){
+  close(api.vec3.normalize({x:magnitude,y:magnitude,z:0}),{x:Math.SQRT1_2,y:Math.SQRT1_2,z:0});
+ }
+});
+
+test('quaternion normalization preserves rotations across float magnitudes',()=>{
+ for(const api of [js,wasm])for(const magnitude of [1e-30,1e30,1e-320]){
+  close(api.quat.normalize({x:magnitude,y:0,z:0,w:magnitude}),{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2});
+ }
+});
+
+test('axis-angle rotation is independent of finite nonzero axis magnitude',()=>{
+ const expected=js.mat4.rotation(0.7,{x:1,y:1,z:0});
+ for(const api of [js,wasm])for(const magnitude of [1e-30,1e30,1e-320])
+  close(api.mat4.rotation(0.7,{x:magnitude,y:magnitude,z:0}),expected);
+});
+
+test('vector length stays representable across very small and large magnitudes',()=>{
+ for(const api of [js,wasm])for(const magnitude of [1e-30,1e30]){
+  const length=api.vec3.length({x:magnitude,y:magnitude,z:0}),expected=Math.SQRT2*magnitude;
+  assert.ok(Number.isFinite(length)&&Math.abs(length/expected-1)<1e-5,`${api.backend}: ${length} != ${expected}`);
+ }
+});
+
+test('vector distance preserves representable small and large separations',()=>{
+ for(const api of [js,wasm])for(const magnitude of [1e-30,1e30]){
+  const distance=api.vec3.distance({x:magnitude,y:0,z:0},{x:0,y:magnitude,z:0});
+  assert.ok(Number.isFinite(distance)&&Math.abs(distance/(Math.SQRT2*magnitude)-1)<1e-5,`${api.backend}: ${distance}`);
+ }
+});

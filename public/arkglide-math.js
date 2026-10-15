@@ -44,15 +44,29 @@
     const vec3 = {
       add: (a,b) => vecBinary('add',a,b), sub: (a,b) => vecBinary('sub',a,b),
       dot: (a,b) => vecBinary('dot',a,b,true), cross: (a,b) => vecBinary('cross',a,b),
-      distance: (a,b) => vecBinary('distance',a,b,true),
+      distance(a,b) {
+        readV(a);readV(b);
+        const delta={x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};
+        if (![delta.x,delta.y,delta.z].every(Number.isFinite)) return Infinity;
+        return vec3.length(delta);
+      },
       lerp(a,b,t) { if (!Number.isFinite(t)) throw new TypeError('Expected finite t'); return vecBinary('lerp',a,b,false,t); },
-      length(a) { readV(a); return module ? scoped(own => own(v(a)).length()) : Math.hypot(a.x,a.y,a.z); },
+      length(a) {
+        readV(a);
+        if (!module) return Math.hypot(a.x,a.y,a.z);
+        const largest=Math.max(Math.abs(a.x),Math.abs(a.y),Math.abs(a.z));
+        if (!largest) return 0;
+        return scoped(own => own(v({x:a.x/largest,y:a.y/largest,z:a.z/largest})).length()) * largest;
+      },
       scale(a,s) {
         readV(a); if (!Number.isFinite(s)) throw new TypeError('Expected finite scale');
         return module ? scoped(own => plainV(own(own(v(a)).scale(s)))) : { x:a.x*s,y:a.y*s,z:a.z*s };
       },
       normalize(a) {
         readV(a);
+        const largest=Math.max(Math.abs(a.x),Math.abs(a.y),Math.abs(a.z));
+        if (!largest) return {x:0,y:0,z:0};
+        a={x:a.x/largest,y:a.y/largest,z:a.z/largest};
         if (module) return scoped(own => plainV(own(own(v(a)).normalize())));
         const n=Math.hypot(a.x,a.y,a.z); return n ? vec3.scale(a,1/n) : {x:0,y:0,z:0};
       },
@@ -71,8 +85,9 @@
       scaling(s) { readV(s);if(module) return scoped(own=>plainM(own(module.Matrix4.scale(s.x,s.y,s.z))));const r=identity();r[0]=s.x;r[5]=s.y;r[10]=s.z;return r; },
       rotation(angle,axis) {
         readV(axis); if(!Number.isFinite(angle)) throw new TypeError('Expected finite angle');
-        if(module) return scoped(own=>plainM(own(module.Matrix4.rotate(angle,axis.x,axis.y,axis.z))));
-        const {x,y,z}=vec3.normalize(axis);if(!(x||y||z))return identity();const c=Math.cos(angle),s=Math.sin(angle),t=1-c;
+        const {x,y,z}=vec3.normalize(axis);if(!(x||y||z))return identity();
+        if(module) return scoped(own=>plainM(own(module.Matrix4.rotate(angle,x,y,z))));
+        const c=Math.cos(angle),s=Math.sin(angle),t=1-c;
         return [t*x*x+c,t*x*y+s*z,t*x*z-s*y,0,t*x*y-s*z,t*y*y+c,t*y*z+s*x,0,t*x*z+s*y,t*y*z-s*x,t*z*z+c,0,0,0,0,1];
       },
       // Babylon-compatible yaw(Y), pitch(X), roll(Z), column-major matrices.
@@ -91,7 +106,11 @@
     };
     const quat = {
       normalize(a) {
-        readQ(a);if(module)return scoped(own=>plainQ(own(own(q(a)).normalize())));
+        readQ(a);
+        const largest=Math.max(Math.abs(a.x),Math.abs(a.y),Math.abs(a.z),Math.abs(a.w));
+        if (!largest) return {x:0,y:0,z:0,w:1};
+        a={x:a.x/largest,y:a.y/largest,z:a.z/largest,w:a.w/largest};
+        if(module)return scoped(own=>plainQ(own(own(q(a)).normalize())));
         const n=Math.hypot(a.x,a.y,a.z,a.w);return n ? {x:a.x/n,y:a.y/n,z:a.z/n,w:a.w/n} : {x:0,y:0,z:0,w:1};
       },
       // The C++ constructor uses XYZ Euler composition; scene compose uses YXZ above.
