@@ -269,3 +269,27 @@ test("parser ignores imports in comments, strings and regexes; diagnostics prese
   });
   syntax.dispose();
 });
+
+test('renaming incomplete modules preserves reexports with string export names',()=>{
+ const sources={
+  'tools.js':'export const value=1;',
+  'barrel.js':`export {value as "public-value"} from './tools.js';\nconst unfinished =`,
+ };
+ const moved=M.rewriteRename(sources,'tools.js','math.js');
+ assert.equal(moved['barrel.js'],`export {value as "public-value"} from "./math.js";\nconst unfinished =`);
+});
+
+test('renaming incomplete modules preserves imports with string binding names',()=>{
+ const sources={
+  'tools.js':'const value=1;export {value as "public-value"};',
+  'main.js':`import {"public-value" as value} from './tools.js';\nentity.`,
+ };
+ const moved=M.rewriteRename(sources,'tools.js','math.js');
+ assert.equal(moved['main.js'],`import {"public-value" as value} from "./math.js";\nentity.`);
+});
+
+test('tolerant renaming handles string namespace reexport aliases',()=>{
+ const sources={'tools.js':'export const value=1;','barrel.js':`export * as "public-tools" from './tools.js';\nconst unfinished =`};
+ const moved=M.rewriteRename(sources,'tools.js','math.js');
+ assert.equal(moved['barrel.js'],`export * as "public-tools" from "./math.js";\nconst unfinished =`);
+});

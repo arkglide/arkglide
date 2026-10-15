@@ -168,7 +168,7 @@
           history.at(-2) === "import" && ![".", "?."].includes(history.at(-3))
         )
           references.push({ value: token.value, start: token.start, end: token.end });
-        if (exportStart !== null && label === "string" && history.at(-1) === "name") {
+        if (!depth && exportStart !== null && label === "string" && history.at(-1) === "name") {
           try {
             const node = root.acorn.parse(source.slice(exportStart, token.end), {
               ecmaVersion: 2022,
@@ -180,14 +180,14 @@
                 start: exportStart + node.source.start,
                 end: exportStart + node.source.end,
               });
+            exportStart = null;
           } catch {}
-          exportStart = null;
         }
         if (!depth && label === ";") exportStart = null;
         if (!depth && label === "import") start = token.start;
         else if (start !== null) {
           if (label === "(" || label === ".") start = null;
-          else if (label === "string") {
+          else if (!depth && label === "string") {
             const text = source.slice(start, token.end);
             try {
               const node = root.acorn.parse(text, {
