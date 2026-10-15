@@ -34,4 +34,4 @@ await fs.mkdir(target,{recursive:true});
 if ((await fs.readdir(target)).length) throw Error('输出目录必须为空: '+target);
 for (const [name,raw] of Object.entries(game.files)) { const file=path.join(target,name);await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,raw); }
 await fs.writeFile(target+'.zip',game.zip(),{flag:'wx'});
-console.log(`独立游戏导出完成：${game.manifest.resources.length} 个资源，${game.manifest.files.length+1} 份文件。目录 ${target}`);
+console.log(`独立游戏导出完成：${game.manifest.statistics.resources} 个资源，${game.manifest.statistics.files} 份文件。目录 ${target}`);

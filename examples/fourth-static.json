@@ -754,7 +754,13 @@
     "fpsCap": 60,
     "fixedTimeStep": 0.016666666666666666,
     "maxSubSteps": 8,
-    "timeScale": 1
+    "timeScale": 1,
+    "build": {
+      "preload": [
+        "audio:music",
+        "audio:tone"
+      ]
+    }
   },
   "content": {
     "materials": {

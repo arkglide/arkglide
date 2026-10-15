@@ -27,7 +27,8 @@
     "test:portals:browser": "node --test tests/portal/browser.mjs",
     "test:foundations:browser": "node --test tests/foundations/browser.mjs",
     "example:composition": "node scripts/create-composition-example.mjs",
-    "test:composition:browser": "node --test tests/composition/browser.mjs"
+    "test:composition:browser": "node --test tests/composition/browser.mjs",
+    "test:package:browser": "node --test tests/package/browser.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",
@@ -45,6 +46,7 @@
     "monaco-editor": "0.57.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "terser": "^5.51.2",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

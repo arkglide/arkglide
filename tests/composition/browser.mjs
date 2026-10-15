@@ -32,7 +32,7 @@ test('composition lab connects real grab, plate, reflection, motion, projected b
   page.on('pageerror', error => errors.push(error.message));
   let frame;
   try {
-    await page.goto('http://127.0.0.1:' + server.address().port); await page.locator('#start').click();
+    await page.goto('http://127.0.0.1:' + server.address().port); await page.evaluate(() => ArkGlidePlayer.start());
     await page.waitForFunction(() => document.body.dataset.state === 'playing');
     frame = page.frames().find(f => f.url().includes('runtime.html?boot='));
     await frame.waitForFunction(() => globalThis.compositionLab?.status().ready || globalThis.compositionLab?.status().error);
@@ -98,15 +98,15 @@ test('composition lab connects real grab, plate, reflection, motion, projected b
     assert.equal(await frame.evaluate(() => scriptErrors), 0);
     assert.deepEqual(errors, []);
 
-    await page.locator('#stop').click(); await page.waitForFunction(() => document.body.dataset.state === 'stopped');
+    await page.evaluate(() => ArkGlidePlayer.stop()); await page.waitForFunction(() => document.body.dataset.state === 'stopped');
     const stats = await page.evaluate(() => ArkGlidePlayer.stats);
     for (const key of ['scripts', 'physicsBodies', 'physicsFields', 'physicsTriggers', 'signalNodes', 'signalListeners', 'motionControllers', 'opticalReflectors', 'visualResources']) assert.equal(stats[key], 0, key);
-    await page.locator('#start').click(); await page.waitForFunction(() => document.body.dataset.state === 'playing');
+    await page.evaluate(() => ArkGlidePlayer.start()); await page.waitForFunction(() => document.body.dataset.state === 'playing');
     frame = page.frames().find(f => f.url().includes('runtime.html?boot='));
     await frame.waitForFunction(() => globalThis.compositionLab?.status().ready);
     assert.equal(await frame.evaluate(() => compositionLab.status().plate), false);
     assert.equal(await frame.evaluate(() => scriptErrors), 0);
-    await page.locator('#stop').click(); await page.waitForFunction(() => document.body.dataset.state === 'stopped');
+    await page.evaluate(() => ArkGlidePlayer.stop()); await page.waitForFunction(() => document.body.dataset.state === 'stopped');
   } catch (error) {
     console.error('Composition diagnostics:', errors, await frame?.evaluate(() => ({ errors: globalThis.scriptErrors, state: globalThis.compositionLab?.status() })).catch(() => null));
     throw error;

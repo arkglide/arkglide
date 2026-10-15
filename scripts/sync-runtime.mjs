@@ -15,6 +15,8 @@ copyFileSync(
 );
 
 for (const [source, target] of [
+  ["binary-runtime", "binary"],
+  ["package-runtime", "package"],
   ["state-runtime", "state"],
   ["storage-host", "storage-host"],
   ["visual-runtime", "visuals"],

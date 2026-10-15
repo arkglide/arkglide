@@ -3,7 +3,7 @@
   "use strict";
   function createPrefabAPI(options) {
     const pending = new Set(),
-      liveBuffers = new Map();
+      liveBuffers = new Map(), liveLeases = new Map();
     function abortError() {
       const error = new Error(
         "预制体生成已取消：运行停止、父节点或所属脚本已销毁",
@@ -16,7 +16,7 @@
         id: p.id,
         name: p.name,
         revision: p.revision,
-        nodeCount: p.nodes.length,
+        nodeCount: p.nodeCount ?? p.nodes.length,
       };
     }
     function vector(v, fallback) {
@@ -26,6 +26,17 @@
       return { x: v.x, y: v.y, z: v.z };
     }
     async function instantiate(id, settings = {}, owner) {
+      if (!options.isRunning() || (owner && (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed))) throw abortError();
+      if (settings?.parent?.destroyed) throw abortError();
+      let lease, handle;
+      try {
+        if (options.preparePrefab) lease = await options.preparePrefab(id);
+        handle = await instantiateReady(id, settings, owner);
+        if (lease) liveLeases.set(handle.root.id, lease);
+        return handle;
+      } finally { if (!handle) lease?.release(); }
+    }
+    async function instantiateReady(id, settings = {}, owner) {
       if (
         !options.isRunning() ||
         (owner &&
@@ -183,6 +194,8 @@
           instantiate: (id, settings) => instantiate(id, settings, owner),
         }),
       onEntityDestroyed(id) {
+        const lease=liveLeases.get(id);
+        if(lease){liveLeases.delete(id);queueMicrotask(()=>lease.release());}
         for (const token of [...pending])
           if (token.parentId === id || token.ids.includes(id)) token.cancel();
         const buffers = liveBuffers.get(id);
@@ -195,6 +208,8 @@
         for (const token of [...pending]) token.cancel();
         for (const [id, buffers] of liveBuffers) delete buffers[id];
         liveBuffers.clear();
+        for(const lease of liveLeases.values())lease.release();
+        liveLeases.clear();
       },
       get pendingCount() {
         return pending.size;

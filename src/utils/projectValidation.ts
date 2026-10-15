@@ -1,3 +1,4 @@
+import { exportSettings } from '../export/export-settings.mjs';
 import { validateAdvancedReferences } from "./advancedGameplayValidation";
 import {
   validateComponents,
@@ -144,6 +145,8 @@ export function validateProject(data: any): {
     ...data.settings,
     gravity: vector(data.settings?.gravity, DEFAULT_SETTINGS.gravity),
   };
+
+  if(settings.build!==undefined)settings.build=exportSettings(settings.build);
   if (
     ![settings.ambientIntensity, settings.fpsCap].every(Number.isFinite) ||
     settings.ambientIntensity < 0 ||

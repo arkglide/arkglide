@@ -523,7 +523,9 @@
       linkParents();
       return Promise.all(loads);
     }
+    let batchGeneration=0;
     function clear() {
+      batchGeneration++;
       definitions = [];
       pending.clear();
       nodes.forEach((object) => {
@@ -548,6 +550,29 @@
       nodes,
       resources,
       sync,
+      refreshMaterials(content,textureBuffers){return materialLibrary.sync(content,textureBuffers);},
+      async syncBatched(next,buffers,content,textureBuffers,batchNodes=128) {
+        clear();
+        const generation=batchGeneration;
+        const all=next; definitions=all;
+        await materialLibrary.sync(content,textureBuffers);
+        for(let offset=0;offset<all.length;offset+=batchNodes){
+          if(disposed||generation!==batchGeneration)throw Error('场景分块创建已取消');
+          const slice=all.slice(offset,offset+batchNodes);
+          // Incrementally append without rescanning the previously constructed prefix.
+          const loading=[];
+          for(const node of slice){
+            const buffer=buffers instanceof Map?buffers.get(node.id):buffers[node.id];
+            make(node);update(node);
+            if(node.type==='model'&&buffer)loading.push(loadModel(node,buffer));
+            records.set(node.id,{kind:node.type+':'+(node.type==='mesh'?primitiveOf(node):node.lightType||''),buffer,url:node.modelUrl,definition:node});
+          }
+          await Promise.all(loading);
+          await new Promise(resolve=>setTimeout(resolve,0));
+        }
+        if(disposed||generation!==batchGeneration)throw Error('场景分块创建已取消');
+        linkParents();
+      },
       add(next, buffers, content, textureBuffers) {
         if (disposed) return Promise.reject(new Error("场景已销毁，实体添加已取消"));
         definitions = definitions.filter((n) => nodes.has(n.id));

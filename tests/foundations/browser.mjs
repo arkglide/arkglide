@@ -1,10 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import {chromium}from 'playwright';import {RUNTIME_FILES,createStaticGame}from '../../src/export/static-game.mjs';import {serveStatic}from '../../scripts/serve-static.mjs';
 const fixture=new URL('../../.foundations-browser-test/',import.meta.url);
-const script=`export default ({scene,physics,visuals,surfaces,fields,levels,storage,saves,portals,time,triggers})=>{
+const script=`export default ({scene,physics,visuals,surfaces,fields,levels,storage,saves,portals,time,triggers,assets})=>{
  const probe=globalThis.foundationProbe={ready:false,error:null};
  const body={motion:'dynamic',shape:'box',size:{x:1,y:1,z:1},mass:2,friction:.3,restitution:0,sensor:false,lockRotation:false,linearDamping:0,angularDamping:0};
  function box(id,position,scale,motion='static'){const e=scene.create('box',id);e.position=position;e.scale=scale;physics.add(e,{...body,motion});return e;}
- return {onStart(){(async()=>{
+ return {onStart(){(async()=>{await assets.load('texture','texture');
   time.timeScale=0;
   const wallA=box('wallA',{x:0,y:0,z:0},{x:10,y:10,z:.2}),wallB=box('wallB',{x:8,y:0,z:0},{x:.2,y:10,z:10}),actor=box('actor',{x:0,y:2,z:3},{x:.5,y:.5,z:.5},'dynamic');
   const texture=visuals.createTexture({assetId:'texture'});await texture.ready;const material=visuals.createMaterial({color:'#ffffff',emissive:'#224466',texture});material.apply(actor);
@@ -35,15 +35,15 @@ test.after(async()=>{await browser?.close();await new Promise(r=>server.close(r)
 test('independent opaque-origin runtime renders assets, injects every foundation API, restores saves and retains persistence across restart',{timeout:60000},async()=>{
  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('#start').click();await page.waitForFunction(()=>document.body.dataset.state==='playing');
+  await page.goto('http://127.0.0.1:'+server.address().port);await page.evaluate(() => ArkGlidePlayer.start());await page.waitForFunction(()=>document.body.dataset.state==='playing');
   async function frameReady(){const frame=page.frames().find(f=>f.url().includes('runtime.html?boot='));await frame.waitForFunction(()=>foundationProbe?.ready||foundationProbe?.error);const probe=await frame.evaluate(()=>foundationProbe);assert.equal(probe.error,null);assert.equal(probe.chapter,2);assert.deepEqual(probe.path,['A']);assert.equal(probe.level,'room');assert.ok(Math.abs(probe.restored.x)<.001);assert.ok(Math.abs(probe.velocity.x-2)<.001);assert.equal(await frame.evaluate(()=>scriptErrors),0);return {frame,probe};}
   const first=await frameReady();assert.equal(first.probe.previousRuns,0);assert.ok(await first.frame.evaluate(()=>scene.particleSystems.length>0&&scene.textures.length>0));
   await first.frame.evaluate(()=>{time.timeScale=1;});await first.frame.waitForFunction(()=>fieldsRuntime.forOwner({record:{active:true}})&&physicsRuntime.stats().physicsBodies>0);
   await first.frame.waitForFunction(()=>foundationProbe.triggerEntered===1);assert.equal(await first.frame.evaluate(()=>foundationProbe.triggerEntity),'actor');
   await first.frame.evaluate(()=>{window.__beforeStopStats={physicsBodies:physicsRuntime.stats().physicsBodies};});
-  await page.locator('#stop').click();await page.waitForFunction(()=>document.body.dataset.state==='stopped');
+  await page.evaluate(() => ArkGlidePlayer.stop());await page.waitForFunction(()=>document.body.dataset.state==='stopped');
   const stats=await page.evaluate(()=>ArkGlidePlayer.stats);for(const name of ['physicsBodies','physicsFields','physicsTriggers','triggerMembers','surfacePatches','visualResources','checkpointProviders','storageRequests','scripts'])assert.equal(stats[name],0,name);
-  await page.locator('#start').click();await page.waitForFunction(()=>document.body.dataset.state==='playing');const second=await frameReady();assert.equal(second.probe.previousRuns,1);assert.deepEqual(errors,[]);
-  await page.locator('#stop').click();await page.waitForFunction(()=>document.body.dataset.state==='stopped');
+  await page.evaluate(() => ArkGlidePlayer.start());await page.waitForFunction(()=>document.body.dataset.state==='playing');const second=await frameReady();assert.equal(second.probe.previousRuns,1);assert.deepEqual(errors,[]);
+  await page.evaluate(() => ArkGlidePlayer.stop());await page.waitForFunction(()=>document.body.dataset.state==='stopped');
  }finally{await page.close();}
 });

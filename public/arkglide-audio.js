@@ -328,6 +328,7 @@
         : null;
       let untrack;
       const voice = {
+        assetId: id,
         source,
         gain,
         panner,
@@ -663,6 +664,7 @@
     };
     return {
       load,
+      unload(id) { for(const v of [...voices])if(v.assetId===id)v.stop();loads.delete(id);buffers.delete(id);data.delete(id);assets.delete(id); },
       unlock,
       forOwner: api,
       attach(nodes) {

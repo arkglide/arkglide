@@ -5,6 +5,8 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 const files = unzipSync(new Uint8Array(await fs.readFile(new URL('../examples/third-full.arkglide',import.meta.url))));
 const project = JSON.parse(strFromU8(files['project.json']));
 project.name = 'ArkGlide 独立导出演示';
+// These sounds are referenced by script IDs rather than attached AudioSources.
+project.settings.build = {preload: ['audio:music', 'audio:tone']};
 project.content.materials['export-material']={id:'export-material',name:'导出示例 PBR 贴图材质',baseColor:'#809BCC',emissiveColor:'#000000',metallic:0.1,roughness:0.7,alpha:1,doubleSided:false,uvScale:{u:2,v:2},albedoTextureId:project.content.textures[0].id};
 const materialNode=project.scene.nodes.find(n=>n.type==='mesh'&&!n.parentId);
 if(materialNode)materialNode.materialId='export-material';

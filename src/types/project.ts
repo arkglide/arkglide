@@ -11,6 +11,7 @@ export interface AssetRef {
 
 // 项目设置：重力/背景色/环境光/帧率上限等运行时配置
 export interface ProjectSettings {
+  build?: import("../export/static-game.mjs").StaticExportSettings;
   gravity: { x: number; y: number; z: number }; // 重力向量（默认 0,-9.8,0）
   backgroundColor: string; // 背景色 hex（默认 '#0D0D0D'）
   ambientIntensity: number; // 环境光强度（默认 0.5）

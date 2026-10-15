@@ -27,6 +27,10 @@
 | 持久存储 | `storage.read/write/remove` | 通过父页面按项目/游戏隔离保存有限、无环 JSON；校验消息来源和运行 ID；停止时取消未完成请求 |
 | 检查点 | `saves.register/capture/restore/save/load` | 内置世界/物理/关节/传送门状态，游戏状态由版本化 provider 补充；恢复期间冻结模拟并在失败时尝试回滚 |
 
+## 按需资源
+
+独立包中仅由脚本动态 ID 引用的资源，需要先 `await assets.load(kind,id)`，或在 `settings.build.preload` 中声明 `kind:id`。返回租约由所属脚本管理，支持 `active` 与 `release()`；停止或销毁脚本时自动释放。`prefabs.instantiate()` 和 `levels.load()` 自动获取模板依赖。编辑器使用同一接口验证已持有的资源。完整种类、配置和异步就绪示例见 [打包与部署](fourth-batch.md#脚本资源声明)。
+
 ## 凸体积投射与力场组合
 
 `direction` 的长度代表最大射程。`profile` 是初始垂直截面内的凸多边形；它必须没有自交。`thickness` 是用于原生障碍检测的扫描厚度，`inset` 控制门口数值余量。宽度、厚度、射程、速度及力度均来自游戏配置。

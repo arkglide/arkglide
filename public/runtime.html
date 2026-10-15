@@ -22,6 +22,7 @@
       }
     </style>
     <script>
+      window.addEventListener("load", function(event){if(event.target?.tagName==='SCRIPT')window.parent.postMessage({type:'boot-log',bootToken:new URLSearchParams(location.search).get('boot')||'',message:'模块 '+event.target.src.split('/').pop()},'*');},true);
       // Bootstrap errors must be visible even before the gameplay reporter exists.
       var arkglideBootFinished = false;
       window.addEventListener("error", function (event) {
@@ -68,6 +69,8 @@
     <script src="./arkglide-animation.js"></script>
     <script src="./lib/acorn.js"></script>
     <script src="./arkglide-modules.js"></script>
+    <script src="./arkglide-binary.js"></script>
+    <script src="./arkglide-package.js"></script>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
@@ -168,9 +171,48 @@
         runtimeModelData = {},
         runtimeTextureData = {},
         runtimeScripts = {};
+      var packageRuntime=null,packageWorker=null,packageWorkerURL=null,packageCounter=0;
+      var packageReads=new Map(),packageDecodes=new Map(),packageConfig=null;
+      function rejectPackageWork(){
+        const error=Object.assign(Error('Package session canceled'),{name:'AbortError'});
+        for(const map of [packageReads,packageDecodes]){for(const p of map.values())p.reject(error);map.clear();}
+        packageWorker?.terminate();packageWorker=null;if(packageWorkerURL)URL.revokeObjectURL(packageWorkerURL);packageWorkerURL=null;
+      }
+      function createPackageSession(msg){
+        packageConfig=msg.config;
+        const source='importScripts('+JSON.stringify(new URL('arkglide-binary.js',msg.packageBase).href)+');onmessage=function(e){var m=e.data;try{var raw=new Uint8Array(m.raw);if(ArkGlideBinary.hash(raw)!==m.hash)throw Error("文件校验失败");var value=m.binary?ArkGlideBinary.decode(raw,{maxBytes:m.maxBytes}):raw;postMessage({id:m.id,value:value},m.binary?[]:[value.buffer]);}catch(error){postMessage({id:m.id,error:error.message});}}';
+        packageWorkerURL=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));packageWorker=new Worker(packageWorkerURL);
+        packageWorker.onmessage=function(e){const m=e.data,p=packageDecodes.get(m.id);if(!p)return;packageDecodes.delete(m.id);if(m.error)p.reject(Error(m.error));else p.resolve(m.value);};
+        packageWorker.onerror=function(e){for(const p of packageDecodes.values())p.reject(Error(e.message));packageDecodes.clear();};
+        const value=ArkGlidePackage.create({
+          read(d){return new Promise((resolve,reject)=>{const id=++packageCounter;packageReads.set(id,{resolve,reject});sendToEditor({type:'package-read',id,descriptor:d});});},
+          decode(raw,hash,binary){return new Promise((resolve,reject)=>{const id=++packageCounter;packageDecodes.set(id,{resolve,reject});packageWorker.postMessage({id,raw:raw.buffer,hash,binary,maxBytes:packageConfig.maxChunkBytes},[raw.buffer]);});},
+          log(message){sendToEditor({type:'boot-log',message});},
+          onAudioLoad(asset,buffer){return audioRuntime?.load([asset],{[asset.id]:buffer});},
+          onAudioUnload(id){audioRuntime?.unload(id);},
+          onResourcesChanged(){return sceneAdapter?.refreshMaterials(runtimeContent,runtimeTextureData);},
+          onRelease(){queueMicrotask(()=>{if(packageRuntime===value)sceneAdapter?.refreshMaterials(runtimeContent,runtimeTextureData);});},
+        });
+        globalThis.__arkglideImport=id=>value.importModule(id);
+        return value;
+      }
+      function assetsForOwner(owner){return Object.freeze({
+        async load(kind,id){
+          if(!owner.record.active)throw Error('Resource owner expired');
+          const categories={model:runtimeModelData,texture:runtimeTextureData,audio:runtimeContent.audio,prefab:runtimeContent.prefabs,materials:runtimeContent.materials,animationControllers:runtimeContent.animationControllers,retargetProfiles:runtimeContent.retargetProfiles};
+          if(!Object.hasOwn(categories,kind)||typeof id!=='string'||!id)throw Error('Invalid resource kind or ID');
+          if(!packageRuntime){const values=categories[kind];if(!(Array.isArray(values)?values.some(a=>a.id===id):Object.hasOwn(values||{},id)))throw Error('Resource does not exist: '+kind+':'+id);}
+          let lease=packageRuntime?await packageRuntime.load(kind,id):{release(){}};
+          if(!owner.record.active||owner.record.destroying){lease.release();throw Error('Resource owner expired');}
+          let live=true,off;const release=()=>{if(!live)return;live=false;lease.release();off?.();};off=owner.track(release);
+          return Object.freeze({kind,id,get active(){return live;},release});
+        },
+      });}
+
       var moduleLoader = null;
       var prefabLibrary = ArkGlidePrefabs.createPrefabAPI({
         sceneAPI: sceneAPI,
+        preparePrefab: id => packageRuntime ? packageRuntime.preparePrefab(id) : undefined,
         getContent: function () {
           return runtimeContent;
         },
@@ -373,6 +415,7 @@
         _lastTelemetry = now;
         var stats = Object.assign(
           session.stats(),
+          packageRuntime?.stats() || {packageResources:0,packageGroups:0,packageIndexes:0,packageModules:0},
           physicsRuntime?.stats(),
           cameraRuntime?.stats() || {runtimeCameras:0,cameraRigs:0},
           portalRuntime?.stats() || {portals:0,portalSurfaces:0,portalTravelers:0,portalClones:0,portalViews:0,portalRenderedViews:0,portalTraversals:0},
@@ -654,6 +697,7 @@
                   "signals",
                   "motion",
                   "optics",
+                  "assets",
                   code +
                     "\n//# sourceURL=arkglide-script:///" +
                     encodeURIComponent(file),
@@ -691,6 +735,7 @@
                 signalsRuntime.forOwner(owner),
                 motionRuntime.forOwner(owner),
                 opticsRuntime.forOwner(owner),
+                assetsForOwner(owner),
               ];
               var context = Object.fromEntries(
                 ArkGlideModules.parameters.map(function (name, index) {
@@ -745,15 +790,18 @@
           audioRuntime?.setPaused(true);
         }
         audioRuntime?.setScale(time.timeScale);
-        unlockButton.style.display = runtimeContent.audio?.length
+        unlockButton.style.display = !packageRuntime && runtimeContent.audio?.length
           ? "block"
           : "none";
         telemetry(true);
         sendToEditor({ type: "started" });
       }
+      document.getElementById('renderCanvas').addEventListener('pointerdown',()=>{audioRuntime?.unlock().catch(()=>{});});
       var runtimeSettings = {};
       function stopRun() {
         running = false;
+        rejectPackageWork();
+        packageRuntime?.dispose();packageRuntime=null;packageConfig=null;delete globalThis.__arkglideImport;
         savesRuntime?.dispose();
         levelsRuntime?.dispose();
         storageRuntime?.dispose();
@@ -791,21 +839,7 @@
 
         telemetry(true);
       }
-      // ===== 接收编辑器消息（source 验证）=====
-      window.addEventListener("message", function (ev) {
-        if (ev.source !== PARENT) return; // 只接受来自 parent 的消息
-        var msg = ev.data;
-        if (!msg || typeof msg !== "object") return;
-
-        switch (msg.type) {
-          case "storage-result":
-            if (msg.runId === currentRunId) storageRuntime?.receive(msg);
-            break;
-          case "run":
-            var generation = ++runGeneration;
-            stopRun();
-            currentRunId = msg.runId;
-            desiredState = "playing";
+      function startRuntime(msg, generation) {
             scriptErrors = 0;
             _renderFrames = 0;
             _lastTelemetry = performance.now();
@@ -835,7 +869,7 @@
                 });
               },
             );
-            moduleLoader = ArkGlideModules.createLoader(
+            moduleLoader = packageRuntime ? packageRuntime.moduleLoader : ArkGlideModules.createLoader(
               runtimeScripts,
               scriptEntries,
             );
@@ -843,11 +877,12 @@
               moduleLoader.prepare(),
               mathReady,
               joltReady,
-              sceneAdapter.sync(
+              (packageRuntime ? sceneAdapter.syncBatched.bind(sceneAdapter) : sceneAdapter.sync.bind(sceneAdapter))(
                 msg.project.scene.nodes,
                 msg.modelData || {},
                 msg.project.content || {},
                 msg.textureData || {},
+                packageConfig?.batchNodes,
               ),
             ])
               .then(function () {
@@ -882,6 +917,39 @@
                   sendToEditor({ type: "fatal", message: String(error) });
                 }
               });
+
+      }
+      // ===== 接收编辑器消息（source 验证）=====
+      window.addEventListener("message", function (ev) {
+        if (ev.source !== PARENT) return; // 只接受来自 parent 的消息
+        var msg = ev.data;
+        if (!msg || typeof msg !== "object") return;
+
+        switch (msg.type) {
+          case "package-file": {
+            if(msg.runId!==currentRunId)break;
+            const request=packageReads.get(msg.id);if(!request)break;packageReads.delete(msg.id);
+            if(msg.error)request.reject(Error(msg.error));else request.resolve(new Uint8Array(msg.raw));
+            break;
+          }
+          case "run-package": {
+            const generation=++runGeneration;stopRun();currentRunId=msg.runId;desiredState='playing';
+            packageRuntime=createPackageSession(msg);
+            packageRuntime.initialize(msg.descriptor).then(result=>{
+              if(generation!==runGeneration||desiredState==='stopped')return;
+              startRuntime({...msg,...result},generation);
+            }).catch(error=>{if(generation===runGeneration){desiredState='stopped';stopRun();sendToEditor({type:'fatal',message:String(error)});}});
+            break;
+          }
+          case "storage-result":
+            if (msg.runId === currentRunId) storageRuntime?.receive(msg);
+            break;
+          case "run":
+            var generation = ++runGeneration;
+            stopRun();
+            currentRunId = msg.runId;
+            desiredState = "playing";
+            startRuntime(msg, generation);
             break;
           case "pause":
             if (desiredState === "stopped") break;

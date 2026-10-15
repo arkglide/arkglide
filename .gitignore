@@ -61,3 +61,6 @@ playwright-report/
 
 # Composition verification deployment
 .composition-browser-test/
+
+# Chunked package verification deployments
+.package-browser-test/

@@ -34,6 +34,7 @@
     "signals",
     "motion",
     "optics",
+    "assets",
   ];
   function failure(file, message, node) {
     const error = new Error(message);
@@ -479,6 +480,7 @@
   }
   root.ArkGlideModules = {
     parameters,
+    edits,
     inspect,
     languageInfo,
     resolve,

@@ -1090,3 +1090,9 @@ declare const levels: LevelsAPI;
 declare const storage: StorageAPI;
 declare const saves: SavesAPI;
 interface ScriptContext { visuals: VisualsAPI; surfaces: SurfacesAPI; fields: FieldsAPI; levels: LevelsAPI; storage: StorageAPI; saves: SavesAPI; triggers: TriggersAPI; }
+
+/** Explicit leases for resources referenced dynamically by scripts in streaming packages. */
+interface ResourceLease { readonly kind: string; readonly id: string; readonly active: boolean; release(): void; }
+interface AssetsAPI { load(kind: 'model' | 'texture' | 'audio' | 'prefab' | 'materials' | 'animationControllers' | 'retargetProfiles', id: string): Promise<ResourceLease>; }
+declare const assets: AssetsAPI;
+interface ScriptContext { assets: AssetsAPI; }

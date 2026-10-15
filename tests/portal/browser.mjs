@@ -56,7 +56,7 @@ test(
     await page.route('**/favicon.ico', route => route.fulfill({ status: 204 }));
     try {
       await page.goto(url);
-      await page.locator("#start").click();
+      await page.evaluate(() => ArkGlidePlayer.start());
       await page.waitForFunction(
         () => document.body.dataset.state === "playing",
       );
@@ -110,14 +110,14 @@ test(
       );
       assert.notDeepEqual(changed, orientation);
       // Pause from the parent releases the lock and freezes simulation.
-      await page.locator("#pause").evaluate((e) => e.click());
+      await page.evaluate(() => ArkGlidePlayer.pause());
       await frame.waitForFunction(
         () => !running && document.pointerLockElement === null,
       );
       const timeBefore = await frame.evaluate(() => time.totalTime);
       await page.waitForTimeout(100);
       assert.equal(await frame.evaluate(() => time.totalTime), timeBefore);
-      await page.locator("#pause").click();
+      await page.evaluate(() => ArkGlidePlayer.pause());
       await frame.waitForFunction(() => running);
       await canvas.click({ position: { x: 300, y: 300 } });
       await frame.waitForFunction(() => document.pointerLockElement === document.getElementById('renderCanvas'));
@@ -127,10 +127,10 @@ test(
         try {
           await frame.waitForFunction(mode => document.querySelector('[data-hud-id="mode"]').textContent.includes(mode), mode, { timeout: 5000 });
         } catch (error) {
-          throw Error(mode + ': ' + JSON.stringify(await frame.evaluate(() => ({ keys: __modeKeys, active: document.activeElement.tagName, running, errors: scriptErrors, mode: document.querySelector('[data-hud-id="mode"]').textContent, key: inputRuntime.isKeyDown('f') }))), { cause: error });
+          throw Error(mode + ': ' + JSON.stringify(await frame.evaluate(() => ({ keys: __modeKeys, active: document.activeElement.tagName, running, errors: scriptErrors, mode: document.querySelector('[data-hud-id="mode"]').textContent, key: inputRuntime.input.isKeyDown('f') }))), { cause: error });
         } finally { await page.keyboard.up('f'); }
-        const rendered = await frame.evaluate(() => _renderFrames);
-        await frame.waitForFunction(before => _renderFrames > before, rendered);
+        const rendered = await frame.evaluate(() => time.unscaledTotalTime);
+        await frame.waitForFunction(before => time.unscaledTotalTime > before, rendered);
       }
       await switchMode('thirdPerson');
       await switchMode('observer');
@@ -160,7 +160,7 @@ test(
         ),
       );
       assert.equal(await frame.evaluate(() => scriptErrors), 0);
-      await page.locator("#stop").evaluate((e) => e.click());
+      await page.evaluate(() => ArkGlidePlayer.stop());
       await page.waitForFunction(
         () => document.body.dataset.state === "stopped",
       );
@@ -177,7 +177,7 @@ test(
       ])
         assert.equal(cleaned[key], 0, key);
       for (let i = 0; i < 2; i++) {
-        await page.locator("#start").click();
+        await page.evaluate(() => ArkGlidePlayer.start());
         await page.waitForFunction(
           () => document.body.dataset.state === "playing",
         );
@@ -186,7 +186,7 @@ test(
           .find((f) => f.url().includes("runtime.html?boot="));
         await f.waitForFunction(() => globalThis.portalDemo);
         assert.equal(await f.evaluate(() => scriptErrors), 0);
-        await page.locator("#stop").click();
+        await page.evaluate(() => ArkGlidePlayer.stop());
         await page.waitForFunction(
           () => document.body.dataset.state === "stopped",
         );
@@ -208,7 +208,7 @@ test(
     });
     try {
       await page.goto(url);
-      await page.locator("#start").click();
+      await page.evaluate(() => ArkGlidePlayer.start());
       await page.waitForFunction(
         () => document.body.dataset.state === "playing",
       );
@@ -296,7 +296,7 @@ test(
 test('portal stays rendered inside the camera near plane and uses native resolution with configurable MSAA', { timeout: 90000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
   try {
-    await page.goto(url); await page.locator('#start').click();
+    await page.goto(url); await page.evaluate(() => ArkGlidePlayer.start());
     await page.waitForFunction(() => document.body.dataset.state === 'playing');
     const frame = page.frames().find(f => f.url().includes('runtime.html?boot='));
     await frame.waitForFunction(() => globalThis.portalDemo && portalRuntime.stats().portalRenderedViews > 0);
@@ -340,7 +340,7 @@ test('portal stays rendered inside the camera near plane and uses native resolut
 test('a rendered body stays visible on every sampled frame as its source and ghost swap sides', { timeout: 90000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
   try {
-    await page.goto(url); await page.locator('#start').click();
+    await page.goto(url); await page.evaluate(() => ArkGlidePlayer.start());
     await page.waitForFunction(() => document.body.dataset.state === 'playing');
     const frame = page.frames().find(f => f.url().includes('runtime.html?boot='));
     await frame.waitForFunction(() => globalThis.portalDemo && portalRuntime.stats().portalRenderedViews > 0);
