@@ -22,6 +22,7 @@ import {
   Add as AddIcon,
 } from "@mui/icons-material";
 import { useEditorStore, type AssetEntry } from "../../store/useEditorStore";
+import ScriptRenameDialog from "./ScriptRenameDialog";
 
 // 展示用资源条目：在 AssetEntry 基础上扩展 isUserScript 标记
 type DisplayAsset = AssetEntry & { isUserScript?: boolean };
@@ -133,11 +134,15 @@ export default function AssetBrowser() {
   const scripts = useEditorStore((s) => s.scripts);
   const activeFileId = useEditorStore((s) => s.activeFileId);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const [renamingFile, setRenamingFile] = useState<string | null>(null);
 
   // 新建脚本：生成唯一文件名并创建
   const handleCreateScript = () => {
-    const name = `script_${Date.now().toString(36).slice(-4)}.js`;
+    const base = `script_${Date.now().toString(36).slice(-4)}`;
+    let name = base + ".js", suffix = 2;
+    while (Object.hasOwn(useEditorStore.getState().scripts, name)) name = `${base}_${suffix++}.js`;
     createScript(name);
+    setRenamingFile(name);
   };
 
   // 打开文件夹：优先使用 File System Access API
@@ -326,7 +331,20 @@ export default function AssetBrowser() {
               <Box
                 key={a.id}
                 title={a.path}
+                role={a.isUserScript ? "button" : undefined}
+                aria-label={a.isUserScript ? "脚本 " + a.name : undefined}
+                tabIndex={a.isUserScript ? 0 : undefined}
                 draggable={a.type === "model"}
+                onDoubleClick={() => {
+                  if (a.isUserScript && a.name !== "main.js" && playState === "stopped") setRenamingFile(a.name);
+                }}
+                onKeyDown={event => {
+                  if (!a.isUserScript) return;
+                  if (event.key === "Enter") { event.preventDefault(); setActiveFile(a.name); }
+                  if (event.key === "F2" && a.name !== "main.js" && playState === "stopped") {
+                    event.preventDefault(); setRenamingFile(a.name);
+                  }
+                }}
                 onClick={async () => {
                   if (a.isUserScript) {
                     // 用户脚本：直接切换 activeFileId
@@ -424,6 +442,7 @@ export default function AssetBrowser() {
           </Typography>
         )}
       </Box>
+      {renamingFile && <ScriptRenameDialog key={renamingFile} fileName={renamingFile} onClose={() => setRenamingFile(null)} />}
     </Box>
   );
 }

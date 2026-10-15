@@ -519,3 +519,74 @@ test('save project waits for IME confirmation before submitting its name',async(
  expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().currentProjectId;})).toBe(null);
  await field.press('Enter');await expect(dialog).toBeHidden();
 });
+
+test('new scripts can be named and renamed from tabs or assets without native prompts', async ({ page }) => {
+ await page.goto('/'); await page.waitForSelector('#viewport');
+ await page.getByRole('tab', { name: '项目资源', exact: true }).click();
+ const nativeDialogs: string[] = [];
+ page.on('dialog', async dialog => { nativeDialogs.push(dialog.type()); await dialog.dismiss(); });
+ await page.getByRole('button', { name: '新建脚本', exact: true }).click();
+ const dialog = page.getByRole('dialog', { name: '重命名脚本', exact: true });
+ await expect(dialog).toBeVisible();
+ const oldName = await dialog.getByLabel('脚本文件名', { exact: true }).inputValue();
+ await page.evaluate(async name => {
+  const { useEditorStore: s } = await import('/src/store/useEditorStore.ts');
+  s.getState().updateScript(name, 'export default 42;');
+  s.getState().updateScript('main.js', `import value from './${name}';\nconsole.log(value);`);
+  s.getState().attachScript('cube', name);
+ }, oldName);
+ await dialog.getByLabel('脚本文件名', { exact: true }).fill('logic/玩家');
+ await dialog.getByRole('button', { name: '重命名', exact: true }).click();
+ await expect(dialog).toBeHidden();
+ await page.getByRole('tab', { name: '代码编辑器', exact: true }).click();
+ const tab = page.getByRole('tab', { name: 'logic/玩家.js', exact: true });
+ await expect(tab).toHaveAttribute('aria-selected', 'true');
+ await expect(page.locator('.monaco-editor .view-lines')).toContainText('export default 42;');
+ expect(await page.evaluate(async oldName => {
+  const { useEditorStore: s } = await import('/src/store/useEditorStore.ts');
+  return { oldExists: Object.hasOwn(s.getState().scripts, oldName), source: s.getState().scripts['logic/玩家.js'],
+   main: s.getState().scripts['main.js'], attached: s.getState().nodes.find(n => n.id === 'cube')?.scripts };
+ }, oldName)).toEqual({ oldExists: false, source: 'export default 42;', main: expect.stringContaining('./logic/玩家.js'), attached: ['main.js', 'logic/玩家.js'] });
+ await tab.dblclick(); await expect(dialog).toBeVisible();
+ const history = await page.evaluate(async () => (await import('/src/store/useEditorStore.ts')).useEditorStore.getState().past.length);
+ await dialog.getByLabel('脚本文件名', { exact: true }).fill('main.js');
+ await dialog.getByRole('button', { name: '重命名', exact: true }).click();
+ await expect(dialog.getByRole('alert')).toContainText('已存在');
+ await dialog.getByLabel('脚本文件名', { exact: true }).fill('../bad');
+ await dialog.getByRole('button', { name: '重命名', exact: true }).click();
+ await expect(dialog.getByRole('alert')).toContainText('无效脚本文件路径');
+ expect(await page.evaluate(async () => (await import('/src/store/useEditorStore.ts')).useEditorStore.getState().past.length)).toBe(history);
+ await dialog.getByRole('button', { name: '取消', exact: true }).click();
+ await page.getByRole('tab', { name: '项目资源', exact: true }).click();
+ await page.getByRole('button', { name: '脚本 logic/玩家.js', exact: true }).dblclick();
+ await expect(dialog).toBeVisible();
+ await dialog.getByLabel('脚本文件名', { exact: true }).fill('hero');
+ await dialog.getByLabel('脚本文件名', { exact: true }).press('Enter');
+ await page.getByRole('tab', { name: '代码编辑器', exact: true }).click();
+ await expect(page.getByRole('tab', { name: 'hero.js', exact: true })).toBeVisible();
+ await page.getByRole('tab', { name: 'hero.js', exact: true }).press('F2');
+ await expect(dialog).toBeVisible(); await page.keyboard.press('Escape'); await expect(dialog).toBeHidden();
+ await page.evaluate(async () => (await import('/src/store/useEditorStore.ts')).useEditorStore.getState().undo());
+ await expect(tab).toBeVisible();
+ await page.evaluate(async () => (await import('/src/store/useEditorStore.ts')).useEditorStore.getState().redo());
+ await expect(page.getByRole('tab', { name: 'hero.js', exact: true })).toBeVisible();
+ expect(nativeDialogs).toEqual([]);
+});
+
+test('script rename respects IME confirmation and clears its draft when switching documents', async ({ page }) => {
+ await page.goto('/'); await page.waitForSelector('#viewport');
+ await page.getByRole('tab', { name: '项目资源', exact: true }).click();
+ await page.getByRole('button', { name: '新建脚本', exact: true }).click();
+ const dialog = page.getByRole('dialog', { name: '重命名脚本', exact: true });
+ const field = dialog.getByLabel('脚本文件名', { exact: true });
+ await expect(dialog).toBeVisible();
+ await field.fill('中文');
+ await field.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true, keyCode: 229 });
+ await expect(dialog).toBeVisible(); await field.press('Enter');
+ await page.getByRole('tab', { name: '代码编辑器', exact: true }).click();
+ await expect(page.getByRole('tab', { name: '中文.js', exact: true })).toBeVisible();
+ await page.getByRole('tab', { name: '中文.js', exact: true }).dblclick(); await field.fill('未确认');
+ await page.evaluate(async () => { const { useEditorStore: s } = await import('/src/store/useEditorStore.ts'); s.getState().newProject(); s.getState().createScript('中文.js', 'new document'); });
+ await expect(dialog).toBeHidden();
+ expect(await page.evaluate(async () => (await import('/src/store/useEditorStore.ts')).useEditorStore.getState().scripts['中文.js'])).toBe('new document');
+});

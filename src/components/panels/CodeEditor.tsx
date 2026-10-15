@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 // Vite 原生 ?worker import：本地打包 Monaco worker（离线可用）
@@ -12,6 +12,7 @@ import dtsContent from "../../types/arkglide.d.ts?raw";
 import { Box, Tabs, Tab, IconButton } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useEditorStore } from "../../store/useEditorStore";
+import ScriptRenameDialog from "./ScriptRenameDialog";
 
 // 配置 Monaco worker
 (self as any).MonacoEnvironment = {
@@ -74,8 +75,8 @@ export default function CodeEditor() {
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
   const navigation = useEditorStore((s) => s.scriptNavigation);
   const playState = useEditorStore((s) => s.playState);
-  const renameScript = useEditorStore((s) => s.renameScript);
   const deleteScript = useEditorStore((s) => s.deleteScript);
+  const [renamingFile, setRenamingFile] = useState<string | null>(null);
 
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const modelMapRef = useRef(new Map<string, monaco.editor.ITextModel>());
@@ -206,15 +207,15 @@ export default function CodeEditor() {
             key={name}
             value={name}
             label={name}
+            title={name === "main.js" ? name : "双击或按 F2 重命名脚本"}
             onDoubleClick={() => {
               if (name === "main.js" || playState !== "stopped") return;
-              const next = window.prompt("脚本文件名", name)?.trim();
-              if (next) {
-                try {
-                  renameScript(name, next.endsWith(".js") ? next : next + ".js");
-                } catch (error) {
-                  window.alert(error instanceof Error ? error.message : String(error));
-                }
+              setRenamingFile(name);
+            }}
+            onKeyDown={event => {
+              if (event.key === "F2" && name !== "main.js" && playState === "stopped") {
+                event.preventDefault();
+                setRenamingFile(name);
               }
             }}
             icon={
@@ -283,6 +284,7 @@ export default function CodeEditor() {
           }}
         />
       </Box>
+      {renamingFile && <ScriptRenameDialog key={renamingFile} fileName={renamingFile} onClose={() => setRenamingFile(null)} />}
     </Box>
   );
 }
