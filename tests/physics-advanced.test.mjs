@@ -6,7 +6,7 @@ import "../src/engine/physics-advanced.js";
 import "../src/engine/physics-runtime.js";
 import "../src/engine/lifecycle-runtime.js";
 const J = await createArkGlideJolt();
-function setup(config) {
+function setup(config, onError) {
   const engine = new B.NullEngine(),
     scene = new B.Scene(engine),
     objects = new Map(),
@@ -14,6 +14,7 @@ function setup(config) {
     session = ArkGlideLifecycle.createSession();
   const physics = ArkGlidePhysics.createPhysics(J, B, {
     config,
+    onError,
     getObject: (id) => objects.get(id),
     find: (id) => entities.get(id),
   });
@@ -563,4 +564,64 @@ test("unknown collision groups fail before allocating native body shapes", () =>
     for (const shape of allocated) shape.Release();
     s.done();
   }
+});
+
+test('contact subscriptions created through another owner during shutdown are released',()=>{
+ const s=setup();
+ try {
+  const later=s.session.owner({id:'later'},'later.js');
+  later.attach({onDestroy(){s.api.onContact(null,()=>{});}});
+  s.session.startRecords([later.record]);s.session.stop();
+  assert.equal(s.physics.stats().physicsSubscriptions,0);
+ } finally {s.done();}
+});
+
+test('contact callbacks skip owners whose entity was destroyed before cleanup',()=>{
+ const s=setup();
+ try {
+  s.body('floor',{x:0,y:0,z:0});const ball=s.body('ball',{x:0,y:0.5,z:0},'dynamic');
+  const ownerEntity={id:'script-owner',destroyed:false};s.owner.record.entity=ownerEntity;
+  let events=0;s.api.onContact(ball,()=>events++);ownerEntity.destroyed=true;
+  s.physics.step(1/60);assert.equal(events,0);
+ } finally {s.done();}
+});
+
+test('a failed contact callback is unsubscribed before diagnostic reporting',()=>{
+ const s=setup(undefined,()=>{throw Error('reporter failed');});
+ try {
+  s.body('floor',{x:0,y:0,z:0});const ball=s.body('ball',{x:0,y:0.5,z:0},'dynamic');
+  s.api.onContact(ball,()=>{throw Error('contact failed');});
+  assert.throws(()=>s.physics.step(1/60),/reporter failed/);
+  assert.equal(s.physics.stats().physicsSubscriptions,0);
+ } finally {s.done();}
+});
+
+test('contact registration after physics disposal rejects without retaining a subscription',()=>{
+ const s=setup();
+ try {
+  s.physics.dispose();
+  assert.throws(()=>s.api.onContact(null,()=>{}),/stopped|停止/);
+  assert.equal(s.physics.stats().physicsSubscriptions,0);
+ } finally {s.done();}
+});
+
+test('contact dispatch skips remaining subscribers after a contact entity is disposed',()=>{
+ const s=setup();
+ try {
+  s.body('floor',{x:0,y:0,z:0});const ball=s.body('ball',{x:0,y:0.5,z:0},'dynamic');
+  let later=0;
+  s.api.onContact(ball,()=>s.objects.get(ball.id).dispose());
+  s.api.onContact(ball,()=>later++);
+  s.physics.step(1/60);assert.equal(later,0);
+ } finally {s.done();}
+});
+
+test('queries ignore disposed entities before the next physics cleanup step',()=>{
+ const s=setup();
+ try {
+  const entity=s.body('disposed',{x:0,y:0,z:0});s.objects.get(entity.id).dispose();
+  assert.equal(s.api.raycast({x:0,y:3,z:0},{x:0,y:-5,z:0}),null);
+  assert.equal(s.api.shapeCast({kind:'sphere',radius:0.2},{x:0,y:3,z:0},{x:0,y:-5,z:0}),null);
+  assert.deepEqual(s.api.overlap({kind:'sphere',radius:2},{x:0,y:0,z:0}),[]);
+ } finally {s.done();}
 });

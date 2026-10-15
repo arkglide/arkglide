@@ -257,11 +257,12 @@
     function flush() {
       for (const event of queue.splice(0)) {
         for (const sub of [...subscribers]) {
-          if (!subscribers.has(sub) || !sub.owner.record.active) continue;
+          if (!subscribers.has(sub) || !sub.owner.record.active ||
+              sub.owner.record.destroying || sub.owner.record.entity?.destroyed) continue;
           if (sub.id && event.a !== sub.id && event.b !== sub.id) continue;
           const a = options.find(event.a),
             b = options.find(event.b);
-          if (!a || !b) continue;
+          if (!a || !b || a.destroyed || b.destroyed) continue;
           try {
             sub.fn({
               phase: event.phase,
@@ -270,13 +271,13 @@
               sensor: event.sensor,
             });
           } catch (error) {
+            sub.dispose();
             options.onError?.({
               file: sub.owner.record.file,
               entityId: sub.owner.record.entity?.id,
               hook: "physics.contact",
               error,
             });
-            sub.dispose();
           }
         }
       }
@@ -416,13 +417,14 @@
           r.last = signature(worldPose(r.object));
         },
         onContact(entity, fn) {
+          if (disposed) throw new Error("Physics session stopped");
           if (entity) requireBody(entity);
           if (typeof fn !== "function")
             throw new TypeError("Expected contact callback");
           const sub = { id: entity?.id, fn, owner };
-          sub.dispose = owner.track(() => subscribers.delete(sub));
           if (owner.record.active && !owner.record.destroying)
             subscribers.add(sub);
+          sub.dispose = owner.track(() => subscribers.delete(sub));
           return sub.dispose;
         },
       });
