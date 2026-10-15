@@ -86,6 +86,7 @@
     let active = true,
       simulation = true,
       disposed = false,
+      mousePointer = null,
       mouseDown = false,
       mousePressed = false,
       mouseReleased = false,
@@ -151,6 +152,7 @@
       released.clear();
       actionPressed.clear();
       actionReleased.clear();
+      mousePointer = null;
       mouseDown = mousePressed = mouseReleased = false;
       dx = dy = 0;
       blockers.clear();
@@ -189,7 +191,7 @@
     function rebind(name, map, acceptConflicts = false) {
       if (disposed) throw Error("输入会话已停止");
       const a = action(name),
-        next = { ...a, ...structuredClone(map) };
+        next = { ...a, ...structuredClone(map), name: a.name };
       if (
         !["positive", "negative"].every(
           (k) =>
@@ -327,7 +329,8 @@
       });
     });
     listen(canvas, "pointerdown", (e) => {
-      if (!allow()) return;
+      if (!allow() || mouseDown) return;
+      mousePointer = e.pointerId ?? 0;
       mouseDown = mousePressed = true;
       mx = e.clientX;
       my = e.clientY;
@@ -335,16 +338,17 @@
         canvas.setPointerCapture?.(e.pointerId);
       } catch {}
     });
-    listen(win, "pointerup", () => {
-      if (mouseDown) mouseReleased = true;
-      mouseDown = false;
-    });
-    listen(win, "pointercancel", () => {
-      mouseDown = false;
+    function releaseMouse(e) {
+      if (!mouseDown || mousePointer !== (e.pointerId ?? 0)) return;
       mouseReleased = true;
-    });
+      mouseDown = false;
+      mousePointer = null;
+    }
+    listen(win, "pointerup", releaseMouse);
+    listen(canvas, "lostpointercapture", releaseMouse);
+    listen(win, "pointercancel", releaseMouse);
     listen(canvas, "pointermove", (e) => {
-      if (!allow()) return;
+      if (!allow() || (mouseDown && mousePointer !== (e.pointerId ?? 0))) return;
       if (mouseDown) {
         dx += e.clientX - mx;
         dy += e.clientY - my;
@@ -460,9 +464,10 @@
       rebind,
       resetBindings(name) {
         if (disposed) throw Error("输入会话已停止");
+        if (name !== undefined) action(name);
         reset();
         for (const a of config.actions) {
-          if (name && a.name !== name) continue;
+          if (name !== undefined && a.name !== name) continue;
           const d = defaults.find((v) => v.name === a.name);
           if (d) {
             a.positive = [...d.positive];
@@ -658,7 +663,8 @@
               enabled(r) &&
               listeners.has(s) &&
               s.type === type &&
-              (!s.owner || s.owner.record.active)
+              (!s.owner || (s.owner.record.active && !s.owner.record.destroying &&
+                !s.owner.record.entity?.destroyed))
             ) {
               try {
                 s.fn({ id: def.id, type, value: value ?? def.text });
@@ -950,7 +956,8 @@
         const copy = { ...input };
         for (const name of ["rebind", "resetBindings", "captureBinding"])
           copy[name] = (...args) => {
-            if (!owner.record.active) throw Error("输入脚本已销毁");
+            if (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed)
+              throw Error("输入脚本已销毁");
             if (name === "captureBinding") {
               const result = input[name](...args),
                 token = binding,

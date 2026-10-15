@@ -104,6 +104,25 @@ const def = (id, kind = "button", extra = {}) => ({
   background: "#222222",
   ...extra,
 });
+test('losing canvas pointer capture releases held mouse input',()=>{
+ const t=fixture();
+ try {
+  t.canvas.emit('pointerdown',{pointerId:1,clientX:10,clientY:10});
+  assert.equal(t.ui.input.isMouseDown(),true);
+  t.canvas.emit('lostpointercapture',{pointerId:1});
+  assert.equal(t.ui.input.isMouseDown(),false);assert.equal(t.ui.input.wasMouseReleased(),true);
+ } finally {t.done();}
+});
+test('unrelated pointer release does not end the active canvas drag',()=>{
+ const t=fixture();
+ try {
+  t.canvas.emit('pointerdown',{pointerId:1,clientX:10,clientY:10});
+  t.window.emit('pointerup',{pointerId:2});
+  assert.equal(t.ui.input.isMouseDown(),true);assert.equal(t.ui.input.wasMouseReleased(),false);
+  t.canvas.emit('lostpointercapture',{pointerId:2});assert.equal(t.ui.input.isMouseDown(),true);
+  t.window.emit('pointerup',{pointerId:1});assert.equal(t.ui.input.isMouseDown(),false);
+ } finally {t.done();}
+});
 test("gamepad deadzones, opposing keyboard input, disconnect and zero-time reset; remap conflicts and defaults", () => {
   const t = fixture();
   try {
@@ -509,4 +528,52 @@ test("input events under disabled parents preserve their text and do not emit ch
   } finally {
     t.done();
   }
+});
+
+test('rebinding keys preserves the action identity when passed an action descriptor',()=>{
+ const t=fixture();
+ try {
+  const mapping={...t.ui.input.bindings()[0],name:'jump',positive:['KeyL']};
+  assert.equal(t.ui.input.rebind('moveX',mapping,true).applied,true);
+  assert.equal(t.ui.input.bindings().filter(a=>a.name==='jump').length,1);
+  t.window.emit('keydown',{key:'l',code:'KeyL'});
+  assert.equal(t.ui.input.getAction('moveX'),1);
+ } finally {t.done();}
+});
+
+test('resetting an unknown action rejects without clearing held input or valid bindings',()=>{
+ const t=fixture();
+ try {
+  t.ui.input.rebind('moveX',{positive:['KeyL']});
+  t.window.emit('keydown',{key:'l',code:'KeyL'});
+  const before=t.ui.input.bindings();
+  assert.throws(()=>t.ui.input.resetBindings('missing'),/输入动作不存在/);
+  assert.equal(t.ui.input.getAction('moveX'),1);assert.deepEqual(t.ui.input.bindings(),before);
+ } finally {t.done();}
+});
+
+test('HUD events skip subscribers whose owner entity is destroyed',()=>{
+ const t=fixture([def('button')]);
+ try {
+  const entity={id:'subscriber',destroyed:false};t.owner.record.entity=entity;
+  let clicks=0;t.ui.forOwner(t.owner).get('button').on('click',()=>clicks++);
+  t.layer.children[0].emit('click');assert.equal(clicks,1);
+  entity.destroyed=true;t.layer.children[0].emit('click');assert.equal(clicks,1);
+ } finally {t.done();}
+});
+
+test('input mutations from an owner being destroyed preserve existing action mappings',()=>{
+ const t=fixture();
+ try {
+  const input=t.ui.inputForOwner(t.owner),before=input.bindings();
+  t.owner.record.entity={id:'owner'};
+  t.owner.attach({onDestroy(){
+   assert.throws(()=>input.rebind('moveX',{positive:['KeyL']}),/销毁/);
+   assert.throws(()=>input.resetBindings(),/销毁/);
+   assert.throws(()=>input.captureBinding('moveX'),/销毁/);
+  }});
+  t.session.destroyEntity('owner');
+  assert.equal(t.session.stats().errors,0);assert.deepEqual(t.ui.input.bindings(),before);
+  assert.equal(t.ui.stats().inputCaptures,0);
+ } finally {t.done();}
 });
