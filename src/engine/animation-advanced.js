@@ -124,18 +124,19 @@
           !c.entity.destroyed &&
           sub.id === c.entity.id &&
           listeners.has(sub) &&
-          sub.owner.record.active
+          sub.owner.record.active && !sub.owner.record.destroying &&
+          !sub.owner.record.entity?.destroyed
         ) {
           try {
             sub.fn({ ...event, entity: c.entity, state: c.state });
           } catch (error) {
+            sub.dispose();
             o.onError?.({
               hook: "animation.event",
               file: sub.owner.record.file,
               entityId: c.entity.id,
               error,
             });
-            sub.dispose();
           }
         }
     }
@@ -301,7 +302,8 @@
       return { delta, rotation };
     }
     function control(entity, id, params = {}, owner) {
-      if (owner && !owner.record.active) throw Error("动画脚本已销毁");
+      if (owner && (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed))
+        throw Error("动画脚本已销毁");
       const resource = o.controllers?.[id];
       if (!resource) throw Error("动画控制器不存在: " + id);
       const imported = groups(entity);
@@ -610,8 +612,8 @@
         groups(e);
         if (typeof fn !== "function") throw Error("动画事件需要回调");
         const sub = { id: e.id, fn, owner };
-        sub.dispose = owner.track(() => listeners.delete(sub));
         if (owner.record.active) listeners.add(sub);
+        sub.dispose = owner.track(() => listeners.delete(sub));
         return sub.dispose;
       },
       retarget(source, target, id) {

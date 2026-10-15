@@ -4,7 +4,7 @@ import * as B from "@babylonjs/core";
 import "../src/engine/lifecycle-runtime.js";
 import "../src/engine/animation-advanced.js";
 import "../src/engine/animation-runtime.js";
-function setup() {
+function setup(onError) {
   const engine = new B.NullEngine(),
     scene = new B.Scene(engine),
     entities = new Map(),
@@ -81,7 +81,7 @@ function setup() {
     find: (id) => entities.get(id),
     getGroups: (id) => groups.get(id),
     getTargets: (id) => targets.get(id),
-    onError: (e) => errors.push(e),
+    onError: onError || ((e) => errors.push(e)),
     applyRootMotion: (e, p, q, dt) => motions.push({ e, p, q, dt }),
   });
   function api() {
@@ -91,6 +91,7 @@ function setup() {
     return { owner, api: runtime.forOwner(owner) };
   }
   return {
+    session,
     engine,
     scene,
     model,
@@ -540,4 +541,64 @@ test("nested time-zero state events share the dispatch limit without overflowing
   } finally {
     s.done();
   }
+});
+
+test('animation subscriptions requested during owner teardown leave no retained listener',()=>{
+ const s=setup();
+ try {
+  const {entity}=s.model('model'),{owner,api}=s.api();
+  owner.attach({onDestroy(){api.onEvent(entity,()=>{});}});
+  s.session.stop();
+  assert.equal(s.runtime.stats().animationEventSubscriptions,0);
+ } finally {s.done();}
+});
+
+test('controller creation during owner teardown preserves another owners controller',()=>{
+ const s=setup();
+ try {
+  const {entity}=s.model('model');
+  s.clip('model','Idle',B.Vector3.Zero(),B.Vector3.Zero());s.clip('model','Move',B.Vector3.Zero(),B.Vector3.One());
+  const first=s.api(),second=s.api();
+  const running=second.api.createController(entity,'locomotion');
+  first.owner.record.entity={id:'owner'};
+  first.owner.attach({onDestroy(){assert.throws(()=>first.api.createController(entity,'locomotion'),/销毁/);}});
+  s.session.destroyEntity('owner');
+  assert.equal(second.api.controller(entity),running);assert.equal(running.state,'Idle');
+  assert.equal(s.session.stats().errors,0);
+ } finally {s.done();}
+});
+
+test('legacy playback requested during owner teardown preserves active controller',()=>{
+ const s=setup();
+ try {
+  const {entity}=s.model('model');s.clip('model','Idle',B.Vector3.Zero(),B.Vector3.Zero());s.clip('model','Move',B.Vector3.Zero(),B.Vector3.One());
+  const first=s.api(),second=s.api(),running=second.api.createController(entity,'locomotion');
+  first.owner.record.entity={id:'owner'};
+  first.owner.attach({onDestroy(){assert.throws(()=>first.api.play(entity,'Move'),/销毁/);}});
+  s.session.destroyEntity('owner');
+  assert.equal(second.api.controller(entity),running);assert.equal(running.state,'Idle');assert.equal(s.session.stats().errors,0);
+ } finally {s.done();}
+});
+
+test('animation events skip subscribers whose owner entity has been destroyed',()=>{
+ const s=setup();
+ try {
+  const {entity}=s.model('model');s.clip('model','Idle',B.Vector3.Zero(),B.Vector3.Zero());s.clip('model','Move',B.Vector3.Zero(),B.Vector3.One());
+  const running=s.api(),listener=s.api(),ownerEntity={id:'subscriber',destroyed:false};
+  listener.owner.record.entity=ownerEntity;
+  let calls=0;listener.api.onEvent(entity,()=>calls++);
+  const controller=running.api.createController(entity,'locomotion');controller.setState('Move');
+  ownerEntity.destroyed=true;s.runtime.fixedUpdate(0.5);assert.equal(calls,0);
+ } finally {s.done();}
+});
+
+test('failed animation event subscriptions are removed before reporting diagnostics',()=>{
+ const s=setup(()=>{throw Error('reporter failed');});
+ try {
+  const {entity}=s.model('model');s.clip('model','Idle',B.Vector3.Zero(),B.Vector3.Zero());s.clip('model','Move',B.Vector3.Zero(),B.Vector3.One());
+  const {api}=s.api(),controller=api.createController(entity,'locomotion');
+  api.onEvent(entity,()=>{throw Error('event failed');});controller.setState('Move');
+  assert.throws(()=>s.runtime.fixedUpdate(0.5),/reporter failed/);
+  assert.equal(s.runtime.stats().animationEventSubscriptions,0);
+ } finally {s.done();}
 });
