@@ -1,0 +1,168 @@
+{
+  "baselineCommit": "4d80546fc1f0d414bc9f1147152b381b515c9fbf",
+  "limits": [
+    "The empty-game browser benchmark isolates pacing; it does not predict target hardware or complex-scene FPS.",
+    "The entity benchmark uses Babylon NullEngine with real C++ WASM, excludes GPU and physics, and counts only transform/setParent calls."
+  ],
+  "browser": {
+    "before": {
+      "browser": "154.0.8037.57",
+      "viewport": "320x240",
+      "scene": "empty",
+      "renderer": "SwiftShader",
+      "cases": [
+        {
+          "cap": 30,
+          "callbacks": 180,
+          "rendered": 71,
+          "rafFps": 60.002000066668884,
+          "renderedFps": 23.667455581852728,
+          "renderedPerCallback": 0.39444444444444443
+        },
+        {
+          "cap": 60,
+          "callbacks": 180,
+          "rendered": 114,
+          "rafFps": 60.00200006666889,
+          "renderedFps": 38.0012667088903,
+          "renderedPerCallback": 0.6333333333333333
+        },
+        {
+          "cap": 0,
+          "callbacks": 180,
+          "rendered": 180,
+          "rafFps": 60.004000266684464,
+          "renderedFps": 60.004000266684464,
+          "renderedPerCallback": 1
+        }
+      ]
+    },
+    "after": {
+      "browser": "154.0.8037.57",
+      "viewport": "320x240",
+      "scene": "empty",
+      "renderer": "SwiftShader",
+      "cases": [
+        {
+          "cap": 30,
+          "callbacks": 180,
+          "rendered": 90,
+          "rafFps": 60.00200006666889,
+          "renderedFps": 30.001000033334446,
+          "renderedPerCallback": 0.5
+        },
+        {
+          "cap": 60,
+          "callbacks": 180,
+          "rendered": 180,
+          "rafFps": 60.00200006666889,
+          "renderedFps": 60.00200006666889,
+          "renderedPerCallback": 1
+        },
+        {
+          "cap": 0,
+          "callbacks": 180,
+          "rendered": 180,
+          "rafFps": 60.00200006666889,
+          "renderedFps": 60.00200006666889,
+          "renderedPerCallback": 1
+        }
+      ]
+    }
+  },
+  "entities": {
+    "before": {
+      "runtime": "v24.19.0",
+      "entities": 1000,
+      "frames": 60,
+      "samples": 5,
+      "backend": "cpp-wasm",
+      "cases": [
+        {
+          "dirtyFraction": 0,
+          "medianFrameMs": 2.7340629499999975,
+          "callsPerFrame": {
+            "transform": 6500,
+            "setParent": 6500
+          }
+        },
+        {
+          "dirtyFraction": 0.01,
+          "medianFrameMs": 2.698371416666661,
+          "callsPerFrame": {
+            "transform": 6500,
+            "setParent": 6500
+          }
+        },
+        {
+          "dirtyFraction": 0.1,
+          "medianFrameMs": 2.6319424666666693,
+          "callsPerFrame": {
+            "transform": 6500,
+            "setParent": 6500
+          }
+        },
+        {
+          "dirtyFraction": 1,
+          "medianFrameMs": 2.905820366666664,
+          "callsPerFrame": {
+            "transform": 6500,
+            "setParent": 6500
+          }
+        }
+      ]
+    },
+    "after": {
+      "runtime": "v24.19.0",
+      "entities": 1000,
+      "frames": 60,
+      "samples": 5,
+      "backend": "cpp-wasm",
+      "cases": [
+        {
+          "dirtyFraction": 0,
+          "medianFrameMs": 1.1185098833333351,
+          "callsPerFrame": {
+            "transform": 0,
+            "setParent": 0
+          }
+        },
+        {
+          "dirtyFraction": 0.01,
+          "medianFrameMs": 1.1527460666666647,
+          "callsPerFrame": {
+            "transform": 10,
+            "setParent": 0
+          }
+        },
+        {
+          "dirtyFraction": 0.1,
+          "medianFrameMs": 1.3240960499999952,
+          "callsPerFrame": {
+            "transform": 100,
+            "setParent": 0
+          }
+        },
+        {
+          "dirtyFraction": 1,
+          "medianFrameMs": 1.6136396833333342,
+          "callsPerFrame": {
+            "transform": 1000,
+            "setParent": 0
+          }
+        }
+      ]
+    },
+    "method": "Old and new adapters run sequentially after the editor browser suite exited, using the same native module. Each sample contains full sync and 1000 world-position queries per frame in chains of depth 10. transform/setParent counters are installed for one separate untimed frame, then direct native methods are restored before timing."
+  },
+  "validation": {
+    "unitTests": 543,
+    "editorBrowserTests": 33,
+    "editorBrowserCache": "cold",
+    "staticBrowserTests": 7,
+    "gameplayBrowserTests": 10,
+    "typescript": "passed",
+    "fullFrontendBuild": false
+  },
+  "recordedAtUtc": "2026-10-15T17:50:55.258Z"
+}

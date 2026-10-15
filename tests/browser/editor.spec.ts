@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test('editor roadmap: model authoring, persistence, runtime, isolation and WASM', async ({ page }) => {
   const errors: string[] = [];

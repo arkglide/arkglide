@@ -81,7 +81,7 @@ function setup() {
     ),
     context,
   );
-  for (const name of ["spatial", "state", "visuals", "surfaces", "fields", "triggers", "signals", "motion", "optics", "levels", "checkpoints", "portal-projection", "cameras", "portals", "interaction", "physics-tools", "physics", "input-ui", "audio", "animation"])
+  for (const name of ["timing", "spatial", "state", "visuals", "surfaces", "fields", "triggers", "signals", "motion", "optics", "levels", "checkpoints", "portal-projection", "cameras", "portals", "interaction", "physics-tools", "physics", "input-ui", "audio", "animation"])
     vm.runInContext(
       fs.readFileSync(
         new URL("../public/arkglide-" + name + ".js", import.meta.url),
@@ -126,6 +126,20 @@ const node = {
   transform: { x: 0, y: 0, z: 0 },
   scripts: ["main.js"],
 };
+
+test("the integrated runtime renders every jittered 60 Hz callback at its default 60 FPS cap", async () => {
+  const {context, send, tick} = setup();
+  try {
+    await send({type: "run", project: {scene: {nodes: [node]}, scripts: {"main.js": "return {};"}}});
+    tick(0);
+    const before = context.time.frameCount;
+    for (let i = 0; i < 120; i++) tick(i % 2 ? 17 : 1000 / 30 - 17);
+    assert.equal(context.time.frameCount - before, 120);
+  } finally {
+    await send({type: "stop"});
+    context.engine?.dispose();
+  }
+});
 
 test("bound scripts receive factory context, axis input and pause-safe time", async () => {
   const { context, send, tick, handlers, canvasHandlers } = setup();

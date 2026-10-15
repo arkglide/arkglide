@@ -42,6 +42,7 @@
     <script src="./lib/arkglide_math.js"></script>
     <script src="./arkglide-api.js"></script>
     <script src="./arkglide-lifecycle.js"></script>
+    <script src="./arkglide-timing.js"></script>
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-prefabs.js"></script>
     <script src="./lib/jolt-physics.js"></script>
@@ -469,7 +470,7 @@
         });
       }
       var _fpsCap = 60; // 帧率上限，0=无限
-      var _lastRenderTime = 0; // 上次渲染时间戳（用于帧率限制）
+      var framePacer = ArkGlideTiming.createFramePacer({ fps: _fpsCap });
 
       // 将 hex 颜色字符串解析为 {r, g, b}（0-1 范围）
       // 支持 #RGB 和 #RRGGBB 格式，无效时返回默认值
@@ -521,12 +522,10 @@
           }
         }
 
-        // 帧率上限：0 = 无限制
-        // Babylon Engine 没有直接 setFpsLimit API
-        // 使用 engine 的 render loop 频率控制：通过自定义时间步长
-        // 简单方案：存到全局变量，在 render loop 中按需跳帧
+        // 帧率上限：0 = 无限制。计时抖动不应使 60 FPS 退化为隔帧渲染。
         if (typeof settings.fpsCap === "number") {
           _fpsCap = settings.fpsCap;
+          framePacer.setCap(_fpsCap);
         }
       }
 
@@ -563,17 +562,8 @@
           animate(running ? time.deltaTime * 1000 : 0);
         };
         engine.runRenderLoop(function () {
-          // 帧率限制：如果 _fpsCap > 0，按间隔跳帧
-          if (_fpsCap > 0) {
-            var now = performance.now();
-            var minInterval = 1000 / _fpsCap;
-            if (now - _lastRenderTime < minInterval) {
-              return; // 跳过本帧
-            }
-            _lastRenderTime = now;
-          }
-
           var frameStart = performance.now();
+          if (!framePacer.shouldRender(frameStart)) return;
           inputRuntime?.setSimulationActive?.(time.timeScale > 0);
           inputRuntime?.beginFrame?.();
           if (running) {
@@ -783,6 +773,7 @@
       }
       function runEntityScripts(scripts, nodes, legacyCode) {
         resetInput();
+        framePacer.reset();
         session = createSession();
         time = session.time;
         lifecycleInstances = session.records;

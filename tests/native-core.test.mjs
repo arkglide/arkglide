@@ -150,3 +150,62 @@ test("lifecycle clock views refresh after unrelated scene allocations grow WASM 
     w.delete();
   }
 });
+
+test("native facade skips clean writes but immediately imports renderer mutations and reparenting", () => {
+  const engine = new B.NullEngine(),
+    scene = new B.Scene(engine),
+    w = new module.RuntimeWorld();
+  const calls = { transform: 0, setParent: 0 };
+  for (const method of Object.keys(calls)) {
+    const fn = w[method].bind(w);
+    w[method] = (...args) => {
+      calls[method]++;
+      return fn(...args);
+    };
+  }
+  const api = ArkGlideRuntime.createEntityAPI(
+    B,
+    () => scene,
+    () => null,
+    { getWorld: () => w },
+  );
+  try {
+    const a = api.sceneAPI.create("box", "a"),
+      b = api.sceneAPI.create("box", "b"),
+      c = api.sceneAPI.create("box", "c");
+    api.getObject("b").parent = api.getObject("a");
+    api.sync();
+    calls.transform = calls.setParent = 0;
+    for (let i = 0; i < 10; i++) {
+      api.sync();
+      b.getWorldMatrix();
+      b.getWorldPosition();
+    }
+    assert.deepEqual(calls, { transform: 0, setParent: 0 });
+    const copy = b.getWorldMatrix();
+    copy[12] = 123;
+    assert.equal(b.getWorldPosition().x, 0);
+    // Updates within one frame must be visible, including a changed ancestor.
+    api.getObject("a").position.x = 4;
+    api.getObject("b").position.y = 3;
+    assert.deepEqual(b.getWorldPosition(), { x: 4, y: 3, z: 0 });
+    assert.deepEqual(calls, { transform: 2, setParent: 0 });
+    c.setPosition(10, 0, 0);
+    api.getObject("b").parent = api.getObject("c");
+    assert.deepEqual(b.getWorldPosition(), { x: 10, y: 3, z: 0 });
+    assert.equal(calls.setParent, 1);
+    api.getObject("b").parent = null;
+    assert.equal(b.getWorldPosition().x, 0);
+    const foreign = new B.TransformNode("foreign", scene);
+    foreign.position.z = 7;
+    api.getObject("b").parent = foreign;
+    assert.deepEqual(b.getWorldPosition(), { x: 0, y: 3, z: 7 });
+    api.getObject("b").parent = api.getObject("a");
+    a.destroy();
+    assert.equal(b.destroyed, true);
+    assert.throws(() => b.getWorldPosition(), /destroyed/);
+  } finally {
+    engine.dispose();
+    w.delete();
+  }
+});

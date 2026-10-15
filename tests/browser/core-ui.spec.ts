@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import fs from "node:fs/promises";
 import { unzipSync } from "fflate";
 import { serveStatic } from "../../scripts/serve-static.mjs";
@@ -11,10 +11,24 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.waitForSelector("#viewport");
+  await page.waitForFunction(() =>
+    performance
+      .getEntriesByType("resource")
+      .some((r) => r.name.includes("/@babylonjs_core.js?")),
+  );
   await page.evaluate(async () => {
     (window as any).coreStore = (
       await import("/src/store/useEditorStore.ts")
     ).useEditorStore;
+    const coreUrl = performance
+      .getEntriesByType("resource")
+      .map((r) => r.name)
+      .find((url) => url.includes("/@babylonjs_core.js?"))!;
+    const B = await import(coreUrl);
+    (window as any).coreEditorFrames = 0;
+    B.EngineStore.LastCreatedScene.onAfterRenderObservable.add(
+      () => (window as any).coreEditorFrames++,
+    );
   });
   await page.getByRole("tab", { name: "材质与预制体", exact: true }).click();
   await page.getByRole("tab", { name: "UI 画布", exact: true }).click();
@@ -51,7 +65,7 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
   await panel
     .getByRole("button", { name: "清除元素覆盖", exact: true })
     .click();
-  await expect(panel.getByLabel("透明度",{exact:true})).toHaveValue("0.8");
+  await expect(panel.getByLabel("透明度", { exact: true })).toHaveValue("0.8");
   const ids = await page.evaluate(() => {
     const g = (window as any).coreStore.getState().content.gameplay;
     return {
@@ -119,6 +133,14 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
   });
   let runtime = page.frames().find((f) => f.url().includes("/runtime.html"))!;
   await runtime.waitForFunction(() => (window as any).coreUIProbe?.ticks > 2);
+  const editorFramesDuringPlay = await page.evaluate(
+    () => (window as any).coreEditorFrames,
+  );
+  await runtime.waitForFunction(() => (window as any).coreUIProbe?.ticks > 8);
+  expect(
+    await page.evaluate(() => (window as any).coreEditorFrames),
+    "hidden authoring scene must stop rendering during play",
+  ).toBe(editorFramesDuringPlay);
   expect(
     await runtime.evaluate(() => ({
       scene: (window as any).entityAPI.stats().sceneBackend,
@@ -136,6 +158,10 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
   );
   await expect(control).toHaveCSS("opacity", "0.2");
   await page.evaluate(() => (window as any).coreStore.getState().stop());
+  await page.waitForFunction(
+    (before) => (window as any).coreEditorFrames > before,
+    editorFramesDuringPlay,
+  );
   await runtime.waitForFunction(
     () =>
       (window as any).session.stats().nativeOwners === 0 &&
@@ -149,10 +175,17 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
     name: "导出独立游戏",
     exact: true,
   });
+  const navigations: string[] = [];
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) navigations.push(frame.url());
+  });
+  const documentId = await page.evaluate(() => performance.timeOrigin);
   await dialog.getByRole("button", { name: "开始打包", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("打包完成", {
     timeout: 30000,
   });
+  expect(navigations, "export must preserve the editor document").toEqual([]);
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(documentId);
   const pending = page.waitForEvent("download");
   await dialog
     .getByRole("button", { name: "下载游戏 ZIP", exact: true })

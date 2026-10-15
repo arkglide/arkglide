@@ -11,6 +11,8 @@
     "test": "node --test tests/*.test.mjs",
     "sync:wasm": "node scripts/sync-wasm.mjs",
     "benchmark:math": "node scripts/benchmark-math.mjs",
+    "benchmark:runtime": "node scripts/benchmark-runtime.mjs",
+    "benchmark:runtime:browser": "npm run sync:runtime && node scripts/benchmark-runtime-browser.mjs",
     "test:browser": "playwright test",
     "sync:runtime": "node scripts/sync-runtime.mjs",
     "predev": "npm run sync:runtime",

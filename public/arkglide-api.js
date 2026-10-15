@@ -16,25 +16,59 @@
       const h = handles.get(entity);
       if (!h?.native || !h.mesh) return;
       const n = h.mesh,
-        angles = n.rotationQuaternion?.toEulerAngles() || n.rotation;
-      h.native.transform(
-        h.nativeId,
-        n.position.x,
-        n.position.y,
-        n.position.z,
-        angles.x,
-        angles.y,
-        angles.z,
-        n.scaling.x,
-        n.scaling.y,
-        n.scaling.z,
-      );
-      const parent = entities.get(n.parent?.metadata?.arkglideId),
-        p = parent && handles.get(parent);
+        angles = n.rotationQuaternion?.toEulerAngles() || n.rotation,
+        p = n.position,
+        s = n.scaling,
+        t = h.syncedTransform;
+      // Physics and animation can mutate Babylon objects without the facade.
+      // Compare live values on every query, but cross into WASM only if dirty.
       if (
-        !h.native.setParent(h.nativeId, p?.mesh === n.parent ? p.nativeId : 0)
-      )
-        throw Error("Invalid logical scene hierarchy");
+        !t ||
+        t[0] !== p.x ||
+        t[1] !== p.y ||
+        t[2] !== p.z ||
+        t[3] !== angles.x ||
+        t[4] !== angles.y ||
+        t[5] !== angles.z ||
+        t[6] !== s.x ||
+        t[7] !== s.y ||
+        t[8] !== s.z
+      ) {
+        if (
+          !h.native.transform(
+            h.nativeId,
+            p.x,
+            p.y,
+            p.z,
+            angles.x,
+            angles.y,
+            angles.z,
+            s.x,
+            s.y,
+            s.z,
+          )
+        )
+          throw Error("Invalid logical entity transform");
+        const cache =
+          h.syncedTransform || (h.syncedTransform = new Float64Array(9));
+        cache[0] = p.x;
+        cache[1] = p.y;
+        cache[2] = p.z;
+        cache[3] = angles.x;
+        cache[4] = angles.y;
+        cache[5] = angles.z;
+        cache[6] = s.x;
+        cache[7] = s.y;
+        cache[8] = s.z;
+      }
+      const parent = entities.get(n.parent?.metadata?.arkglideId),
+        parentHandle = parent && handles.get(parent),
+        parentId = parentHandle?.mesh === n.parent ? parentHandle.nativeId : 0;
+      if (h.syncedParent !== parentId) {
+        if (!h.native.setParent(h.nativeId, parentId))
+          throw Error("Invalid logical scene hierarchy");
+        h.syncedParent = parentId;
+      }
     }
     function sync() {
       for (const e of entities.values()) syncEntity(e);
@@ -102,6 +136,43 @@
           ? mesh.rotationQuaternion.toEulerAngles()
           : mesh[field];
       return { x: value.x, y: value.y, z: value.z };
+    }
+
+    // The native view stays private and is consumed before any other WASM
+    // allocation. Position queries copy three scalars instead of a 16-value
+    // matrix; getWorldMatrix still returns an independent script-owned array.
+    function worldMatrix(entity) {
+      const math = getMath(),
+        mesh = meshOf(entity),
+        h = handles.get(entity);
+      if (h.native) {
+        const chain = [];
+        let node = mesh,
+          foreign = false;
+        while (node && node.position) {
+          const e = entities.get(node.metadata?.arkglideId);
+          if (!e || handles.get(e).mesh !== node) {
+            foreign = true;
+            break;
+          }
+          chain.push(e);
+          node = node.parent;
+        }
+        if (!foreign) {
+          for (let i = chain.length - 1; i >= 0; i--) syncEntity(chain[i]);
+          return h.native.world(h.nativeId);
+        }
+      }
+      if (!math) return mesh.computeWorldMatrix(true).m;
+      function world(node) {
+        const angles =
+          node.rotationQuaternion?.toEulerAngles() || node.rotation;
+        const local = math.mat4.compose(node.position, angles, node.scaling);
+        return node.parent && node.parent.position
+          ? math.mat4.multiply(world(node.parent), local)
+          : local;
+      }
+      return world(mesh);
     }
 
     class EntityHandle {
@@ -187,40 +258,10 @@
         setVector(this, "rotation", x, y, z);
       }
       getWorldMatrix() {
-        const math = getMath(),
-          mesh = meshOf(this);
-        const h = handles.get(this);
-        if (h.native) {
-          const chain = [];
-          let node = mesh,
-            foreign = false;
-          while (node && node.position) {
-            const e = entities.get(node.metadata?.arkglideId);
-            if (!e || handles.get(e).mesh !== node) {
-              foreign = true;
-              break;
-            }
-            chain.push(e);
-            node = node.parent;
-          }
-          if (!foreign) {
-            for (let i = chain.length - 1; i >= 0; i--) syncEntity(chain[i]);
-            return Array.from(h.native.world(h.nativeId));
-          }
-        }
-        if (!math) return Array.from(mesh.computeWorldMatrix(true).m);
-        function world(node) {
-          const angles =
-            node.rotationQuaternion?.toEulerAngles() || node.rotation;
-          const local = math.mat4.compose(node.position, angles, node.scaling);
-          return node.parent && node.parent.position
-            ? math.mat4.multiply(world(node.parent), local)
-            : local;
-        }
-        return world(mesh);
+        return Array.from(worldMatrix(this));
       }
       getWorldPosition() {
-        const matrix = this.getWorldMatrix();
+        const matrix = worldMatrix(this);
         return { x: matrix[12], y: matrix[13], z: matrix[14] };
       }
       getScale() {

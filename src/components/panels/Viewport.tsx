@@ -208,12 +208,26 @@ export default function Viewport() {
       camera.target.addInPlace(move);
     });
 
-    engine.runRenderLoop(() => scene.render());
+    const renderEditor = () => scene.render();
+    // The runtime iframe covers this canvas during play/pause. Release its GPU
+    // work completely; resume the same scene when returning to authoring.
+    const updateRendering = () => {
+      engine.stopRenderLoop(renderEditor);
+      if (useEditorStore.getState().playState === "stopped") {
+        engine.resize();
+        engine.runRenderLoop(renderEditor);
+      }
+    };
+    const unsubscribeRendering = useEditorStore.subscribe((state, previous) => {
+      if (state.playState !== previous.playState) updateRendering();
+    });
+    updateRendering();
 
     const ro = new ResizeObserver(() => engine.resize());
     ro.observe(canvas);
 
     return () => {
+      unsubscribeRendering();
       ro.disconnect();
       engine.stopRenderLoop();
       scene.onBeforeRenderObservable.remove(flyObserver);

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 function twoPartGLB() {
   const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
   const json = {

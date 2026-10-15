@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {zipSync,strToU8} from 'fflate';
 
 test('batch one: clock, cleanup, diagnostics and crash recovery',async({page})=>{
