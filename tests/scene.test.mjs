@@ -3,6 +3,22 @@ import assert from "node:assert/strict";
 import * as B from "@babylonjs/core";
 import "../public/arkglide-scene.js";
 import "../public/arkglide-api.js";
+test('clearing a scene before entity addition settles reports cancellation',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine),adapter=ArkGlideScene.createSceneAdapter(B,scene);
+ try {
+  const adding=adapter.add([{id:'late',name:'late',type:'empty',transform:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1}}]);
+  adapter.clear();await assert.rejects(adding,/已取消/);assert.equal(adapter.nodes.size,0);
+ } finally {adapter.dispose();engine.dispose();}
+});
+test('adding entities after scene disposal rejects rather than reporting success',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);
+ const adapter=ArkGlideScene.createSceneAdapter(B,scene);
+ try {
+  adapter.dispose();
+  await assert.rejects(adapter.add([{id:'late',name:'late',type:'empty',transform:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1}}]),/已取消/);
+  assert.equal(adapter.nodes.size,0);
+ } finally {adapter.dispose();engine.dispose();}
+});
 const node = (id, type = "mesh", extra = {}) => ({
   id,
   name: "Cube",
@@ -12,6 +28,89 @@ const node = (id, type = "mesh", extra = {}) => ({
   scale: { x: 1, y: 1, z: 1 },
   visible: true,
   ...extra,
+});
+test('a completion callback that clears then throws releases its model only once',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let adapter,disposals=0;
+ const fake={...B,SceneLoader:{async LoadAssetContainerAsync(){return {
+  meshes:[],transformNodes:[],animationGroups:[],addAllToScene(){},dispose(){disposals++;},
+ };}}};
+ adapter=ArkGlideScene.createSceneAdapter(fake,scene,{onLoaded(){adapter.clear();throw Error('initialization interrupted');}});
+ try {
+  await assert.rejects(adapter.add([node('model','model')],new Map([['model',new ArrayBuffer(4)]])),/已取消/);
+  assert.equal(disposals,1);assert.equal(adapter.resources.size,0);
+ } finally {adapter.dispose();engine.dispose();}
+});
+test('clearing from onLoaded makes prefab model addition report cancellation',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let adapter,disposals=0;
+ const fake={...B,SceneLoader:{async LoadAssetContainerAsync(){return {
+  meshes:[],transformNodes:[],animationGroups:[],addAllToScene(){},dispose(){disposals++;},
+ };}}};
+ adapter=ArkGlideScene.createSceneAdapter(fake,scene,{onLoaded:()=>adapter.clear()});
+ try {
+  await assert.rejects(adapter.add([node('model','model')],new Map([['model',new ArrayBuffer(4)]])),/已取消/);
+  assert.equal(adapter.resources.size,0);assert.equal(disposals,1);
+ } finally {adapter.dispose();engine.dispose();}
+});
+test('clearing the scene from model metadata callbacks cancels the pending load',async()=>{
+ for(const hook of ['onAnimations','onParts']){
+  const engine=new B.NullEngine(),scene=new B.Scene(engine);let disposals=0,loaded=0,adapter,armed=false;
+  const fake={...B,SceneLoader:{async LoadAssetContainerAsync(){return {
+   meshes:[],transformNodes:[],animationGroups:[{name:'clip',stop(){}}],addAllToScene(){},dispose(){disposals++;},
+  };}}};
+  adapter=ArkGlideScene.createSceneAdapter(fake,scene,{
+   [hook]:()=>{if(armed){armed=false;adapter.clear();}},onLoaded:()=>loaded++,
+  });
+  try {
+   const pending=adapter.sync([node('model','model')],new Map([['model',new ArrayBuffer(4)]]));
+   armed=true;const results=await pending;
+   assert.ok(results.includes(false));assert.equal(adapter.resources.size,0);
+   assert.equal(adapter.nodes.size,0);assert.equal(disposals,1);assert.equal(loaded,0);
+  } finally {adapter.dispose();engine.dispose();}
+ }
+});
+test('failed model initialization removes its disposed container and metadata',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let disposals=0,clips=[],parts=[];
+ const fake={...B,SceneLoader:{async LoadAssetContainerAsync(){return {
+  meshes:[],transformNodes:[],animationGroups:[{name:'clip',stop(){}}],addAllToScene(){},dispose(){disposals++;},
+ };}}};
+ const adapter=ArkGlideScene.createSceneAdapter(fake,scene,{
+  onLoaded(){throw Error('component initialization failed');},
+  onAnimations:(id,names)=>{clips=names;},onParts:(id,names)=>{parts=names;},
+ });
+ try {
+  const results=await adapter.sync([node('model','model')],new Map([['model',new ArrayBuffer(4)]]));
+  assert.ok(results.includes(false));assert.equal(adapter.resources.size,0);
+  assert.deepEqual(clips,[]);assert.deepEqual(parts,[]);assert.equal(disposals,1);
+  adapter.clear();assert.equal(disposals,1);
+ } finally {adapter.dispose();engine.dispose();}
+});
+test('replacing a model clears old animation metadata even when loading fails',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let fail=false,clips=[];
+ const fake={...B,SceneLoader:{async LoadAssetContainerAsync(){
+  if(fail)throw Error('broken replacement');
+  return {meshes:[],transformNodes:[],animationGroups:[{name:'Old clip',stop(){}}],addAllToScene(){},dispose(){}};
+ }}};
+ const adapter=ArkGlideScene.createSceneAdapter(fake,scene,{onAnimations:(id,names)=>{clips=names;}});
+ try {
+  await adapter.sync([node('model','model')],new Map([['model',new ArrayBuffer(4)]]));
+  assert.deepEqual(clips,['Old clip']);fail=true;
+  await adapter.sync([node('model','model')],new Map([['model',new ArrayBuffer(8)]]));
+  assert.deepEqual(clips,[]);
+ } finally {adapter.dispose();engine.dispose();}
+});
+test('clearing a scene clears model metadata alongside its resources',async()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine);let clips=[],parts=[];
+ const fake={...B,SceneLoader:{async LoadAssetContainerAsync(){return {
+  meshes:[],transformNodes:[],animationGroups:[{name:'clip',stop(){}}],addAllToScene(){},dispose(){},
+ };}}};
+ const adapter=ArkGlideScene.createSceneAdapter(fake,scene,{
+  onAnimations:(id,names)=>{clips=names;},onParts:(id,names)=>{parts=names;},
+ });
+ try {
+  await adapter.sync([node('model','model')],new Map([['model',new ArrayBuffer(4)]]));
+  assert.deepEqual(clips,['clip']);adapter.clear();
+  assert.deepEqual(clips,[]);assert.deepEqual(parts,[]);
+ } finally {adapter.dispose();engine.dispose();}
 });
 function setup(options = {}) {
   const engine = new B.NullEngine(),
