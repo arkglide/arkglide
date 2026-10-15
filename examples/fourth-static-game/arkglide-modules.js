@@ -64,7 +64,11 @@
           node.type,
         );
       if (node.type === "ReturnStatement" && !functionDepth) topReturn = true;
-      if (node.type === "AwaitExpression" && !functionDepth)
+      if (
+        (node.type === "AwaitExpression" ||
+          (node.type === "ForOfStatement" && node.await)) &&
+        !functionDepth
+      )
         throw failure(
           file,
           "暂不支持顶层 await；请在脚本启动后的异步函数中使用 await",
@@ -139,10 +143,13 @@
     try {
       return inspect(source);
     } catch {}
-    const imports = [];
+    const imports = [],
+      references = [],
+      history = [];
     let hasExports = false,
       depth = 0,
-      start = null;
+      start = null,
+      exportStart = null;
     try {
       const tokens = root.acorn.tokenizer(source, {
         ecmaVersion: 2022,
@@ -152,28 +159,60 @@
         const token = tokens.getToken(),
           label = token.type.label;
         if (label === "eof") break;
-        if (!depth && label === "export") hasExports = true;
+        if (!depth && label === "export") {
+          hasExports = true;
+          exportStart = token.start;
+        }
+        if (
+          label === "string" && history.at(-1) === "(" &&
+          history.at(-2) === "import" && ![".", "?."].includes(history.at(-3))
+        )
+          references.push({ value: token.value, start: token.start, end: token.end });
+        if (!depth && exportStart !== null && label === "string" && history.at(-1) === "name") {
+          try {
+            const node = root.acorn.parse(source.slice(exportStart, token.end), {
+              ecmaVersion: 2022,
+              sourceType: "module",
+            }).body[0];
+            if (node.source)
+              references.push({
+                ...node.source,
+                start: exportStart + node.source.start,
+                end: exportStart + node.source.end,
+              });
+            exportStart = null;
+          } catch {}
+        }
+        if (!depth && label === ";") exportStart = null;
         if (!depth && label === "import") start = token.start;
         else if (start !== null) {
           if (label === "(" || label === ".") start = null;
-          else if (label === "string") {
+          else if (!depth && label === "string") {
             const text = source.slice(start, token.end);
             try {
               const node = root.acorn.parse(text, {
                 ecmaVersion: 2022,
                 sourceType: "module",
               }).body[0];
-              if (node.type === "ImportDeclaration")
+              if (node.type === "ImportDeclaration") {
                 imports.push({ ...node, start, end: token.end });
+                references.push({
+                  ...node.source,
+                  start: start + node.source.start,
+                  end: start + node.source.end,
+                });
+              }
             } catch {}
             start = null;
           }
         }
         if (["{", "(", "[", "${"].includes(label)) depth++;
         if (["}", ")", "]"].includes(label)) depth--;
+        history.push(label);
+        if (history.length > 3) history.shift();
       }
     } catch {}
-    return { imports, hasExports };
+    return { imports, hasExports, references };
   }
   function rewriteRename(sources, oldName, newName) {
     const result = {};
@@ -193,11 +232,7 @@
       try {
         references = inspect(source, file).references;
       } catch {
-        references = languageInfo(source).imports.map((n) => ({
-          ...n.source,
-          start: n.start + n.source.start,
-          end: n.start + n.source.end,
-        }));
+        references = languageInfo(source).references;
       }
       const replacements = [];
       for (const ref of references) {
@@ -327,8 +362,10 @@
       return url;
     }
     async function prepare() {
+      if (disposed) return;
       await Promise.all(
         [...entries].map(async (file) => {
+          if (disposed) return;
           try {
             const info = analyze(file);
             if (!info.hasExports && !info.references.length) return;

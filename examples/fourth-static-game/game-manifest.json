@@ -100,7 +100,7 @@
     },
     {
       "path": "standalone-player.js",
-      "byteLength": 11329
+      "byteLength": 11489
     },
     {
       "path": "index.html",
@@ -108,35 +108,35 @@
     },
     {
       "path": "arkglide-math.js",
-      "byteLength": 7320
+      "byteLength": 8071
     },
     {
       "path": "arkglide-api.js",
-      "byteLength": 8101
+      "byteLength": 9147
     },
     {
       "path": "arkglide-lifecycle.js",
-      "byteLength": 11932
+      "byteLength": 13173
     },
     {
       "path": "arkglide-scene.js",
-      "byteLength": 17697
+      "byteLength": 19138
     },
     {
       "path": "arkglide-prefabs.js",
-      "byteLength": 6788
+      "byteLength": 6794
     },
     {
       "path": "arkglide-physics-tools.js",
-      "byteLength": 34103
+      "byteLength": 34098
     },
     {
       "path": "arkglide-physics.js",
-      "byteLength": 17306
+      "byteLength": 17487
     },
     {
       "path": "arkglide-input-ui.js",
-      "byteLength": 33454
+      "byteLength": 34145
     },
     {
       "path": "arkglide-audio-stretch.js",
@@ -144,19 +144,19 @@
     },
     {
       "path": "arkglide-audio.js",
-      "byteLength": 22604
+      "byteLength": 24153
     },
     {
       "path": "arkglide-animation-tools.js",
-      "byteLength": 24643
+      "byteLength": 24795
     },
     {
       "path": "arkglide-animation.js",
-      "byteLength": 4365
+      "byteLength": 4436
     },
     {
       "path": "arkglide-modules.js",
-      "byteLength": 14634
+      "byteLength": 15960
     },
     {
       "path": "lib/babylon.js",
@@ -188,7 +188,7 @@
     },
     {
       "path": "lib/babylon-LICENSE.md",
-      "byteLength": 9226
+      "byteLength": 9155
     },
     {
       "path": "lib/arkglide-LICENSE.txt",

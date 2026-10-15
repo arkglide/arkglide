@@ -57,13 +57,9 @@
           );
           vertices.push(p.x * scale.x, p.y * scale.y, p.z * scale.z);
         }
-        indices.push(
-          ...Array.from(
-            idx?.length
-              ? idx
-              : Array.from({ length: data.length / 3 }, (_, i) => i),
-          ).map((i) => i + offset),
-        );
+        const count = idx?.length || data.length / 3;
+        for (let i = 0; i < count; i++)
+          indices.push((idx?.length ? idx[i] : i) + offset);
       }
       if (
         !vertices.length ||
@@ -160,10 +156,11 @@
             !!(groups[l >> 1].mask & (1 << sourceGroup))));
       const accept = (id) => {
         const eid = numbers.get(id),
-          r = bodies.get(eid) || chars.get(eid);
+          r = bodies.get(eid) || chars.get(eid),
+          entity = o.find(eid);
         return (
           !!r &&
-          o.find(eid) &&
+          entity && !entity.destroyed &&
           (!q.character || !chars.has(eid)) &&
           !(q.ignore || []).some((e) => (e?.id || e) === eid) &&
           (q.sensors !== false || !r.config.sensor)

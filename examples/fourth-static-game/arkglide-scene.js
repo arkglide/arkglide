@@ -63,26 +63,32 @@
           texture: null,
         };
         slots.set(key, item);
-        item.texture = new B.Texture(
-          url,
-          scene,
-          false,
-          true,
-          B.Texture.TRILINEAR_SAMPLINGMODE,
-          finish,
-          (message, error) => {
-            if (slots.get(key) === item)
-              options.onError?.(
-                { id: textureId, name: asset.name, type: "texture" },
-                error || new Error(message || "贴图解码失败"),
-              );
-            finish();
-          },
-          undefined,
-          false,
-          undefined,
-          asset.mime,
-        );
+        try {
+          item.texture = new B.Texture(
+            url,
+            scene,
+            false,
+            true,
+            B.Texture.TRILINEAR_SAMPLINGMODE,
+            finish,
+            (message, error) => {
+              if (slots.get(key) === item)
+                options.onError?.(
+                  { id: textureId, name: asset.name, type: "texture" },
+                  error || new Error(message || "贴图解码失败"),
+                );
+              finish();
+            },
+            undefined,
+            false,
+            undefined,
+            asset.mime,
+          );
+        } catch (error) {
+          if (slots.get(key) === item) slots.delete(key);
+          release(item);
+          throw error;
+        }
         item.texture.name = "arkglide:texture:" + key;
         item.texture.gammaSpace = role === "albedo";
         old = item;
@@ -231,8 +237,11 @@
       const resource = resources.get(id);
       resources.delete(id);
       if (resource) resource.dispose();
-      if (definitions.find((n) => n.id === id)?.type === "model")
+      if (definitions.find((n) => n.id === id)?.type === "model" ||
+          records.get(id)?.definition.type === "model") {
         options.onParts?.(id, []);
+        options.onAnimations?.(id, []);
+      }
     }
     function decorate(mesh, id) {
       mesh.metadata = { ...(mesh.metadata || {}), arkglideId: id };
@@ -372,7 +381,7 @@
       pending.set(node.id, token);
       options.onLoading?.(1);
       const url = URL.createObjectURL(new Blob([buffer]));
-      let container;
+      let container, registered = false;
       try {
         container = await B.SceneLoader.LoadAssetContainerAsync(
           "",
@@ -395,6 +404,10 @@
           node.id,
           (container.animationGroups || []).map((g) => g.name),
         );
+        if (disposed || pending.get(node.id) !== token || object !== nodes.get(node.id)) {
+          container.dispose();
+          return false;
+        }
         const parts = [];
         container.meshes.forEach((mesh, index) => {
           if (!mesh.getTotalVertices?.()) return;
@@ -410,6 +423,10 @@
           );
         });
         options.onParts?.(node.id, parts);
+        if (disposed || pending.get(node.id) !== token || object !== nodes.get(node.id)) {
+          container.dispose();
+          return false;
+        }
         const imported = new Set([
           ...container.meshes,
           ...container.transformNodes,
@@ -419,15 +436,26 @@
           decorate(mesh, node.id);
         });
         resources.set(node.id, container);
+        registered = true;
         materialLibrary.apply(
           definitions.find((n) => n.id === node.id) || node,
           object,
         );
         options.onLoaded?.(node.id);
+        if (disposed || pending.get(node.id) !== token || object !== nodes.get(node.id))
+          return false;
       } catch (error) {
-        container?.dispose();
-        if (!disposed && pending.get(node.id) === token)
+        const ownsContainer = !registered || resources.get(node.id) === container;
+        if (resources.get(node.id) === container && container) {
+          materialLibrary.prepareDestroy(object);
+          resources.delete(node.id);
+        }
+        if (ownsContainer) container?.dispose();
+        if (!disposed && pending.get(node.id) === token) {
+          options.onAnimations?.(node.id, []);
+          options.onParts?.(node.id, []);
           options.onError?.(node, error);
+        }
         return false;
       } finally {
         URL.revokeObjectURL(url);
@@ -516,14 +544,18 @@
       resources,
       sync,
       add(next, buffers, content, textureBuffers) {
+        if (disposed) return Promise.reject(new Error("场景已销毁，实体添加已取消"));
         definitions = definitions.filter((n) => nodes.has(n.id));
-        return sync(
+        const loading = sync(
           [...definitions, ...next],
           buffers,
           content,
           textureBuffers,
-        ).then((results) => {
-          if (results?.some((result) => result === false))
+        );
+        const added = next.map((node) => [node.id, nodes.get(node.id)]);
+        return loading.then((results) => {
+          if (disposed || added.some(([id, object]) => !object || nodes.get(id) !== object) ||
+              results?.some((result) => result === false))
             throw new Error("预制体模型加载失败或已取消");
         });
       },

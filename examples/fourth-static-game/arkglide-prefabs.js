@@ -98,10 +98,10 @@
       };
       pending.add(token);
       const untrack = owner?.track(token.cancel);
-      for (const n of prefab.nodes)
-        if (n.type === "model")
-          buffers[nodeMap[n.id]] = buffers[prefab.modelKeys[n.id]].slice(0);
       try {
+        for (const n of prefab.nodes)
+          if (n.type === "model")
+            buffers[nodeMap[n.id]] = buffers[prefab.modelKeys[n.id]].slice(0);
         await Promise.race([
           Promise.resolve().then(() => {
             if (!token.live) throw abortError();
