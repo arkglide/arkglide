@@ -4,7 +4,8 @@
   function createSession(options = {}) {
     const records = [],
       scheduled = new Map(),
-      subscriptions = new Set();
+      subscriptions = new Set(),
+      nativeListeners = new Set();
     let nextId = 0,
       last = null,
       accumulator = 0,
@@ -38,15 +39,20 @@
     });
     function report(record, hook, error) {
       errors++;
-      options.onError?.({
+      try {
+        options.onError?.({
         file: record?.file,
         entityId: record?.entity?.id,
         hook,
         error,
-      });
+        });
+      } catch (reportError) {
+        root.console?.error("Lifecycle error reporting failed", reportError, error);
+      }
     }
     function call(record, hook, callback, args = []) {
-      if (!record.active || typeof callback !== "function") return;
+      if (!record.active || ((record.destroying || record.entity?.destroyed) && hook !== "onDestroy") ||
+          typeof callback !== "function") return;
       const started = now();
       try {
         callback.apply(record.instance, args);
@@ -75,19 +81,21 @@
       call(record, "onDestroy", record.instance?.onDestroy);
       record.active = false;
       cleanup(record);
+      const index = records.indexOf(record);
+      if (index >= 0) records.splice(index, 1);
     }
     function owner(entity, file) {
       const record = {
         entity,
         file,
         instance: null,
-        active: true,
+        active: !stopping,
         started: false,
         destroying: false,
         cleanup: new Set(),
         failed: new Set(),
       };
-      records.push(record);
+      if (record.active) records.push(record);
       const allowed = () =>
         record.active &&
         !record.destroying &&
@@ -170,8 +178,12 @@
               dispose();
             if (once) dispose();
           };
-          if (allowed()) target.addEventListener(name, wrapped, options);
+          if (allowed()) {
+            target.addEventListener(name, wrapped, options);
+            nativeListeners.add(wrapped);
+          }
           dispose = track(() => {
+            nativeListeners.delete(wrapped);
             target.removeEventListener(name, wrapped, { capture });
             if (dispose) signal?.removeEventListener("abort", dispose);
           });
@@ -188,6 +200,8 @@
       };
       const nativeTimers = new Map();
       function nativeTimer(callback, ms, interval, args) {
+        if (typeof callback !== "function")
+          throw new TypeError("Expected a timer callback function");
         const id = ++nextId;
         nativeTimers.set(
           id,
@@ -236,25 +250,27 @@
     }
     function start(settings = {}) {
       const step = settings.fixedTimeStep ?? 1 / 60,
-        substeps = settings.maxSubSteps ?? 8;
+        substeps = settings.maxSubSteps ?? 8,
+        nextScale = settings.timeScale ?? 1;
       if (
         !Number.isFinite(step) ||
         step < 1 / 240 ||
         step > 0.1 ||
         !Number.isInteger(substeps) ||
         substeps < 1 ||
-        substeps > 32
+        substeps > 32 ||
+        !Number.isFinite(nextScale) || nextScale < 0 || nextScale > 100
       )
         throw new RangeError("Invalid fixed time step settings");
       time.fixedDeltaTime = step;
-      maxSubSteps = settings.maxSubSteps ?? 8;
-      time.timeScale = settings.timeScale ?? 1;
-      // All factories complete before start; dynamic batches use the same ordering.
-      startRecords(records);
+      maxSubSteps = substeps;
+      time.timeScale = nextScale;
       if (!stopping) {
         active = true;
         last = null;
       }
+      // All factories complete before start; dynamic batches use the same ordering.
+      startRecords(records);
     }
     function startRecords(batch) {
       for (const record of [...batch]) {
@@ -287,6 +303,7 @@
       droppedTime += Math.max(0, raw - clamped) * scale;
       for (const record of [...records])
         if (record.entity?.destroyed) release(record);
+      if (!active) return;
       accumulator += time.deltaTime;
       let steps = 0;
       while (
@@ -297,10 +314,14 @@
         steps++;
         time.fixedTotalTime += time.fixedDeltaTime;
         time.fixedFrameCount++;
-        for (const record of [...records])
+        for (const record of [...records]) {
+          if (!active) return;
           if (record.started && !record.failed.has("onFixedUpdate"))
             call(record, "onFixedUpdate", record.instance?.onFixedUpdate);
+        }
+        if (!active) return;
         options.onFixedStep?.(time.fixedDeltaTime);
+        if (!active) return;
       }
       // Physics consumes the velocities/forces set by this fixed script batch.
       if (accumulator >= time.fixedDeltaTime) {
@@ -312,6 +333,7 @@
       time.interpolationAlpha = Math.max(0, accumulator / time.fixedDeltaTime);
       // At most one callback per repeating timer per rendered frame; missed intervals are coalesced.
       for (const item of [...scheduled.values()]) {
+        if (!active) return;
         if (
           !scheduled.has(item.id) ||
           item.due > time.totalTime + 1e-10 ||
@@ -323,9 +345,11 @@
         if (call(item.record, "timer:" + item.id, item.callback) === false)
           item.cancel();
       }
-      for (const record of [...records])
+      for (const record of [...records]) {
+        if (!active) return;
         if (record.started && !record.failed.has("onUpdate"))
           call(record, "onUpdate", record.instance?.onUpdate);
+      }
     }
     function pause() {
       active = false;
@@ -334,6 +358,7 @@
       time.unscaledDeltaTime = 0;
     }
     function resume() {
+      if (stopping) return;
       active = true;
       last = null;
     }
@@ -365,11 +390,7 @@
         scripts: records.filter((r) => r.active).length,
         timers: scheduled.size,
         subscriptions: subscriptions.size,
-        listeners:
-          records.reduce((n, r) => n + r.cleanup.size, 0) -
-          scheduled.size -
-          subscriptions.size -
-          records.filter((r) => r.active).length,
+        listeners: nativeListeners.size,
         scriptMs,
         droppedTime,
         errors,

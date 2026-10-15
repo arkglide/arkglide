@@ -3,6 +3,84 @@ import assert from 'node:assert/strict';
 import {getEventListeners} from 'node:events';
 import '../src/engine/lifecycle-runtime.js';
 const create=options=>globalThis.ArkGlideLifecycle.createSession(options);
+test('injected native timers reject non-function callbacks without allocating timers',()=>{
+ const session=create(),owner=session.owner({id:'one'},'timers.js');owner.attach({});
+ for(const callback of [null,undefined,42,'code']){
+  assert.throws(()=>owner.globals.setTimeout(callback,10),TypeError);
+  assert.throws(()=>owner.globals.setInterval(callback,10),TypeError);
+ }
+ assert.equal(session.stats().timers,0);session.stop();
+});
+test('destroyed entities stop receiving events before the next cleanup tick',()=>{
+ const session=create(),entity={id:'gone',destroyed:false},owner=session.owner(entity,'gone.js'),sender=session.owner({id:'sender'},'sender.js');
+ let events=0,destroyed=0;owner.attach({onDestroy(){destroyed++;}});sender.attach({});
+ owner.events.on('message',()=>events++);session.start();entity.destroyed=true;
+ sender.events.emit('message');assert.equal(events,0);
+ session.tick(0);assert.equal(destroyed,1);session.stop();assert.equal(destroyed,1);
+});
+test('invalid startup time scale preserves the existing simulation settings',()=>{
+ const session=create();session.start({fixedTimeStep:1/60,maxSubSteps:8,timeScale:2});
+ assert.throws(()=>session.start({fixedTimeStep:0.1,maxSubSteps:1,timeScale:NaN}),RangeError);
+ assert.equal(session.time.fixedDeltaTime,1/60);assert.equal(session.time.timeScale,2);
+ session.tick(0);session.tick(100);assert.equal(session.time.fixedFrameCount,8);session.stop();
+});
+test('listener telemetry counts native event listeners rather than unrelated owned resources',()=>{
+ const session=create(),owner=session.owner({id:'one'},'resources.js'),target=new EventTarget();
+ owner.attach({});session.start();
+ const resource=owner.track(()=>{});
+ assert.equal(session.stats().listeners,0);
+ const listener=owner.events.listen(target,'ping',()=>{});
+ assert.equal(session.stats().listeners,1);resource();assert.equal(session.stats().listeners,1);
+ listener();assert.equal(session.stats().listeners,0);session.stop();
+});
+test('tick removes script records of entities destroyed outside the lifecycle API',()=>{
+ const session=create();session.start();let destroyed=0;
+ for(let i=0;i<20;i++){
+  const entity={id:String(i),destroyed:false},owner=session.owner(entity,'dynamic.js');
+  owner.attach({onDestroy(){destroyed++;}});session.startRecords([owner.record]);
+  entity.destroyed=true;session.tick(i*20);
+  assert.equal(session.records.length,0);assert.equal(session.stats().scripts,0);
+ }
+ assert.equal(destroyed,20);session.stop();
+});
+test('destroying owners do not receive events emitted by another owner during teardown',()=>{
+ const session=create(),a=session.owner({id:'a'},'a.js'),b=session.owner({id:'b'},'b.js');let events=0;
+ a.attach({onDestroy(){b.events.emit('cleanup');}});b.attach({});
+ a.events.on('cleanup',()=>events++);session.start();session.destroyEntity('a');
+ assert.equal(events,0);session.stop();
+});
+test('pause requested during startup remains effective until explicit resume',()=>{
+ const session=create(),owner=session.owner({id:'one'},'startup.js');let frames=0;
+ owner.attach({onStart(){session.pause();},onUpdate(){frames++;}});
+ session.start();session.tick(0);session.tick(20);
+ assert.equal(frames,0);assert.equal(session.time.frameCount,0);
+ session.resume();session.tick(40);assert.equal(frames,1);session.stop();
+});
+test('late owners after session stop remain inactive and retain no script records',()=>{
+ const session=create();session.start();session.stop();
+ const owner=session.owner({id:'late'},'late.js');let calls=0;
+ owner.attach({onStart(){calls++;},onDestroy(){calls++;}});
+ owner.timers.after(0,()=>calls++);owner.events.on('late',()=>calls++);
+ session.startRecords([owner.record]);owner.events.emit('late');
+ assert.equal(owner.record.active,false);assert.equal(session.records.length,0);
+ assert.equal(session.stats().scripts,0);assert.equal(session.stats().timers,0);assert.equal(calls,0);
+});
+test('stopping inside a fixed hook prevents physics stepping and stopped sessions cannot resume',()=>{
+ let steps=0;
+ const session=create({onFixedStep:()=>steps++}),owner=session.owner({id:'one'},'stop.js');
+ owner.attach({onFixedUpdate(){session.stop();}});session.start();session.tick(0);session.tick(20);
+ assert.equal(steps,0);assert.equal(session.time.frameCount,0);
+ session.resume();session.tick(100);assert.equal(session.time.frameCount,0);
+});
+test('pausing inside a timer defers remaining timers and frame hooks until resume',()=>{
+ const session=create(),owner=session.owner({id:'one'},'pause.js'),calls=[];
+ owner.attach({onUpdate(){calls.push('frame');}});
+ owner.timers.after(0.02,()=>{calls.push('pause');session.pause();});
+ owner.timers.after(0.02,()=>calls.push('timer'));
+ session.start();session.tick(0);calls.length=0;session.tick(20);
+ assert.deepEqual(calls,['pause']);session.resume();session.tick(30);
+ assert.deepEqual(calls,['pause','timer','frame']);session.stop();
+});
 
 test('fixed-step results agree at 30, 60 and 120 FPS and run before frame hooks',()=>{
   for(const fps of [30,60,120]){
@@ -97,4 +175,15 @@ test('aborted native listeners release their owned cleanup records',()=>{
  assert.equal(getEventListeners(target,'ping').length,0);assert.equal(session.stats().listeners,0);
  owner.events.listen(target,'ping',()=>{}, {signal:controller.signal});
  assert.equal(session.stats().listeners,0);session.stop();
+});
+
+test('a throwing error reporter cannot interrupt script teardown or remaining owners',()=>{
+ const session=create({onError(){throw Error('reporter failed');}}),a=session.owner({id:'a'},'a.js'),b=session.owner({id:'b'},'b.js');
+ let released=0;
+ a.attach({onDestroy(){released++;}});
+ b.attach({onDestroy(){throw Error('script destroy failed');}});
+ a.timers.after(1,()=>{});b.timers.after(1,()=>{});
+ session.start();assert.doesNotThrow(()=>session.stop());
+ assert.equal(released,1);assert.equal(session.records.length,0);
+ assert.equal(session.stats().timers,0);assert.equal(session.stats().errors,1);
 });
