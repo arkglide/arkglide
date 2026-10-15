@@ -1,5 +1,5 @@
 import { NodeContentInspector } from "./ContentPanel";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   Box,
   TextField,
@@ -25,6 +25,24 @@ const DEG2RAD = Math.PI / 180;
 type Mixed<T> = T | "mixed";
 // 三轴向量，每轴可为具体值或 'mixed'
 type Vec3Mixed = { x: Mixed<number>; y: Mixed<number>; z: Mixed<number> };
+
+function AxisField({label, value, mixed, onChange}: {
+  label: string; value: string; mixed: boolean; onChange: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return <TextField
+    label={label} type="number" size="small" fullWidth
+    value={draft ?? value} placeholder={mixed ? "—" : undefined}
+    onFocus={() => setDraft(value)}
+    onBlur={() => setDraft(null)}
+    onChange={(event) => {
+      const text = event.target.value;
+      setDraft(text);
+      if (text.trim() && Number.isFinite(Number(text))) onChange(Number(text));
+    }}
+    sx={{ "& .MuiInputBase-input": { fontSize: 12 } }}
+  />;
+}
 
 // 三轴数值输入组（支持 'mixed' 显示，按轴回调修改）
 // isAngle=true 时 value 是弧度，显示角度；'mixed' 显示空 + placeholder "—"
@@ -53,16 +71,12 @@ function Vec3Input({
       {(["x", "y", "z"] as const).map((axis) => {
         const isMixed = value[axis] === "mixed";
         return (
-          <TextField
+          <AxisField
             key={axis}
             label={`${label} ${axis.toUpperCase()}`}
-            type="number"
-            size="small"
-            fullWidth
             value={toDisplay(value[axis])}
-            placeholder={isMixed ? "—" : undefined}
-            onChange={(e) => handleChange(axis, Number(e.target.value))}
-            sx={{ "& .MuiInputBase-input": { fontSize: 12 } }}
+            mixed={isMixed}
+            onChange={(next) => handleChange(axis, next)}
           />
         );
       })}
@@ -146,6 +160,7 @@ export default function Inspector() {
     axis: "x" | "y" | "z",
     newVal: number,
   ) => {
+    if (selectedNodes.every((n) => Object.is(n[field][axis], newVal))) return;
     beginTransform();
     selectedNodes.forEach((n) => {
       updateTransform(
@@ -170,6 +185,9 @@ export default function Inspector() {
       Pick<SceneNode, "visible" | "color" | "intensity" | "fov">
     >,
   ) => {
+    if (selectedNodes.every((n) => Object.entries(partial).every(
+      ([key, value]) => Object.is(n[key as keyof SceneNode], value),
+    ))) return;
     beginTransform();
     selectedNodeIds.forEach((id) => updateTransform(id, partial, false));
   };

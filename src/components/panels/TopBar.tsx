@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
+  Alert,
   AppBar,
   Toolbar,
   Box,
@@ -87,11 +88,20 @@ export default function TopBar() {
 
   // 项目设置 Dialog 状态
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   // 从 store 获取 settings 和 updateSettings
   const settings = useEditorStore((s) => s.settings);
   const updateSettings = useEditorStore((s) => s.updateSettings);
   // 本地编辑副本（Dialog 打开时从 store 复制，确认时写回）
   const [localSettings, setLocalSettings] = useState<ProjectSettings>(settings);
+  const [gravityDraft, setGravityDraft] = useState(() => ({
+    x: String(settings.gravity.x), y: String(settings.gravity.y), z: String(settings.gravity.z),
+  }));
+
+  const [timeDraft, setTimeDraft] = useState(() => ({
+    scale: String(settings.timeScale), hz: String(1 / settings.fixedTimeStep),
+    substeps: String(settings.maxSubSteps), fps: String(settings.fpsCap),
+  }));
 
   // 关闭菜单
   const closeMenu = () => setAnchorEl(null);
@@ -215,6 +225,9 @@ export default function TopBar() {
   // 打开项目设置 Dialog：关闭菜单 + 从 store 拷贝当前 settings 到本地副本
   const handleOpenSettings = () => {
     closeMenu();
+    setSettingsError(null);
+    setTimeDraft({scale:String(settings.timeScale),hz:String(1/settings.fixedTimeStep),substeps:String(settings.maxSubSteps),fps:String(settings.fpsCap)});
+    setGravityDraft({x:String(settings.gravity.x),y:String(settings.gravity.y),z:String(settings.gravity.z)});
     setLocalSettings({ ...settings, gravity: { ...settings.gravity } });
     setSettingsDialogOpen(true);
   };
@@ -222,9 +235,12 @@ export default function TopBar() {
   // 确认设置：调用 updateSettings 写回 store + 关闭 Dialog
   const handleSettingsConfirm = () => {
     try{
-      validateProject({scene:{nodes:useEditorStore.getState().nodes},scripts:useEditorStore.getState().scripts,settings:localSettings});
-      updateSettings(localSettings);setSettingsDialogOpen(false);setImportError(null);
-    }catch(error){setImportError(String(error));}
+      const state = useEditorStore.getState();
+      const number = (value: string) => value.trim() ? Number(value) : NaN;
+      const nextSettings = {...localSettings,timeScale:number(timeDraft.scale),fixedTimeStep:1/number(timeDraft.hz),maxSubSteps:number(timeDraft.substeps),fpsCap:number(timeDraft.fps),gravity:{x:number(gravityDraft.x),y:number(gravityDraft.y),z:number(gravityDraft.z)}};
+      validateProject({scene:{nodes:state.nodes},scripts:state.scripts,content:state.content,settings:nextSettings});
+      updateSettings(nextSettings);setSettingsDialogOpen(false);setImportError(null);
+    }catch(error){setSettingsError(error instanceof Error ? error.message : String(error));}
   };
 
   // 全局撤销/重做快捷键：Ctrl/Cmd+Z 撤销，Ctrl/Cmd+Shift+Z 或 Ctrl/Cmd+Y 重做
@@ -237,6 +253,9 @@ export default function TopBar() {
       // Monaco 焦点检查：Monaco 容器带 class 'monaco-editor'
       const active = document.activeElement;
       if (active) {
+        if (active.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
+        if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' ||
+            (active instanceof HTMLElement && active.isContentEditable)) return;
         const monacoContainer = active.closest('.monaco-editor');
         if (monacoContainer) return; // 焦点在 Monaco 内，交给 Monaco 处理
       }
@@ -354,6 +373,7 @@ export default function TopBar() {
             value={projectNameInput}
             onChange={(e) => setProjectNameInput(e.target.value)}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
               if (e.key === 'Enter') void handleSaveConfirm();
             }}
             disabled={saving}
@@ -449,6 +469,7 @@ export default function TopBar() {
         PaperProps={{ sx: { borderRadius: 4, backgroundColor: '#1E1E1E' } }}
       >
         <DialogTitle sx={{ fontSize: 14, fontWeight: 600 }}>项目设置</DialogTitle>
+        {settingsError && <Alert severity="error" sx={{mx:3,mb:1}}>{settingsError}</Alert>}
         <DialogContent sx={{ minWidth: 320, py: 2 }}>
           {/* 重力 */}
           <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
@@ -459,24 +480,24 @@ export default function TopBar() {
               size="small"
               type="number"
               label="X"
-              value={localSettings.gravity.x}
-              onChange={(e) => setLocalSettings((s) => ({ ...s, gravity: { ...s.gravity, x: parseFloat(e.target.value) || 0 } }))}
+              value={gravityDraft.x}
+              onChange={(e) => setGravityDraft((s) => ({ ...s, x: e.target.value }))}
               sx={{ flex: 1 }}
             />
             <TextField
               size="small"
               type="number"
               label="Y"
-              value={localSettings.gravity.y}
-              onChange={(e) => setLocalSettings((s) => ({ ...s, gravity: { ...s.gravity, y: parseFloat(e.target.value) || 0 } }))}
+              value={gravityDraft.y}
+              onChange={(e) => setGravityDraft((s) => ({ ...s, y: e.target.value }))}
               sx={{ flex: 1 }}
             />
             <TextField
               size="small"
               type="number"
               label="Z"
-              value={localSettings.gravity.z}
-              onChange={(e) => setLocalSettings((s) => ({ ...s, gravity: { ...s.gravity, z: parseFloat(e.target.value) || 0 } }))}
+              value={gravityDraft.z}
+              onChange={(e) => setGravityDraft((s) => ({ ...s, z: e.target.value }))}
               sx={{ flex: 1 }}
             />
           </Box>
@@ -547,9 +568,9 @@ export default function TopBar() {
 
           <Typography variant="caption" sx={{display:'block',mb:1}}>游戏时间与固定步</Typography>
           <Box sx={{display:'flex',gap:1,mb:2}}>
-            <TextField size="small" type="number" label="时间倍率" value={localSettings.timeScale} onChange={e=>setLocalSettings(s=>({...s,timeScale:Number(e.target.value)}))} />
-            <TextField size="small" type="number" label="固定步 Hz" value={Math.round(1/localSettings.fixedTimeStep)} onChange={e=>setLocalSettings(s=>({...s,fixedTimeStep:1/Number(e.target.value)}))} />
-            <TextField size="small" type="number" label="最大追赶步数" value={localSettings.maxSubSteps} onChange={e=>setLocalSettings(s=>({...s,maxSubSteps:Number(e.target.value)}))} />
+            <TextField size="small" type="number" label="时间倍率" value={timeDraft.scale} onChange={e=>setTimeDraft(s=>({...s,scale:e.target.value}))} />
+            <TextField size="small" type="number" label="固定步 Hz" value={timeDraft.hz} onChange={e=>setTimeDraft(s=>({...s,hz:e.target.value}))} />
+            <TextField size="small" type="number" label="最大追赶步数" value={timeDraft.substeps} onChange={e=>setTimeDraft(s=>({...s,substeps:e.target.value}))} />
           </Box>
           {/* 帧率上限 */}
           <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
@@ -559,8 +580,8 @@ export default function TopBar() {
             size="small"
             type="number"
             fullWidth
-            value={localSettings.fpsCap}
-            onChange={(e) => setLocalSettings((s) => ({ ...s, fpsCap: parseInt(e.target.value) || 0 }))}
+            value={timeDraft.fps}
+            onChange={(e) => setTimeDraft((s) => ({ ...s, fps: e.target.value }))}
             placeholder="60"
           />
         </DialogContent>

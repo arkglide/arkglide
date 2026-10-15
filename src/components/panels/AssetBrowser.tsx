@@ -119,6 +119,7 @@ function traverseFileList(files: FileList): AssetEntry[] {
 export default function AssetBrowser() {
   const [keyword, setKeyword] = useState("");
   const assets = useEditorStore((s) => s.assets);
+  const playState = useEditorStore((s) => s.playState);
   const setAssets = useEditorStore((s) => s.setAssets);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -267,6 +268,7 @@ export default function AssetBrowser() {
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={handleCreateScript}
+            disabled={playState !== "stopped"}
           >
             新建脚本
           </Button>

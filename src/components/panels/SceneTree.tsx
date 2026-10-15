@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import {
   List,
   ListItem,
@@ -31,6 +31,7 @@ import {
   type NodeType,
   type SceneNode,
 } from "../../store/useEditorStore";
+import { isSceneDescendant } from "../../utils/sceneHierarchy";
 
 // 节点类型 → 图标
 const NODE_ICON: Record<NodeType, ReactNode> = {
@@ -44,6 +45,7 @@ const NODE_ICON: Record<NodeType, ReactNode> = {
 // 左侧场景树：工具栏创建节点 + Delete 删除 + 双击重命名 + 拖拽父子层级
 export default function SceneTree() {
   const nodes = useEditorStore((s) => s.nodes);
+  const documentId = useEditorStore((s) => s.documentId);
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const selectedNodeIds = useEditorStore((s) => s.selectedNodeIds);
   const selectNode = useEditorStore((s) => s.selectNode);
@@ -76,6 +78,16 @@ export default function SceneTree() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   // 搜索框文本：实时过滤场景树节点（保持层级结构：匹配节点 + 祖先链）
   const [searchQuery, setSearchQuery] = useState("");
+  const selectionAnchor = useRef<string | null>(null);
+  useEffect(() => {
+    setHierarchyError(null);
+    setRenamingId(null);
+    setRenameValue("");
+    setDraggedId(null);
+    setDragOverId(null);
+    setSearchQuery("");
+    selectionAnchor.current = null;
+  }, [documentId]);
 
   // Delete 键监听：删除选中节点（重命名中或焦点在输入框时不触发）
   useEffect(() => {
@@ -83,7 +95,9 @@ export default function SceneTree() {
       if (useEditorStore.getState().playState !== "stopped") return;
       if (e.key === "Delete" && selectedNodeId && renamingId === null) {
         const target = e.target as HTMLElement;
-        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+        if (target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
+        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA" &&
+            !target.isContentEditable && !target.closest(".monaco-editor")) {
           const store = useEditorStore.getState();
           store.removeNodes(store.selectedNodeIds);
         }
@@ -100,6 +114,7 @@ export default function SceneTree() {
     const handler = (e: KeyboardEvent) => {
       if (useEditorStore.getState().playState !== "stopped") return;
       const target = e.target as HTMLElement;
+      if (target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
       if (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
@@ -112,21 +127,27 @@ export default function SceneTree() {
 
       const isCtrl = e.ctrlKey || e.metaKey;
       if (!isCtrl) return;
-
-      if (e.key === "c" || e.key === "C") {
-        e.preventDefault();
-        useEditorStore.getState().copyToClipboard();
-      } else if (e.key === "v" || e.key === "V") {
-        e.preventDefault();
-        useEditorStore.getState().pasteFromClipboard();
-      } else if (e.key === "d" || e.key === "D") {
-        e.preventDefault();
-        const selectedId = useEditorStore.getState().selectedNodeId;
-        if (selectedId) {
-          const store = useEditorStore.getState();
-          store.copyToClipboard();
-          store.pasteFromClipboard();
+      const command = e.key.toLowerCase();
+      if (!["c", "v", "d"].includes(command)) return;
+      try {
+        if (command === "c") {
+          e.preventDefault();
+          useEditorStore.getState().copyToClipboard();
+        } else if (command === "v") {
+          e.preventDefault();
+          useEditorStore.getState().pasteFromClipboard();
+        } else if (command === "d") {
+          e.preventDefault();
+          const selectedId = useEditorStore.getState().selectedNodeId;
+          if (selectedId) {
+            const store = useEditorStore.getState();
+            store.copyToClipboard();
+            store.pasteFromClipboard();
+          }
         }
+        setHierarchyError(null);
+      } catch (error) {
+        setHierarchyError(error instanceof Error ? error.message : String(error));
       }
     };
     window.addEventListener("keydown", handler);
@@ -134,11 +155,9 @@ export default function SceneTree() {
   }, []);
 
   // 检查 nodeId 是否是 ancestorId 的子孙节点（防循环拖拽）
+  const parents = new Map(nodes.map((node) => [node.id, node.parentId]));
   const isDescendant = (nodeId: string, ancestorId: string): boolean => {
-    const node = nodes.find((n) => n.id === nodeId);
-    if (!node || !node.parentId) return false;
-    if (node.parentId === ancestorId) return true;
-    return isDescendant(node.parentId, ancestorId);
+    return isSceneDescendant(parents, nodeId, ancestorId);
   };
 
   // 节点点击选择逻辑：
@@ -147,10 +166,25 @@ export default function SceneTree() {
   // - 普通点击：单选
   const handleNodeClick = (e: React.MouseEvent, nodeId: string) => {
     if (e.ctrlKey || e.metaKey) {
+      selectionAnchor.current = nodeId;
       toggleNodeSelection(nodeId);
     } else if (e.shiftKey) {
-      const flatIds = nodes.map((n) => n.id);
-      const lastId = selectedNodeIds[selectedNodeIds.length - 1];
+      const children = new Map<string | null, SceneNode[]>();
+      for (const node of filteredNodes) {
+        const parent = node.parentId || null;
+        const siblings = children.get(parent) || [];
+        siblings.push(node);
+        children.set(parent, siblings);
+      }
+      const flatIds: string[] = [], pending = [...(children.get(null) || [])].reverse();
+      while (pending.length) {
+        const node = pending.pop()!;
+        flatIds.push(node.id);
+        const descendants = children.get(node.id) || [];
+        for (let i = descendants.length - 1; i >= 0; i--) pending.push(descendants[i]);
+      }
+      const lastId = selectionAnchor.current && selectedNodeIds.includes(selectionAnchor.current)
+        ? selectionAnchor.current : selectedNodeIds[selectedNodeIds.length - 1];
       if (lastId) {
         const startIdx = flatIds.indexOf(lastId);
         const endIdx = flatIds.indexOf(nodeId);
@@ -160,11 +194,14 @@ export default function SceneTree() {
             Math.max(startIdx, endIdx),
           ];
           selectNodes(flatIds.slice(from, to + 1));
+          selectionAnchor.current = lastId;
           return;
         }
       }
       selectNodes([nodeId]);
+      selectionAnchor.current = nodeId;
     } else {
+      selectionAnchor.current = nodeId;
       selectNode(nodeId);
     }
   };
@@ -180,7 +217,7 @@ export default function SceneTree() {
       if (n.name.toLowerCase().includes(lowerQuery)) {
         // 添加匹配节点及其所有祖先
         let current: SceneNode | undefined = n;
-        while (current) {
+        while (current && !matchingIds.has(current.id)) {
           matchingIds.add(current.id);
           current = current.parentId
             ? nodeMap.get(current.parentId)
@@ -191,9 +228,8 @@ export default function SceneTree() {
     return nodes.filter((n) => matchingIds.has(n.id));
   })();
 
-  // 递归渲染节点树
+  // 按层级顺序渲染平铺行，缩进表示节点深度。
   const renderNode = (node: SceneNode, depth: number): ReactNode => {
-    const children = filteredNodes.filter((n) => n.parentId === node.id);
     const isRenaming = renamingId === node.id;
     const isDragOver = dragOverId === node.id;
     const isSelected = selectedNodeIds.includes(node.id);
@@ -212,6 +248,10 @@ export default function SceneTree() {
             onDragStart={(e) => {
               e.dataTransfer.effectAllowed = "move";
               setDraggedId(node.id);
+            }}
+            onDragEnd={() => {
+              setDraggedId(null);
+              setDragOverId(null);
             }}
             onDragOver={(e) => {
               e.preventDefault();
@@ -267,6 +307,7 @@ export default function SceneTree() {
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                   if (e.key === "Enter") {
                     renameNode(node.id, renameValue);
                     setRenamingId(null);
@@ -306,12 +347,26 @@ export default function SceneTree() {
             </IconButton>
           </ListItemButton>
         </ListItem>
-        {children.map((child) => renderNode(child, depth + 1))}
       </div>
     );
   };
 
-  const rootNodes = filteredNodes.filter((n) => !n.parentId);
+  const children = new Map<string | null, SceneNode[]>();
+  for (const node of filteredNodes) {
+    const parent = node.parentId || null;
+    const siblings = children.get(parent) || [];
+    siblings.push(node);
+    children.set(parent, siblings);
+  }
+  const displayed: { node: SceneNode; depth: number }[] = [];
+  const pending = (children.get(null) || []).map((node) => ({ node, depth: 1 })).reverse();
+  while (pending.length) {
+    const row = pending.pop()!;
+    displayed.push(row);
+    const descendants = children.get(row.node.id) || [];
+    for (let i = descendants.length - 1; i >= 0; i--)
+      pending.push({ node: descendants[i], depth: row.depth + 1 });
+  }
 
   return (
     <Box
@@ -403,7 +458,20 @@ export default function SceneTree() {
         }}
       >
         <ListItem disablePadding>
-          <ListItemButton sx={{ pl: 1, py: 0.25 }}>
+          <ListItemButton
+            sx={{ pl: 1, py: 0.25 }}
+            onDragOver={(e) => {
+              if (!draggedId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggedId) reparent(draggedId, null);
+              setDraggedId(null);
+              setDragOverId(null);
+            }}
+          >
             <ListItemIcon sx={{ minWidth: 28 }}>
               <Folder />
             </ListItemIcon>
@@ -413,7 +481,7 @@ export default function SceneTree() {
             />
           </ListItemButton>
         </ListItem>
-        {rootNodes.map((node) => renderNode(node, 1))}
+        {displayed.map(({ node, depth }) => renderNode(node, depth))}
       </List>
     </Box>
   );

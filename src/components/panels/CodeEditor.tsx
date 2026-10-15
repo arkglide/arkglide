@@ -209,8 +209,13 @@ export default function CodeEditor() {
             onDoubleClick={() => {
               if (name === "main.js" || playState !== "stopped") return;
               const next = window.prompt("脚本文件名", name)?.trim();
-              if (next)
-                renameScript(name, next.endsWith(".js") ? next : next + ".js");
+              if (next) {
+                try {
+                  renameScript(name, next.endsWith(".js") ? next : next + ".js");
+                } catch (error) {
+                  window.alert(error instanceof Error ? error.message : String(error));
+                }
+              }
             }}
             icon={
               // main.js 不可关闭，不渲染关闭按钮

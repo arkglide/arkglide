@@ -80,7 +80,7 @@ export default function Viewport() {
   const updateTransform = useEditorStore((s) => s.updateTransform);
   const updateTransformRef = useRef(updateTransform);
   updateTransformRef.current = updateTransform;
-  // beginTransform：Gizmo 拖拽开始时保存拖拽前快照（用于撤销）
+  // Gizmo 确认变换后，在同步节点前保存撤销快照。
   const beginTransform = useEditorStore((s) => s.beginTransform);
   const beginTransformRef = useRef(beginTransform);
   beginTransformRef.current = beginTransform;
@@ -279,7 +279,6 @@ export default function Viewport() {
     );
     const onStart = () => {
       if (isDraggingRef.current) return;
-      beginTransformRef.current();
       isDraggingRef.current = true;
       initialWorldRef.current = new Map(
         roots.map((node) => [node, node.computeWorldMatrix(true).clone()]),
@@ -296,8 +295,16 @@ export default function Viewport() {
     };
     const onEnd = () => {
       if (!isDraggingRef.current) return;
+      const changed = multiple
+        ? !pivot.computeWorldMatrix(true).equals(initialPivotRef.current!)
+        : roots.some((node) => !node.computeWorldMatrix(true).equals(initialWorldRef.current.get(node)!));
+      if (!changed) {
+        isDraggingRef.current = false;
+        return;
+      }
       applyGroup();
       isDraggingRef.current = false;
+      beginTransformRef.current();
       selected.forEach((node) => {
         const rotation =
           node.rotationQuaternion?.toEulerAngles() || node.rotation;
@@ -330,6 +337,15 @@ export default function Viewport() {
     }));
     const frame = scene.onBeforeRenderObservable.add(applyGroup);
     return () => {
+      if (isDraggingRef.current) {
+        const current = useEditorStore.getState();
+        void adapterRef.current?.sync(
+          current.nodes.map((node) => ({ ...node })),
+          current.modelBuffers, current.content, current.textureBuffers,
+        );
+      }
+      isDraggingRef.current = false;
+      initialWorldRef.current.clear();
       observers.forEach(({ g, start, end }) => {
         g.onDragStartObservable.remove(start);
         g.onDragEndObservable.remove(end);
@@ -432,6 +448,7 @@ export default function Viewport() {
     // 键盘按下：监听 window（过滤输入元素，避免在 Inspector/CodeEditor 中触发）
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
+      if (target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (
         target.tagName === "INPUT" ||

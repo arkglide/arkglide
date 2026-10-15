@@ -94,6 +94,12 @@ test('editor roadmap: model authoring, persistence, runtime, isolation and WASM'
     // Exercise the actual drag observers, render synchronization and store commit.
     await page.evaluate(()=>(window as any).auditStore.getState().setGizmoMode('rotate'));
     await expect.poll(()=>page.evaluate(()=>(window as any).auditManager.rotationGizmoEnabled)).toBe(true);
+    expect(await page.evaluate(()=>{
+      const w=window as any,s=w.auditStore,before=s.getState();
+      w.auditManager.gizmos.rotationGizmo.onDragStartObservable.notifyObservers({});
+      w.auditManager.gizmos.rotationGizmo.onDragEndObservable.notifyObservers({});
+      return s.getState().past===before.past&&s.getState().future===before.future;
+    })).toBe(true);
     const rotation=await page.evaluate(({a,b})=>{
       const w=window as any,s=w.auditStore,B=w.auditB,manager=w.auditManager,sc=B.EngineStore.LastCreatedScene;
       const history=s.getState().past.length;
@@ -104,6 +110,28 @@ test('editor roadmap: model authoring, persistence, runtime, isolation and WASM'
       return {nodes:[a,b].map(id=>s.getState().nodes.find((n:any)=>n.id===id)),historyDelta:s.getState().past.length-history};
     },created);
     expect(rotation.nodes[0].transform.z).toBeCloseTo(1);expect(rotation.nodes[1].transform.z).toBeCloseTo(-1);expect(rotation.historyDelta).toBe(1);
+    await page.evaluate(()=>{
+      const w=window as any,sc=w.auditB.EngineStore.LastCreatedScene;
+      w.auditManager.gizmos.rotationGizmo.onDragStartObservable.notifyObservers({});
+      sc.getTransformNodeByName('__selection_pivot').position.x+=3;
+      sc.onBeforeRenderObservable.notifyObservers(sc);
+    });
+    await page.evaluate(()=>(window as any).auditStore.getState().selectNode('cube'));
+    await expect.poll(()=>page.evaluate(()=>(window as any).auditManager.attachedNode?.name)).toBe('cube');
+    expect(await page.evaluate(({a,b})=>{
+      const w=window as any,sc=w.auditB.EngineStore.LastCreatedScene;
+      return [a,b].every(id=>{
+        const data=w.auditStore.getState().nodes.find((n:any)=>n.id===id),mesh=sc.getMeshByName(id);
+        return Math.abs(data.transform.x-mesh.position.x)<1e-6;
+      });
+    },created)).toBe(true);
+    expect(await page.evaluate(()=>{
+      const w=window as any,before=w.auditStore.getState(),g=w.auditManager.gizmos.rotationGizmo;
+      g.onDragStartObservable.notifyObservers({});g.onDragEndObservable.notifyObservers({});
+      return w.auditStore.getState().past===before.past;
+    })).toBe(true);
+    await page.evaluate(({a,b})=>(window as any).auditStore.getState().selectNodes([a,b]),created);
+    await expect.poll(()=>page.evaluate(()=>(window as any).auditManager.attachedNode?.name)).toBe('__selection_pivot');
     await page.evaluate(()=>(window as any).auditStore.getState().setGizmoMode('scale'));
     await expect.poll(()=>page.evaluate(()=>(window as any).auditManager.scaleGizmoEnabled)).toBe(true);
     const scale=await page.evaluate(({a,b})=>{
@@ -202,4 +230,292 @@ test('editor roadmap: model authoring, persistence, runtime, isolation and WASM'
     await expect(page.locator('#results tr')).toHaveCount(5);
   });
   expect(errors).toEqual([]);
+});
+
+test('Delete in editable content preserves scene selection',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');
+  s.getState().selectNode('cube');
+  const input=document.createElement('div');input.contentEditable='true';input.id='editable-shortcut-test';input.textContent='editable';document.body.appendChild(input);input.focus();
+ });
+ await page.keyboard.press('Delete');
+ expect(await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.some(n=>n.id==='cube');
+ })).toBe(true);
+});
+
+test('text undo shortcuts preserve scene history',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ for(const tag of ['input','textarea','div']){
+  await page.evaluate(async(tag)=>{
+   const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');
+   s.getState().newProject();s.getState().renameNode('cube','renamed cube');
+   document.getElementById('text-history-test')?.remove();
+   const input=document.createElement(tag);if(tag==='div')input.contentEditable='true';
+   input.id='text-history-test';document.body.appendChild(input);input.focus();
+  },tag);
+  await page.keyboard.press('Control+z');
+  expect(await page.evaluate(async()=>{
+   const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.name;
+  })).toBe('renamed cube');
+ }
+});
+
+test('project settings apply with existing material references',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');
+  const id=s.getState().createMaterial('settings material');s.getState().setNodeMaterial('cube',id);
+ });
+ await page.getByRole('button',{name:'菜单',exact:true}).click();
+ await page.getByRole('menuitem',{name:'项目设置'}).click();
+ const dialog=page.getByRole('dialog',{name:'项目设置'});
+ await dialog.getByPlaceholder('60').fill('30');
+ await dialog.getByRole('button',{name:'应用',exact:true}).click();
+ await expect(dialog).toBeHidden();
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().settings.fpsCap;})).toBe(30);
+});
+
+test('invalid project settings show an error inside the open dialog',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.getByRole('button',{name:'菜单',exact:true}).click();
+ await page.getByRole('menuitem',{name:'项目设置'}).click();
+ const dialog=page.getByRole('dialog',{name:'项目设置'});
+ await dialog.getByLabel('时间倍率').fill('-1');
+ await dialog.getByRole('button',{name:'应用',exact:true}).click();
+ await expect(dialog.getByRole('alert')).toContainText('无效时间设置');
+ await dialog.getByLabel('时间倍率').fill('1');await dialog.getByRole('button',{name:'应用',exact:true}).click();
+ await expect(dialog).toBeHidden();
+});
+
+test('gravity fields support typing negative values through intermediate input states',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.getByRole('button',{name:'菜单',exact:true}).click();
+ await page.getByRole('menuitem',{name:'项目设置'}).click();
+ const dialog=page.getByRole('dialog',{name:'项目设置'}),input=dialog.getByLabel('Y',{exact:true});
+ await input.fill('');await input.pressSequentially('-5.5');
+ await expect(input).toHaveValue('-5.5');
+ await dialog.getByRole('button',{name:'应用',exact:true}).click();
+ await expect(dialog).toBeHidden();
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().settings.gravity.y;})).toBe(-5.5);
+});
+
+test('time scale fields retain decimal input until settings are applied',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.getByRole('button',{name:'菜单',exact:true}).click();
+ await page.getByRole('menuitem',{name:'项目设置'}).click();
+ const dialog=page.getByRole('dialog',{name:'项目设置'}),input=dialog.getByLabel('时间倍率');
+ await input.fill('');await input.pressSequentially('0.5');await expect(input).toHaveValue('0.5');
+ const hz=dialog.getByLabel('固定步 Hz');await hz.fill('');await hz.pressSequentially('59.94');await expect(hz).toHaveValue('59.94');
+ await dialog.getByRole('button',{name:'应用',exact:true}).click();await expect(dialog).toBeHidden();
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().settings.timeScale;})).toBe(0.5);
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().settings.fixedTimeStep;})).toBeCloseTo(1/59.94,10);
+});
+
+test('inspector position retains signed decimal typing',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().selectNode('cube');});
+ const input=page.getByLabel('Pos X',{exact:true});
+ await input.fill('');await input.pressSequentially('-2.75');await input.press('Tab');
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.transform.x;})).toBe(-2.75);
+});
+
+test('script creation stays locked during playback and pause',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.getByRole('tab',{name:'项目资源',exact:true}).click();
+ const button=page.getByRole('button',{name:'新建脚本',exact:true});await expect(button).toBeEnabled();
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().play();});
+ await expect(button).toBeDisabled();
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().pause();});
+ await expect(button).toBeDisabled();
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().stop();});
+ await expect(button).toBeEnabled();await button.click();
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return Object.keys(s.getState().scripts).length;})).toBe(2);
+});
+
+test('scene tree range selection excludes nodes hidden by search',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');const base=s.getState().nodes.find(n=>n.id==='cube')!;
+  s.setState({nodes:[['range-a','Match A'],['range-hidden','Hidden'],['range-b','Match B']].map(([id,name])=>({...structuredClone(base),id,name,parentId:null})),selectedNodeId:null,selectedNodeIds:[]});
+ });
+ await page.getByPlaceholder('搜索节点...').fill('Match');
+ await page.getByText('Match A',{exact:true}).click();await page.getByText('Match B',{exact:true}).click({modifiers:['Shift']});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().selectedNodeIds;})).toEqual(['range-a','range-b']);
+});
+
+test('scene tree range selection follows displayed hierarchy rather than storage order',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');const base=s.getState().nodes.find(n=>n.id==='cube')!;
+  s.setState({nodes:[['range-parent','Range Parent',null],['range-sibling','Range Sibling',null],['range-child','Range Child','range-parent']].map(([id,name,parentId])=>({...structuredClone(base),id:id!,name:name!,parentId})),selectedNodeId:null,selectedNodeIds:[]});
+ });
+ await page.getByText('Range Parent',{exact:true}).click();await page.getByText('Range Child',{exact:true}).click({modifiers:['Shift']});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().selectedNodeIds;})).toEqual(['range-parent','range-child']);
+});
+
+test('modal dialog keyboard input does not delete or undo the background scene',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().selectNode('cube');s.getState().renameNode('cube','Modal protected');});
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await page.getByRole('menuitem',{name:'项目设置'}).click();
+ const dialog=page.getByRole('dialog',{name:'项目设置'});await dialog.getByRole('button',{name:'应用',exact:true}).focus();
+ await page.keyboard.press('Delete');
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.name;})).toBe('Modal protected');
+ await page.keyboard.press('Control+z');
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.name;})).toBe('Modal protected');
+ await expect(dialog).toBeVisible();
+});
+
+test('popup menu focus isolates scene editing shortcuts',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().selectNode('cube');});
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await expect(page.getByRole('menu')).toBeVisible();
+ await page.keyboard.press('Delete');
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.some(n=>n.id==='cube');})).toBe(true);
+});
+
+test('repeated Shift selection retains the original scene tree anchor',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');const base=s.getState().nodes.find(n=>n.id==='cube')!;
+  s.setState({nodes:['A','B','C'].map(name=>({...structuredClone(base),id:'anchor-'+name,name:'Anchor '+name,parentId:null})),selectedNodeId:null,selectedNodeIds:[]});
+ });
+ await page.getByText('Anchor A',{exact:true}).click();await page.getByText('Anchor C',{exact:true}).click({modifiers:['Shift']});
+ await page.getByText('Anchor B',{exact:true}).click({modifiers:['Shift']});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().selectedNodeIds;})).toEqual(['anchor-A','anchor-B']);
+});
+
+test('unchanged inspector coordinates preserve redo for single and multiple selections',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ for(const ids of [['cube'],['cube','light']]){
+  await page.evaluate(async(ids)=>{
+   const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().newProject();
+   s.getState().renameNode('cube','changed');s.getState().undo();s.getState().selectNodes(ids);
+   (window as any).unchangedEditBefore=s.getState();
+  },ids);
+  const input=page.getByLabel('Pos X',{exact:true});await input.fill('0.0');await input.press('Tab');
+  expect(await page.evaluate(async()=>{
+   const {useEditorStore:s}=await import('/src/store/useEditorStore.ts'),before=(window as any).unchangedEditBefore;
+   return s.getState().nodes===before.nodes&&s.getState().past===before.past&&s.getState().future===before.future;
+  })).toBe(true);
+ }
+});
+
+test('scene tree renders a deep hierarchy without recursive stack overflow',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');
+  s.setState({nodes:Array.from({length:3000},(_,i)=>({id:`deep-${i}`,name:`Deep ${i}`,type:'empty' as const,parentId:i?`deep-${i-1}`:null,transform:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1},visible:true})),selectedNodeIds:[],selectedNodeId:null});
+ });
+ try { await expect(page.getByText('Deep 2999',{exact:true})).toBeAttached(); }
+ catch(error){throw new Error(`${errors.join('\n')}\n${error}`);}
+ expect(errors).toEqual([]);
+});
+
+test('failed clipboard shortcuts show the scene error without an uncaught exception',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/');await page.waitForSelector('#viewport');
+ for(const reset of ['copy','project']){
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');
+  s.getState().newProject();
+  const physics={motion:'dynamic' as const,shape:'box' as const,size:{x:1,y:1,z:1},mass:1,friction:0.5,restitution:0,sensor:false,lockRotation:false};
+  s.getState().updateTransform('sphere',{physics});
+  s.getState().updateTransform('cube',{physics,joints:[{id:'joint',kind:'fixed',targetId:'sphere',anchor:{x:0,y:0,z:0},anchor2:{x:0,y:0,z:0},axis:{x:1,y:0,z:0},min:0,max:0}]});
+  s.getState().selectNode('cube');s.getState().copyToClipboard();s.getState().removeNode('sphere');
+ });
+ await page.keyboard.press('Control+v');
+ const alert=page.getByRole('region',{name:'场景树',exact:true}).getByRole('alert');
+ await expect(alert).toContainText('关节目标刚体缺失');
+ expect(errors).toEqual([]);
+ if(reset==='copy')await page.keyboard.press('Control+c');
+ else await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().newProject();});
+ await expect(alert).toBeHidden();
+ }
+});
+
+test('project switching clears scene tree rename and search drafts',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ const tree=page.getByRole('region',{name:'场景树',exact:true});
+ await tree.getByPlaceholder('搜索节点...').fill('Cube');
+ await tree.getByText('Cube',{exact:true}).dblclick();
+ await expect(tree.getByRole('textbox')).toHaveCount(2);
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().newProject();});
+ await expect(tree.getByRole('textbox')).toHaveCount(1);
+ await expect(tree.getByPlaceholder('搜索节点...')).toHaveValue('');
+ await expect(tree.getByText('Sphere',{exact:true})).toBeVisible();
+});
+
+test('cancelled scene drags do not reparent nodes during a later external drop',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ const tree=page.getByRole('region',{name:'场景树',exact:true}),transfer=await page.evaluateHandle(()=>new DataTransfer());
+ const cube=tree.locator('[draggable="true"]').filter({has:page.getByText('Cube',{exact:true})});
+ const sphere=tree.locator('[draggable="true"]').filter({has:page.getByText('Sphere',{exact:true})});
+ await cube.dispatchEvent('dragstart',{dataTransfer:transfer});
+ await cube.dispatchEvent('dragend',{dataTransfer:transfer});
+ await sphere.dispatchEvent('drop',{dataTransfer:transfer});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.parentId??null;})).toBe(null);
+ await cube.dispatchEvent('dragstart',{dataTransfer:transfer});
+ await sphere.dispatchEvent('drop',{dataTransfer:transfer});
+ await cube.dispatchEvent('dragend',{dataTransfer:transfer});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.parentId;})).toBe('sphere');
+ await sphere.dispatchEvent('dragstart',{dataTransfer:transfer});
+ await cube.dispatchEvent('dragover',{dataTransfer:transfer});
+ await cube.dispatchEvent('drop',{dataTransfer:transfer});
+ await sphere.dispatchEvent('dragend',{dataTransfer:transfer});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='sphere')?.parentId??null;})).toBe(null);
+});
+
+test('dropping a scene node onto Scene restores it to the root hierarchy',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().setParent('cube','sphere');});
+ const tree=page.getByRole('region',{name:'场景树',exact:true}),transfer=await page.evaluateHandle(()=>new DataTransfer());
+ const cube=tree.locator('[draggable="true"]').filter({has:page.getByText('Cube',{exact:true})});
+ await cube.dispatchEvent('dragstart',{dataTransfer:transfer});
+ await tree.getByText('Scene',{exact:true}).dispatchEvent('dragover',{dataTransfer:transfer});
+ await tree.getByText('Scene',{exact:true}).dispatchEvent('drop',{dataTransfer:transfer});
+ await cube.dispatchEvent('dragend',{dataTransfer:transfer});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.parentId??null;})).toBe(null);
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().undo();return s.getState().nodes.find(n=>n.id==='cube')?.parentId;})).toBe('sphere');
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().redo();return s.getState().nodes.find(n=>n.id==='cube')?.parentId??null;})).toBe(null);
+});
+
+test('scene search retains shared nonmatching ancestors and hides unrelated branches',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');const base=s.getState().nodes[0];
+  s.setState({nodes:[['parent','Container',null],['a','Needle A','parent'],['b','Needle B','parent'],['other','Other',null]].map(([id,name,parentId])=>({...structuredClone(base),id:id!,name:name!,parentId})),selectedNodeId:null,selectedNodeIds:[]});
+ });
+ const tree=page.getByRole('region',{name:'场景树',exact:true});await tree.getByPlaceholder('搜索节点...').fill('Needle');
+ for(const name of ['Container','Needle A','Needle B'])await expect(tree.getByText(name,{exact:true})).toBeVisible();
+ await expect(tree.getByText('Other',{exact:true})).toBeHidden();
+ await tree.getByPlaceholder('搜索节点...').fill('');await expect(tree.getByText('Other',{exact:true})).toBeVisible();
+});
+
+test('scene rename waits for IME composition confirmation before committing Enter',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ const tree=page.getByRole('region',{name:'场景树',exact:true});await tree.getByText('Cube',{exact:true}).dblclick();
+ const field=tree.locator('input:not([placeholder])');await field.fill('新名称');
+ await field.dispatchEvent('keydown',{key:'Enter',code:'Enter',isComposing:true});
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().nodes.find(n=>n.id==='cube')?.name;})).toBe('Cube');
+ await field.dispatchEvent('keydown',{key:'Escape',code:'Escape',isComposing:true});
+ await expect(field).toHaveValue('新名称');await field.press('Enter');
+ await expect(tree.getByText('新名称',{exact:true})).toBeVisible();
+ await tree.getByText('新名称',{exact:true}).dblclick();await field.fill('取消名称');await field.press('Escape');
+ await expect(tree.getByText('新名称',{exact:true})).toBeVisible();
+});
+
+test('save project waits for IME confirmation before submitting its name',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await page.getByRole('menuitem',{name:'保存',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'保存项目'}),field=dialog.getByLabel('项目名称');
+ await field.fill('   ');await field.press('Enter');
+ await expect(dialog.getByRole('button',{name:'确认',exact:true})).toBeDisabled();
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().currentProjectId;})).toBe(null);
+ await field.fill('中文项目');await field.dispatchEvent('keydown',{key:'Enter',code:'Enter',isComposing:true});
+ await expect(dialog).toBeVisible();
+ expect(await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return s.getState().currentProjectId;})).toBe(null);
+ await field.press('Enter');await expect(dialog).toBeHidden();
 });
