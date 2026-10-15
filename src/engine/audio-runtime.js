@@ -5,6 +5,7 @@
         options.AudioContext || root.AudioContext || root.webkitAudioContext,
       context = Context ? new Context() : null;
     const buffers = new Map(),
+      loads = new Map(),
       assets = new Map(),
       data = new Map(),
       voices = new Set(),
@@ -90,6 +91,7 @@
       })());
     }
     async function load(list, bytes) {
+      if (disposed) return;
       if (!context) {
         if (list.length)
           options.onError?.({
@@ -101,6 +103,12 @@
       const stretch = prepareStretch();
       await Promise.all(
         list.map(async (a) => {
+          if (disposed) return;
+          const token = {};
+          loads.set(a.id, token);
+          buffers.delete(a.id);
+          assets.delete(a.id);
+          data.delete(a.id);
           const raw = bytes[a.id];
           if (!raw) {
             options.onError?.({
@@ -117,9 +125,9 @@
           if (a.stream) return;
           try {
             const decoded = await context.decodeAudioData(raw.slice(0));
-            if (!disposed) buffers.set(a.id, decoded);
+            if (!disposed && loads.get(a.id) === token) buffers.set(a.id, decoded);
           } catch (error) {
-            if (!disposed)
+            if (!disposed && loads.get(a.id) === token)
               options.onError?.({
                 hook: "audio.decode",
                 entityId: a.id,
@@ -142,10 +150,22 @@
             options.onError?.({ hook: "audio.stream", error });
         });
     }
+    function updatePosition(voice) {
+      if (voice.media || voice.stretch || !voice.live) return;
+      const timestamp = context.currentTime || 0;
+      voice.progress += Math.max(0, timestamp - voice.positionTime) * voice.source.playbackRate.value;
+      voice.positionTime = timestamp;
+      const duration = voice.source.buffer.duration;
+      if (Number.isFinite(duration) && duration > 0)
+        voice.progress = voice.source.loop
+          ? voice.progress % duration
+          : Math.min(duration, voice.progress);
+    }
     function transport() {
       if (!context || disposed) return;
       const uiActive = [...voices].some((v) => v.live && isUI(v.bus));
       for (const voice of [...voices]) {
+        updatePosition(voice);
         const frozen =
             voice.localPaused || (!isUI(voice.bus) && (paused || scale === 0)),
           rate = voice.rate * (isUI(voice.bus) ? 1 : Math.max(0.001, scale));
@@ -204,7 +224,7 @@
       });
     }
     function play(id, params = {}, owner) {
-      if (disposed || (owner && !owner.record.active))
+      if (disposed || (owner && (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed)))
         throw Error("Audio session stopped");
       if (!context || !assets.has(id)) throw Error("音频不存在: " + id);
       const volume = finite(params.volume ?? 1),
@@ -214,6 +234,7 @@
         entity = params.entity,
         stream = params.stream ?? assets.get(id).stream ?? false;
       const preservePitch = params.preservePitch ?? stream;
+      const bufferDuration = buffers.get(id)?.duration;
       if (entity && (entity.destroyed || options.find(entity.id) !== entity))
         throw Error("空间音频实体不存在");
       if (params.spatial) {
@@ -235,11 +256,11 @@
         )[0];
         if (candidate.priority > priority) return expired("priority-limit");
       }
-      const gain = context.createGain(),
-        panner = params.spatial ? context.createPanner() : null;
+      const gain = context.createGain();
       gain.gain.value = volume;
-      let source, media, url;
+      let source, media, url, panner;
       try {
+        panner = params.spatial ? context.createPanner() : null;
         if (stream) {
           media =
             options.createMediaElement?.() ||
@@ -286,6 +307,11 @@
           panner.connect(bus.gain);
         } else gain.connect(bus.gain);
       } catch (error) {
+        if (source?.port) {
+          try { source.port.postMessage({ type: "stop" }); } catch {}
+          source.port.onmessage = null;
+          source.port.close();
+        }
         source?.disconnect();
         gain.disconnect();
         panner?.disconnect();
@@ -297,10 +323,9 @@
         if (url) URL.revokeObjectURL(url);
         throw error;
       }
-      if (voices.size >= maximum)
-        [...voices]
-          .sort((a, b) => a.priority - b.priority || a.sequence - b.sequence)[0]
-          .stop();
+      const replaced = voices.size >= maximum
+        ? [...voices].sort((a, b) => a.priority - b.priority || a.sequence - b.sequence)[0]
+        : null;
       let untrack;
       const voice = {
         source,
@@ -317,12 +342,14 @@
         live: true,
         stretch: !stream && preservePitch,
         progress: 0,
+        positionTime: context.currentTime || 0,
         localPaused: false,
         ramp: null,
         stop: null,
       };
       function finish() {
         if (!voice.live) return;
+        updatePosition(voice);
         voice.live = false;
         voices.delete(voice);
         if (media) {
@@ -332,7 +359,7 @@
           media.load();
           URL.revokeObjectURL(url);
         } else if (voice.stretch) {
-          source.port.postMessage({ type: "stop" });
+          try { source.port.postMessage({ type: "stop" }); } catch {}
           source.port.onmessage = null;
           source.port.close();
         } else {
@@ -353,11 +380,11 @@
       if (media) {
         media.onended = finish;
         media.onerror = () => {
+          finish();
           options.onError?.({
             hook: "audio.stream",
             error: Error("浏览器无法解码流式媒体: " + assets.get(id)?.name),
           });
-          finish();
         };
       } else if (voice.stretch)
         source.port.onmessage = (e) => {
@@ -365,16 +392,20 @@
           if (e.data.type === "progress")
             voice.progress = e.data.samples / context.sampleRate;
           if (e.data.type === "error") {
+            finish();
             options.onError?.({
               hook: "audio.worklet",
               error: Error(e.data.message),
             });
-            finish();
           }
         };
       else source.onended = finish;
       if (owner) untrack = owner.track(finish);
-      if (voice.live && !media && !voice.stretch) source.start();
+      if (voice.live && !media && !voice.stretch) {
+        try { source.start(); }
+        catch (error) { finish(); throw error; }
+      }
+      if (voice.live) replaced?.stop();
       const valid = () => {
         if (!voice.live) throw Error("Audio voice ended");
       };
@@ -383,10 +414,11 @@
           return voice.live;
         },
         get position() {
+          updatePosition(voice);
           return media?.currentTime ?? voice.progress;
         },
         get duration() {
-          const n = media?.duration ?? buffers.get(id)?.duration;
+          const n = media?.duration ?? bufferDuration;
           return Number.isFinite(n) ? n : null;
         },
         stop: finish,
@@ -424,6 +456,7 @@
         },
         pause() {
           valid();
+          updatePosition(voice);
           voice.localPaused = true;
           if (media) media.pause();
           else if (voice.stretch)
@@ -502,6 +535,7 @@
           voice.stop();
           continue;
         }
+        updatePosition(voice);
         if (voice.ramp) {
           const r = voice.ramp;
           r.elapsed += isUI(voice.bus) ? realDt : dt;
@@ -582,7 +616,7 @@
     }
     const api = (owner) => {
       const guard = () => {
-        if (disposed || (owner && !owner.record.active))
+        if (disposed || (owner && (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed)))
           throw Error("音频脚本已销毁");
       };
       return Object.freeze({
@@ -684,6 +718,7 @@
         for (const v of [...voices]) v.stop();
         sources.clear();
         buffers.clear();
+        loads.clear();
         assets.clear();
         data.clear();
         for (const b of buses.values()) b.gain?.disconnect();
