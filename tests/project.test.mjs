@@ -1630,3 +1630,18 @@ test('render compute budgets round-trip and invalid native settings are rejected
  assert.equal(legacy.settings.renderCompute.boundsMinChangedFraction,.25);
  for(const bad of [{enabled:'yes'},{worldBounds:'yes'},{transformsMinEntities:-1},{maxBatchMeshes:0},{epsilon:-1},{cullMinMeshes:NaN},{extra:1}])assert.throws(()=>normalize({...project,settings:{...project.settings,renderCompute:bad}}),/render compute/i);
 });
+
+test('animation compute budgets survive normalization, recovery and archive roundtrip',async()=>{
+ const s=()=>store.getState(); s().newProject();
+ const settings={enabled:true,minTracks:12,maxTracks:4096,maxKeys:120000};
+ store.setState({settings:{...s().settings,animationCompute:settings}});
+ const project=recovery.captureEditorProject(s());
+ assert.deepEqual({...normalize(project).settings.animationCompute},settings);
+ const partial=normalize({...project,settings:{...project.settings,animationCompute:{minTracks:0}}});
+ assert.equal(partial.settings.animationCompute.maxTracks,8192);
+ const bytes=archive.createProjectArchive();s().newProject();
+ await archive.importProject(new File([bytes],'animation.arkglide'));
+ assert.deepEqual({...s().settings.animationCompute},settings);
+ for(const bad of [{enabled:'yes'},{minTracks:-1},{maxKeys:0},{maxTracks:65537},{extra:1}])
+   assert.throws(()=>normalize({...project,settings:{...project.settings,animationCompute:bad}}),/animation compute/i);
+});

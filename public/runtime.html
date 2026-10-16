@@ -68,6 +68,7 @@
     <script src="./arkglide-input-ui.js"></script>
     <script src="./arkglide-audio-stretch.js"></script>
     <script src="./arkglide-audio.js"></script>
+    <script src="./arkglide-animation-compute.js"></script>
     <script src="./arkglide-animation-tools.js"></script>
     <script src="./arkglide-animation.js"></script>
     <script src="./lib/acorn.js"></script>
@@ -131,7 +132,7 @@
         typeof createArkGlideMath === "function"
           ? createArkGlideMath().then(function (module) {
               math = ArkGlideMath.createMathAPI(module);
-              if(!module.RuntimeWorld?.prototype.applySync||!module.RuntimeWorld?.prototype.gatherBounds||!module.RuntimeClock||!module.RenderBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
+              if(!module.RuntimeWorld?.prototype.applySync||!module.RuntimeWorld?.prototype.gatherBounds||!module.RuntimeClock||!module.RenderBatch||!module.AnimationBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
               coreModule=module;logicalWorld=new module.RuntimeWorld();
             })
           : Promise.resolve();
@@ -338,6 +339,8 @@
         });
         animationRuntime = ArkGlideAnimation.createAnimation({
           BABYLON,
+          coreModule,
+          computeSettings: runtimeSettings.animationCompute,
           controllers: content.animationControllers,
           profiles: content.retargetProfiles,
           getTargets: (id) =>

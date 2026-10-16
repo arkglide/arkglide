@@ -42,6 +42,7 @@ for (const [source, target] of [
   ["audio-runtime", "audio"],
   ["audio-stretch", "audio-stretch"],
   ["animation-runtime", "animation"],
+  ["animation-compute", "animation-compute"],
   ["animation-advanced", "animation-tools"],
 ])
   copyFileSync(

@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as B from "@babylonjs/core";
+import factory from "../src/wasm/arkglide_math.js";
+import "../src/engine/animation-compute.js";
 import "../src/engine/lifecycle-runtime.js";
 import "../src/engine/animation-advanced.js";
 import "../src/engine/animation-runtime.js";
+const coreModule = await factory();
 function setup(onError) {
   const engine = new B.NullEngine(),
     scene = new B.Scene(engine),
@@ -77,6 +80,8 @@ function setup(onError) {
   };
   const runtime = ArkGlideAnimation.createAnimation({
     BABYLON: B,
+    coreModule,
+    computeSettings: { minTracks: 0 },
     controllers: { locomotion: controller },
     find: (id) => entities.get(id),
     getGroups: (id) => groups.get(id),
@@ -104,6 +109,7 @@ function setup(onError) {
     done() {
       session.stop();
       runtime.dispose();
+      assert.equal(runtime.stats().animationNativeControllers, 0);
       engine.dispose();
     },
   };

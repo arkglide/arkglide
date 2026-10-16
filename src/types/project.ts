@@ -11,6 +11,12 @@ export interface AssetRef {
 
 // 项目设置：重力/背景色/环境光/帧率上限等运行时配置
 export interface ProjectSettings {
+  animationCompute?: {
+    enabled?: boolean;
+    minTracks?: number;
+    maxTracks?: number;
+    maxKeys?: number;
+  };
   renderCompute?: {
     enabled?: boolean;
     normalsMinVertices?: number;

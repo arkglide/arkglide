@@ -34,6 +34,7 @@ export const RUNTIME_FILES = [
   "arkglide-audio-stretch.js",
   "arkglide-audio.js",
   "arkglide-animation-tools.js",
+  "arkglide-animation-compute.js",
   "arkglide-animation.js",
   "arkglide-modules.js",
   "lib/babylon.js",

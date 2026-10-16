@@ -14,6 +14,7 @@
     "benchmark:runtime": "node scripts/benchmark-runtime.mjs",
     "benchmark:render": "node scripts/benchmark-render.mjs",
     "benchmark:scene": "node scripts/benchmark-scene-batches.mjs",
+    "benchmark:animation": "node scripts/benchmark-animation.mjs",
     "benchmark:runtime:browser": "npm run sync:runtime && node scripts/benchmark-runtime-browser.mjs",
     "test:browser": "playwright test",
     "sync:runtime": "node scripts/sync-runtime.mjs",

@@ -60,6 +60,11 @@
       .filter((c) => c.weight > 0);
   }
   function create(B, o) {
+    const compute = root.ArkGlideAnimationCompute?.create(
+      B,
+      o.coreModule,
+      o.computeSettings,
+    );
     const live = new Map(),
       retargeted = new Map(),
       listeners = new Set();
@@ -124,7 +129,8 @@
           !c.entity.destroyed &&
           sub.id === c.entity.id &&
           listeners.has(sub) &&
-          sub.owner.record.active && !sub.owner.record.destroying &&
+          sub.owner.record.active &&
+          !sub.owner.record.destroying &&
           !sub.owner.record.entity?.destroyed
         ) {
           try {
@@ -186,6 +192,23 @@
       droppedEvents += Math.max(0, scheduled - count);
     }
     function tracks(c, list) {
+      if (c.computePlan && !c.computePlan.valid()) {
+        c.computePlan.dispose();
+        c.computePlan = compute.prepare(c);
+      }
+      if (c.computePlan) {
+        const jobs = [];
+        for (const slot of list)
+          for (const { g, weight } of clips(c, slot.state))
+            if (weight * slot.weight > 0)
+              jobs.push({
+                g,
+                weight: weight * slot.weight,
+                frame: sample(g, slot.time, slot.state.loop),
+              });
+        if (c.computePlan.evaluate(jobs)) return;
+      }
+      compute?.fallback();
       const targets = new Map(
         [...c.bindPose].map(([target, values]) => [
           target,
@@ -302,7 +325,12 @@
       return { delta, rotation };
     }
     function control(entity, id, params = {}, owner) {
-      if (owner && (!owner.record.active || owner.record.destroying || owner.record.entity?.destroyed))
+      if (
+        owner &&
+        (!owner.record.active ||
+          owner.record.destroying ||
+          owner.record.entity?.destroyed)
+      )
         throw Error("动画脚本已销毁");
       const resource = o.controllers?.[id];
       if (!resource) throw Error("动画控制器不存在: " + id);
@@ -371,6 +399,7 @@
           for (const key of path.split(".")) value = value[key];
           paths.set(path, clone(value));
         }
+      c.computePlan = compute?.prepare(c);
       live.set(entity.id, c);
       if (owner) c.untrack = owner.track(() => remove(entity.id));
       const valid = () => {
@@ -599,7 +628,12 @@
         live.delete(id);
         c.untrack?.();
         o.clearRootMotion?.(c.entity);
-        if (!c.entity.destroyed) tracks(c, []);
+        try {
+          if (!c.entity.destroyed) tracks(c, []);
+        } finally {
+          c.computePlan?.dispose();
+          c.computePlan = null;
+        }
       }
     }
     const api = (owner) => ({
@@ -627,8 +661,11 @@
           const controller = live.get(target.id);
           if (
             controller?.resource.states.some((state) =>
-              (state.blend ? state.blend.children : [{ clip: state.clip }]).some(
-                (entry) => created.some((group) => group.name === entry.clip),
+              (state.blend
+                ? state.blend.children
+                : [{ clip: state.clip }]
+              ).some((entry) =>
+                created.some((group) => group.name === entry.clip),
               ),
             )
           )
@@ -675,6 +712,7 @@
         for (const sub of [...listeners]) if (sub.id === id) sub.dispose();
       },
       stats: () => ({
+        ...compute?.stats(),
         animationControllers: live.size,
         animationEventSubscriptions: listeners.size,
         animationRetargetGroups: [...retargeted.values()].reduce(
@@ -689,6 +727,7 @@
           this.removeEntity(id);
         for (const sub of [...listeners]) sub.dispose();
         listeners.clear();
+        compute?.dispose();
         disposed = true;
       },
     };

@@ -12,6 +12,7 @@ import { collectModelRefs } from "./contentResources";
 export const PROJECT_VERSION = "0.6";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 import "../engine/render-compute.js";
+import "../engine/animation-compute.js";
 
 export function assertScriptPath(name: string): void {
   if (
@@ -164,7 +165,13 @@ export function validateProject(data: any): {
   if (settings.build !== undefined)
     settings.build = exportSettings(settings.build);
   if (settings.renderCompute !== undefined)
-    settings.renderCompute = (globalThis as any).ArkGlideRenderCompute.settings(settings.renderCompute);
+    settings.renderCompute = (globalThis as any).ArkGlideRenderCompute.settings(
+      settings.renderCompute,
+    );
+  if (settings.animationCompute !== undefined)
+    settings.animationCompute = (
+      globalThis as any
+    ).ArkGlideAnimationCompute.settings(settings.animationCompute);
   if (
     ![settings.ambientIntensity, settings.fpsCap].every(Number.isFinite) ||
     settings.ambientIntensity < 0 ||

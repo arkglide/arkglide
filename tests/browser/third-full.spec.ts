@@ -68,6 +68,10 @@ test("full third batch: real skinned assets, root-motion character, mixer/workle
     ),
   ).toBe(3);
   const play = async () => {
+    await page.evaluate(() => {
+      const store = (window as any).s;
+      store.setState({ settings: { ...store.getState().settings, animationCompute: { minTracks: 0 } } });
+    });
     await page.evaluate(() => (window as any).s.getState().play());
     await runtime.waitForFunction(
       () =>
@@ -76,6 +80,7 @@ test("full third batch: real skinned assets, root-motion character, mixer/workle
       undefined,
       { polling: 50 },
     );
+    expect(await runtime.evaluate(() => (window as any).animationRuntime.stats().animationNativeControllers)).toBe(2);
   };
   const stop = async () => {
     await page.evaluate(() => (window as any).s.getState().stop());
@@ -282,6 +287,7 @@ test("full third batch: real skinned assets, root-motion character, mixer/workle
     "physicsQueriesActive",
     "animationPlayers",
     "animationControllers",
+    "animationNativeControllers",
     "animationEventSubscriptions",
     "animationRetargetGroups",
     "audioVoices",
