@@ -74,6 +74,8 @@ npm run test:composition:browser
 
 通用信号逻辑、可逆运动机构和原生反射查询已加入。可导入 `examples/composition-lab.arkglide` 体验压板、反射接收、运动门、穿门光桥/牵引场和检查点重试的组合；游戏参数位于 `examples/composition-lab-scripts/config.js`。穿门控制与接口边界统一见上述 API 文档。
 
+代表游戏《折径》（暂定）已进入规划：六个连贯房间、约 20～30 分钟的第一人称空间解谜短篇，先制作两关的完整可玩体验。定位、关卡设计、实现边界和验收见 [代表游戏规划](docs/roadmap.md#代表游戏折径暂定名-foldline)。规划中的游戏内容尚未实现。
+
 ## C++ 逻辑内核与 UI 样式
 
 编辑器预览和独立包默认使用 C++/WASM 管理逻辑实体、父子矩阵缓存、模拟时钟和定时器；脚本 API 保持兼容，运行诊断可以检查后端。Babylon 渲染、Jolt 物理和浏览器资源继续通过适配层协作。
