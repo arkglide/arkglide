@@ -26,6 +26,7 @@ import { useEditorStore, type SceneNode } from "../../store/useEditorStore";
 import type { MaterialAsset, TextureAsset } from "../../types/content";
 import { instanceOverrides } from "../../engine/prefabs";
 import { importTextureFile } from "../../utils/textureImport";
+import { PanelHeading } from "./PanelHeading";
 
 function useAction() {
   const [error, setError] = useState<string | null>(null);
@@ -129,9 +130,10 @@ export function MaterialEditor({ id }: { id: string }) {
           ))}
         </TextField>
       ))}
-      <Typography variant="caption" color="text.secondary">
-        金属粗糙度贴图使用 G 通道粗糙度、B 通道金属度。
-      </Typography>
+      <PanelHeading
+        title="贴图通道"
+        help="金属粗糙度贴图的 G 通道存储粗糙度，B 通道存储金属度。"
+      />
       <Stack direction="row" spacing={1}>
         {(["u", "v"] as const).map((axis) => (
           <TextField
@@ -221,9 +223,10 @@ export function NodeContentInspector({ node }: { node: SceneNode }) {
           </Stack>
           {node.materialId && (
             <>
-              <Typography variant="caption" color="text.secondary">
-                修改此材质会同步到所有引用它的物体。
-              </Typography>
+              <PanelHeading
+                title="共享材质"
+                help="修改会应用到所有使用此材质的物体。需要单独修改时，先创建材质副本。"
+              />
               <MaterialEditor id={node.materialId} />
             </>
           )}
@@ -231,17 +234,18 @@ export function NodeContentInspector({ node }: { node: SceneNode }) {
       )}
       {node.type === "model" && (
         <Stack spacing={1} data-testid="model-material-slots">
-          <Typography variant="caption">模型分部件材质</Typography>
+          <PanelHeading
+            title="部件材质"
+            help="模型加载后显示材质槽。替换模型后，请检查部件编号是否对应。"
+          />
           {!parts.length && (
-            <Typography variant="caption">
-              模型加载后显示材质槽。重新链接不同模型后请检查部件编号。
-            </Typography>
+            <Typography variant="caption">模型加载后显示材质槽。</Typography>
           )}
           {[
             ...parts,
             ...Object.keys(node.materialSlots || {})
               .filter((key) => !parts.some((p) => p.key === key))
-              .map((key) => ({ key, name: "缺失部件 · " + key })),
+              .map((key) => ({ key, name: "缺失部件：" + key })),
           ].map((part) => (
             <TextField
               key={part.key}
@@ -300,10 +304,10 @@ export function NodeContentInspector({ node }: { node: SceneNode }) {
             </Button>
           )}
           <Typography variant="caption">
-            预制体：{prefab.name} · v{instance.revision}
+            预制体：{prefab.name}（v{instance.revision}）
           </Typography>
           <Typography variant="caption" data-testid="prefab-overrides">
-            覆盖 {stats.changed} 个节点 · 删除 {stats.removed} · 新增{" "}
+            覆盖 {stats.changed} 个节点，删除 {stats.removed}，新增{" "}
             {stats.added}
           </Typography>
           <Stack direction="row" spacing={0.5} flexWrap="wrap">
@@ -573,9 +577,10 @@ export default function ContentPanel() {
                 }}
               />
             </Button>
-            <Typography variant="caption" color="text.secondary">
-              PNG / JPEG / WebP，单张最大 64 MiB。项目会保存贴图内容。
-            </Typography>
+            <PanelHeading
+              title="贴图资源"
+              help="支持 PNG、JPEG 和 WebP，单张最大 64 MiB。贴图文件会保存在项目中。"
+            />
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
               {content.textures.map((t) => (
                 <TextureRow key={t.id} asset={t} />
@@ -596,9 +601,10 @@ export default function ContentPanel() {
             >
               从选中子树创建预制体
             </Button>
-            <Typography variant="caption" color="text.secondary">
-              将预制体实例拖到普通父节点下，再从父节点创建复合模板，即可保留嵌套关联。子模板更新会传到父模板与实例；本地覆盖保留。
-            </Typography>
+            <PanelHeading
+              title="预制体资源"
+              help="可将预制体实例放到普通父节点下，再从父节点创建嵌套预制体。子模板更新时保留实例的本地覆盖。"
+            />
             {Object.values(content.prefabs).map((p) => (
               <Box
                 key={p.id}
@@ -623,7 +629,7 @@ export default function ContentPanel() {
                     }}
                   />
                   <Typography variant="caption">
-                    v{p.revision} · {p.nodes.length} 个节点 ·{" "}
+                    v{p.revision}，{p.nodes.length} 个节点，{" "}
                     {
                       Object.values(content.prefabInstances).filter(
                         (i) => i.prefabId === p.id,

@@ -321,7 +321,7 @@ export default function SceneTree() {
             ) : (
               <ListItemText
                 primary={node.name}
-                secondary={`${node.prefab ? "◇ 预制体 · " : ""}P(${node.transform.x.toFixed(1)}, ${node.transform.y.toFixed(1)}, ${node.transform.z.toFixed(1)})`}
+                secondary={`${node.prefab ? "预制体，" : ""}P(${node.transform.x.toFixed(1)}, ${node.transform.y.toFixed(1)}, ${node.transform.z.toFixed(1)})`}
                 primaryTypographyProps={{ fontSize: 13 }}
                 secondaryTypographyProps={{ fontSize: 11 }}
               />

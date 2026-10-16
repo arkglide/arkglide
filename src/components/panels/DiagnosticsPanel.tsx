@@ -1,5 +1,6 @@
 import { Box, Typography } from "@mui/material";
 import { useEditorStore } from "../../store/useEditorStore";
+import { PanelHeading } from "./PanelHeading";
 export default function DiagnosticsPanel() {
   const stats = useEditorStore((s) => s.runtimeStats),
     missing = useEditorStore((s) => s.missingModelIds),
@@ -20,6 +21,15 @@ export default function DiagnosticsPanel() {
           `${stats.nativeMatrixUpdates || 0} / ${((stats.coreWasmHeapBytes || 0) / 1048576).toFixed(1)} MiB`,
         ],
         ["FPS", stats.fps.toFixed(1)],
+        ["渲染计算后端", stats.renderComputeBackend || "—"],
+        [
+          "离屏筛选批次 / 剔除网格",
+          `${stats.renderCullBatches || 0} / ${stats.renderCulledMeshes || 0}`,
+        ],
+        [
+          "法线批次 / 顶点",
+          `${stats.renderNormalBatches || 0} / ${stats.renderNormalVertices || 0}`,
+        ],
         [
           "本帧 CPU / 峰值",
           `${stats.frameMs.toFixed(2)} / ${stats.peakFrameMs.toFixed(2)} ms`,
@@ -98,12 +108,13 @@ export default function DiagnosticsPanel() {
     : [];
   return (
     <Box sx={{ height: "100%", overflow: "auto", p: 1 }}>
-      <Typography variant="body2" sx={{ mb: 1 }}>
-        运行诊断（约每 0.5 秒更新）
-      </Typography>
+      <PanelHeading
+        title="运行诊断"
+        help="播放后显示数据，每 0.5 秒更新。停止后可检查资源是否释放。CPU 数据是同步执行耗时，不包含 GPU 时间；JS 堆不包含 WASM 内存或显存。"
+      />
       {!stats && (
         <Typography color="text.secondary" variant="body2">
-          播放后显示数据。停止后可检查实体、脚本和订阅是否已释放。
+          暂无运行数据
         </Typography>
       )}
       {rows.map(([label, value]) => (
@@ -115,10 +126,6 @@ export default function DiagnosticsPanel() {
           <Box>{value}</Box>
         </Box>
       ))}
-      <Typography variant="caption" color="text.secondary">
-        CPU 数据表示本帧同步执行耗时，不是 GPU
-        时间。灯光和相机计数包含运行器的基础对象；JS 堆内存不代表 WASM 或显存。
-      </Typography>
       {missing.size > 0 && (
         <Box sx={{ mt: 1 }}>
           <Typography color="warning.main" variant="body2">

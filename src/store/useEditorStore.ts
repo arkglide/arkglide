@@ -100,6 +100,12 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  renderComputeBackend?: string;
+  renderCullBatches?: number;
+  renderCullCandidates?: number;
+  renderCulledMeshes?: number;
+  renderNormalBatches?: number;
+  renderNormalVertices?: number;
   sceneBackend?:string;lifecycleBackend?:string;
   nativeEntities?:number;nativeSceneSlots?:number;nativeMatrixUpdates?:number;
   nativeOwners?:number;nativeTimers?:number;coreWasmHeapBytes?:number;

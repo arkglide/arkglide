@@ -22,7 +22,11 @@
       const result = new B.VertexData();
       result.positions = [...data.positions]; result.indices = [...data.indices];
       result.normals = data.normals ? [...data.normals] : [];
-      if (!data.normals) B.VertexData.ComputeNormals(result.positions, result.indices, result.normals);
+      if (!data.normals) {
+        const normals = o.renderCompute?.normalData(result.positions, result.indices);
+        if (normals) result.normals = normals;
+        else B.VertexData.ComputeNormals(result.positions, result.indices, result.normals);
+      }
       if (data.uvs) result.uvs = [...data.uvs];
       return result;
     }

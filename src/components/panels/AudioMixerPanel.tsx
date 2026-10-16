@@ -15,6 +15,7 @@ import {
   type AudioMixerConfig,
 } from "../../types/advancedGameplay";
 import { ValueField } from "./AdvancedGameplayPanel";
+import { PanelHeading } from "./PanelHeading";
 export function AudioMixerPanel() {
   const m = useEditorStore((s) => s.content.mixer) || defaultMixer(),
     [error, setError] = useState("");
@@ -29,7 +30,7 @@ export function AudioMixerPanel() {
   return (
     <Stack spacing={1} data-testid="audio-mixer-panel">
       {error && <Alert severity="warning">{error}</Alert>}
-      <Typography>总线树 · 暂停时 UI 总线继续播放</Typography>
+      <PanelHeading title="总线" help="暂停游戏时，UI 总线继续播放。" />
       <ValueField
         label="最大同时发声数"
         value={m.maxVoices}
@@ -211,7 +212,10 @@ export function AudioMixerPanel() {
       >
         从当前总线创建快照
       </Button>
-      <Typography>自动压低 · 源总线发声时降低目标总线</Typography>
+      <PanelHeading
+        title="自动压低"
+        help="源总线发声时，降低目标总线的音量。"
+      />
       {m.ducking.map((d, i) => (
         <Stack key={i} spacing={1} sx={{ border: "1px solid #555", p: 1 }}>
           {(["sourceBus", "targetBus"] as const).map((k) => (

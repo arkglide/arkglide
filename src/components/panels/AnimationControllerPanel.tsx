@@ -19,6 +19,7 @@ import type {
   RetargetProfile,
 } from "../../types/advancedGameplay";
 import { ValueField } from "./AdvancedGameplayPanel";
+import { PanelHeading } from "./PanelHeading";
 const unique = (prefix: string, names: string[]) => {
   let i = 0;
   while (names.includes(prefix + i)) i++;
@@ -39,11 +40,9 @@ export function AnimationControllerPanel() {
     c = controllers[selected] || Object.values(controllers)[0];
   function save(next: AnimationControllerAsset) {
     try {
-      useEditorStore
-        .getState()
-        .updateAdvancedContent({
-          animationControllers: { ...controllers, [next.id]: next },
-        });
+      useEditorStore.getState().updateAdvancedContent({
+        animationControllers: { ...controllers, [next.id]: next },
+      });
       setError("");
     } catch (e) {
       setError(String(e));
@@ -509,7 +508,7 @@ export function AnimationControllerPanel() {
           >
             添加状态
           </Button>
-          <Typography>过渡条件 · 同一固定步最多一次状态切换</Typography>
+          <PanelHeading title="过渡条件" help="每个固定步最多切换一次状态。" />
           {c.transitions.map((t, i) => (
             <Stack key={i} spacing={1} sx={{ border: "1px solid #555", p: 1 }}>
               {(["from", "to"] as const).map((k) => (
@@ -799,11 +798,9 @@ function RetargetEditor() {
     [error, setError] = useState("");
   const save = (p: RetargetProfile) => {
     try {
-      useEditorStore
-        .getState()
-        .updateAdvancedContent({
-          retargetProfiles: { ...profiles, [p.id]: p },
-        });
+      useEditorStore.getState().updateAdvancedContent({
+        retargetProfiles: { ...profiles, [p.id]: p },
+      });
       setError("");
     } catch (e) {
       setError(String(e));
@@ -812,7 +809,10 @@ function RetargetEditor() {
   return (
     <Stack spacing={1}>
       <Divider />
-      <Typography>显式骨骼 / 节点重定向</Typography>
+      <PanelHeading
+        title="骨骼重定向"
+        help="配置源模型与目标模型的骨骼或节点对应关系。"
+      />
       {error && <Alert severity="warning">{error}</Alert>}
       <Button
         onClick={() => {
@@ -931,9 +931,10 @@ function RetargetEditor() {
           >
             删除映射资源
           </Button>
-          <Typography variant="caption">
-            参考姿势按映射成对配置，旋转使用角度输入。缺少节点或不支持的动画通道会诊断拒绝。
-          </Typography>
+          <PanelHeading
+            title="参考姿势"
+            help="为每对映射配置参考姿势，旋转使用角度。模型缺少节点或动画通道不受支持时会显示错误。"
+          />
           {Object.entries(p.mapping).map(([src, dst]) => (
             <Stack key={src} spacing={1}>
               <Typography>

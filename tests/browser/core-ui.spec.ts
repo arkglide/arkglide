@@ -123,9 +123,13 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
     });
     s.setState({
       nodes,
+      settings: {
+        ...state.settings,
+        renderCompute: { normalsMinVertices: 0, cullMinMeshes: 0 },
+      },
       scripts: {
         "probe.js":
-          "export default function({entity,ui,timers}){globalThis.coreUIProbe={entity,ui,ticks:0};return{onStart(){timers.every(.02,()=>coreUIProbe.ticks++);}};}",
+          "export default function({entity,ui,timers,visuals}){globalThis.coreUIProbe={entity,ui,ticks:0};return{onStart(){visuals.createMesh({positions:[0,0,100,1,0,100,0,1,100],indices:[0,1,2]});timers.every(.02,()=>coreUIProbe.ticks++);}};}",
       },
       activeFileId: "probe.js",
     });
@@ -147,6 +151,11 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
       lifecycle: (window as any).session.stats().lifecycleBackend,
     })),
   ).toEqual({ scene: "cpp-wasm", lifecycle: "cpp-wasm" });
+  expect(
+    await runtime.evaluate(
+      () => (window as any).renderCompute.stats().renderNormalBatches,
+    ),
+  ).toBeGreaterThan(0);
   const control = runtime.locator('[data-hud-id="control"]');
   await control.hover();
   await expect(control).toHaveCSS("opacity", "0.7");
@@ -224,6 +233,11 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
         () => (window as any).session.stats().lifecycleBackend,
       ),
     ).toBe("cpp-wasm");
+    expect(
+      await runtime.evaluate(
+        () => (window as any).renderCompute.stats().renderNormalBatches,
+      ),
+    ).toBeGreaterThan(0);
     const crosshair = runtime.locator(`[data-hud-id="${ids.root}"]`),
       ring = runtime.locator(`[data-hud-id="${ids.ring}"]`);
     await expect(crosshair).toHaveCSS("pointer-events", "none");

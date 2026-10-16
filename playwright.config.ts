@@ -4,6 +4,7 @@ export default defineConfig({
   // Keep worker/browser isolation identical for CI and custom local Chromium.
   projects: [
     { name: "core-ui", testMatch: "**/core-ui.spec.ts" },
+    { name: "render-compute", testMatch: "**/render-compute.spec.ts" },
     { name: "editor", testMatch: "**/editor.spec.ts" },
     { name: "batch1", testMatch: "**/batch1.spec.ts" },
     { name: "batch2", testMatch: "**/batch2.spec.ts" },

@@ -4,6 +4,9 @@ import fs from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { chromium } from "playwright";
 import { serveStatic } from "../../scripts/serve-static.mjs";
+import {tmpdir} from "node:os";
+import path from "node:path";
+import {unzipSync,zipSync,strFromU8,strToU8} from "fflate";
 const root = new URL("../../", import.meta.url),
   fixture = new URL(".portal-browser-test/", root);
 await fs.rm(fixture, { recursive: true, force: true });
@@ -12,15 +15,17 @@ execFileSync(process.execPath, ["scripts/create-portal-example.mjs"], {
   cwd: root,
 });
 execFileSync(process.execPath, ["scripts/sync-runtime.mjs"], { cwd: root });
-execFileSync(
-  process.execPath,
-  [
-    "scripts/export-static-game.mjs",
-    "examples/portal-lab.arkglide",
-    ".portal-browser-test",
-  ],
-  { cwd: root },
-);
+// Exercise native batches even in this small regression scene, without changing
+// the shipped demo's project settings or the engine's general-purpose defaults.
+const temporary = await fs.mkdtemp(path.join(tmpdir(),"arkglide-render-portal-"));
+try {
+  const archive=unzipSync(new Uint8Array(await fs.readFile(new URL("examples/portal-lab.arkglide",root)))), project=JSON.parse(strFromU8(archive["project.json"]));
+  project.settings.renderCompute={normalsMinVertices:0,cullMinMeshes:0};
+  archive["project.json"]=strToU8(JSON.stringify(project));
+  const source=path.join(temporary,"native-render.arkglide");
+  await fs.writeFile(source,zipSync(archive));
+  execFileSync(process.execPath,["scripts/export-static-game.mjs",source,".portal-browser-test"],{cwd:root});
+} finally {await fs.rm(temporary,{recursive:true,force:true});}
 const server = await serveStatic(fixture.pathname, 0),
   url = "http://127.0.0.1:" + server.address().port;
 let browser;
@@ -69,6 +74,8 @@ test(
           portalRuntime.stats().portalRenderedViews > 0,
       );
       assert.equal(await frame.evaluate(() => scriptErrors), 0);
+      assert.equal(await frame.evaluate(() => renderCompute.stats().renderComputeBackend),"cpp-wasm");
+      assert.ok(await frame.evaluate(() => renderCompute.stats().renderCullBatches)>0);
       const before = await frame.evaluate(() => ({
         view: scene.activeCamera.getViewMatrix().asArray(),
         clip: scene.clipPlane,
@@ -121,13 +128,15 @@ test(
       await frame.waitForFunction(() => running);
       await canvas.click({ position: { x: 300, y: 300 } });
       await frame.waitForFunction(() => document.pointerLockElement === document.getElementById('renderCanvas'));
+      await frame.waitForFunction(() => document.hasFocus());
       await frame.evaluate(() => { globalThis.__modeKeys = []; window.addEventListener('keydown', e => __modeKeys.push([e.code, e.target.tagName])); });
       async function switchMode(mode) {
+        await frame.waitForFunction(() => document.hasFocus() && document.pointerLockElement === document.getElementById('renderCanvas'));
         await page.keyboard.down('f');
         try {
           await frame.waitForFunction(mode => document.querySelector('[data-hud-id="mode"]').textContent.includes(mode), mode, { timeout: 5000 });
         } catch (error) {
-          throw Error(mode + ': ' + JSON.stringify(await frame.evaluate(() => ({ keys: __modeKeys, active: document.activeElement.tagName, running, errors: scriptErrors, mode: document.querySelector('[data-hud-id="mode"]').textContent, key: inputRuntime.input.isKeyDown('f') }))), { cause: error });
+          throw Error(mode + ': ' + JSON.stringify(await frame.evaluate(() => ({ keys: __modeKeys, active: document.activeElement.tagName, focus:document.hasFocus(), visibility:document.visibilityState, pointerLocked:!!document.pointerLockElement, timeScale:time.timeScale, stats:inputRuntime.stats(), running, errors: scriptErrors, mode: document.querySelector('[data-hud-id="mode"]').textContent, key: inputRuntime.input.isKeyDown('f') }))), { cause: error });
         } finally { await page.keyboard.up('f'); }
         const rendered = await frame.evaluate(() => time.unscaledTotalTime);
         await frame.waitForFunction(before => time.unscaledTotalTime > before, rendered);

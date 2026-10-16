@@ -1618,3 +1618,11 @@ test('late script edits do not resurrect deleted files or consume redo history',
  s().renameNode('cube','Changed');s().undo();const before=s();
  s().updateScript('old.js','Late editor event');assert.equal(s(),before);assert.equal(Object.hasOwn(s().scripts,'old.js'),false);
 });
+
+test('render compute budgets round-trip and invalid native settings are rejected before replacing the project',()=>{
+ const project=recovery.captureEditorProject(store.getState());
+ project.settings.renderCompute={enabled:true,normalsMinVertices:64,cullMinMeshes:8,maxBatchMeshes:4096,epsilon:1e-6};
+ const result=normalize(project);
+ assert.deepEqual({...result.settings.renderCompute},project.settings.renderCompute);
+ for(const bad of [{enabled:'yes'},{maxBatchMeshes:0},{epsilon:-1},{cullMinMeshes:NaN},{extra:1}])assert.throws(()=>normalize({...project,settings:{...project.settings,renderCompute:bad}}),/render compute/i);
+});

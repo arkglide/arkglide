@@ -1,0 +1,97 @@
+{
+  "baselineCommit": "b9dcfa66b84706605816c6839042392ef59dfb26",
+  "recordedAtUtc": "2026-10-16T11:35:30.293Z",
+  "compiler": "Emscripten 3.1.69 / LLVM 19, -O3, same local toolchain as the prior native core",
+  "cpu": {
+    "runtime": "v24.19.0",
+    "iterations": 40,
+    "samples": 5,
+    "normals": [
+      {
+        "vertices": 81,
+        "triangles": 128,
+        "javascriptMs": 0.008704099999999926,
+        "wasmWithCopiesMs": 0.006071400000001859,
+        "maxDifference": 0
+      },
+      {
+        "vertices": 1089,
+        "triangles": 2048,
+        "javascriptMs": 0.05133552499999609,
+        "wasmWithCopiesMs": 0.04979897500000448,
+        "maxDifference": 0
+      },
+      {
+        "vertices": 16641,
+        "triangles": 32768,
+        "javascriptMs": 1.1553557500000011,
+        "wasmWithCopiesMs": 0.8318870749999974,
+        "maxDifference": 0
+      }
+    ],
+    "visibility": [
+      {
+        "meshes": 6000,
+        "visibleFraction": 0.1,
+        "selected": 600,
+        "javascriptMs": 0.09744319999999788,
+        "wasmWithCopiesMs": 0.04304130000000441
+      },
+      {
+        "meshes": 6000,
+        "visibleFraction": 0.5,
+        "selected": 3000,
+        "javascriptMs": 0.10297977500000002,
+        "wasmWithCopiesMs": 0.058756449999998496
+      },
+      {
+        "meshes": 6000,
+        "visibleFraction": 0.9,
+        "selected": 5400,
+        "javascriptMs": 0.1278827499999977,
+        "wasmWithCopiesMs": 0.0662885249999988
+      }
+    ],
+    "limits": "CPU kernels with transfers and owned output copies; excludes Babylon bounds collection, GPU uploads, shading and target-device FPS."
+  },
+  "browser": {
+    "engine": "Chromium 154 / SwiftShader",
+    "scene": "One visible box and 40 boxes outside a generic offscreen camera; same material and render target for both paths",
+    "fullDraws": 41,
+    "nativeDraws": 1,
+    "selectedCount": 1,
+    "difference": 0,
+    "colored": 3360,
+    "stats": {
+      "renderComputeBackend": "cpp-wasm",
+      "renderCullBatches": 1,
+      "renderCullCandidates": 41,
+      "renderCulledMeshes": 40,
+      "renderNormalBatches": 0,
+      "renderNormalVertices": 0
+    }
+  },
+  "wasmModuleSha256": "efeb9291d5a71ddb8a6fd1ad67c99b2e06a5e03073e314c05e833cab495f5816",
+  "validation": {
+    "unitTests": {
+      "passed": 550,
+      "command": "npm test"
+    },
+    "editorBrowser": {
+      "passed": 34,
+      "coldViteCache": true,
+      "command": "npm run test:browser -- --reporter=list"
+    },
+    "staticBrowser": {
+      "passed": 7,
+      "command": "npm run test:static -- --reporter=list"
+    },
+    "gameplayBrowser": {
+      "passed": 10,
+      "command": "node --test --test-concurrency=1 tests/composition/browser.mjs tests/foundations/browser.mjs tests/package/browser.mjs tests/portal/browser.mjs"
+    },
+    "types": "npx tsc --noEmit passed",
+    "wasm": "Built cpp/math, cpp/runtime and cpp/render with EMXX override; synchronized classic runtime library",
+    "frontendProductionBuild": "Not run"
+  }
+}

@@ -11,6 +11,7 @@ import { assertPrefabGraph, inferInstanceParents } from "../engine/prefabs";
 import { collectModelRefs } from "./contentResources";
 export const PROJECT_VERSION = "0.6";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
+import "../engine/render-compute.js";
 
 export function assertScriptPath(name: string): void {
   if (
@@ -162,6 +163,8 @@ export function validateProject(data: any): {
 
   if (settings.build !== undefined)
     settings.build = exportSettings(settings.build);
+  if (settings.renderCompute !== undefined)
+    settings.renderCompute = (globalThis as any).ArkGlideRenderCompute.settings(settings.renderCompute);
   if (
     ![settings.ambientIntensity, settings.fpsCap].every(Number.isFinite) ||
     settings.ambientIntensity < 0 ||

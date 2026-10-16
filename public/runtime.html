@@ -43,6 +43,7 @@
     <script src="./arkglide-api.js"></script>
     <script src="./arkglide-lifecycle.js"></script>
     <script src="./arkglide-timing.js"></script>
+    <script src="./arkglide-render-compute.js"></script>
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-prefabs.js"></script>
     <script src="./lib/jolt-physics.js"></script>
@@ -125,12 +126,12 @@
       var initialized = false; // Babylon 是否已初始化
 
       // Script API adapter owns renderer details; scripts receive only handles.
-      var math = null,coreModule=null,logicalWorld=null;
+      var math = null,coreModule=null,logicalWorld=null,renderCompute=null;
       var mathReady =
         typeof createArkGlideMath === "function"
           ? createArkGlideMath().then(function (module) {
               math = ArkGlideMath.createMathAPI(module);
-              if(!module.RuntimeWorld||!module.RuntimeClock)throw Error('WASM logical runtime core is missing; rebuild the runtime library');
+              if(!module.RuntimeWorld||!module.RuntimeClock||!module.RenderBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
               coreModule=module;logicalWorld=new module.RuntimeWorld();
             })
           : Promise.resolve();
@@ -285,6 +286,7 @@
         animationRuntime?.attach(nodes);
       }
       function initGameplay(content, audioData) {
+        renderCompute = ArkGlideRenderCompute.create(BABYLON, coreModule, runtimeSettings.renderCompute);
         inputRuntime = ArkGlideInputUI.createInputUI({
           canvas: document.getElementById("renderCanvas"),
           layer: document.getElementById("hudLayer"),
@@ -313,11 +315,11 @@
           physics: physicsRuntime.forOwner({record:{active:true}}),
         });
         portalRuntime = ArkGlidePortals.create(BABYLON, {
-          scene, physics: physicsRuntime, cameras: cameraRuntime, getObject: id => entityAPI.getObject(id) || sceneAdapter.nodes.get(id),
+          scene, renderCompute, physics: physicsRuntime, cameras: cameraRuntime, getObject: id => entityAPI.getObject(id) || sceneAdapter.nodes.get(id),
           find: sceneAPI.find, onError: reportScriptError,
         });
         interactionRuntime = ArkGlideInteraction.create(BABYLON, {physics:physicsRuntime, portals:portalRuntime});
-        visualsRuntime = ArkGlideVisuals.create(BABYLON,{scene,find:sceneAPI.find,getObject:entityAPI.getObject,register:entityAPI.register,getTextures:()=>runtimeContent.textures,getTextureBuffers:()=>runtimeTextureData});
+        visualsRuntime = ArkGlideVisuals.create(BABYLON,{scene,renderCompute,find:sceneAPI.find,getObject:entityAPI.getObject,register:entityAPI.register,getTextures:()=>runtimeContent.textures,getTextureBuffers:()=>runtimeTextureData});
         surfacesRuntime = ArkGlideSurfaces.create(BABYLON,{find:sceneAPI.find,getObject:entityAPI.getObject,visuals:visualsRuntime});
         fieldsRuntime = ArkGlideFields.create({physics:physicsRuntime,onError:reportScriptError});
         triggersRuntime = ArkGlideTriggers.create({physics:physicsRuntime,onError:reportScriptError});
@@ -423,6 +425,7 @@
         var stats = Object.assign(
           session.stats(),
           entityAPI.stats(),
+          renderCompute?.stats() || {renderComputeBackend:"javascript",renderCullBatches:0,renderCullCandidates:0,renderCulledMeshes:0,renderNormalBatches:0,renderNormalVertices:0},
           packageRuntime?.stats() || {packageResources:0,packageGroups:0,packageIndexes:0,packageModules:0},
           physicsRuntime?.stats(),
           cameraRuntime?.stats() || {runtimeCameras:0,cameraRigs:0},
@@ -813,6 +816,7 @@
         fieldsRuntime?.dispose();
         surfacesRuntime?.dispose();
         visualsRuntime?.dispose();
+        renderCompute?.dispose();renderCompute=null;
         savesRuntime = levelsRuntime = storageRuntime = fieldsRuntime = surfacesRuntime = visualsRuntime = null;
         interactionRuntime?.dispose();
         portalRuntime?.dispose();

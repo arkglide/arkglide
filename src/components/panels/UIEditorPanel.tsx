@@ -24,6 +24,7 @@ import {
 } from "../../utils/uiStyles";
 import type { UIState } from "../../types/gameplay";
 import { ValueField } from "./AdvancedGameplayPanel";
+import { HelpTip, PanelHeading } from "./PanelHeading";
 const names: Record<HUDItem["kind"], string> = {
   shape: "图形",
   text: "文本",
@@ -296,9 +297,10 @@ export function UIEditorPanel({
         <Alert severity="info">运行期间布局只读，停止后可编辑。</Alert>
       )}
       <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="body2">
-          拖动布局 · 右下角缩放 · 一次手势一次撤销
-        </Typography>
+        <PanelHeading
+          title="布局"
+          help="拖动元素调整位置，拖动右下角调整尺寸。一次拖动记录一次撤销。"
+        />
         {expanded ? (
           <Button onClick={onClose}>返回编辑器</Button>
         ) : (
@@ -501,7 +503,14 @@ export function UIEditorPanel({
               label="共享样式定义（JSON）"
               value={sheetDraft}
               onChange={(e) => setSheetDraft(e.target.value)}
-              helperText="命名样式支持 base、hover、focus、pressed、disabled；元素可组合多个样式类。"
+              InputProps={{
+                endAdornment: (
+                  <HelpTip label="共享样式定义">
+                    命名样式支持
+                    base、hover、focus、pressed、disabled。一个元素可使用多个样式类。
+                  </HelpTip>
+                ),
+              }}
             />
             <Button
               onClick={() => {
@@ -529,7 +538,7 @@ export function UIEditorPanel({
             {hud.map((d) => (
               <MenuItem key={d.id} value={d.id}>
                 {d.parentId ? "↳ " : ""}
-                {names[d.kind]} · {d.text || d.id} ({d.id})
+                {names[d.kind]}：{d.text || d.id} ({d.id})
               </MenuItem>
             ))}
           </TextField>
@@ -877,7 +886,15 @@ export function UIEditorPanel({
                   label="元素样式覆盖（JSON）"
                   value={styleDraft}
                   onChange={(e) => setStyleDraft(e.target.value)}
-                  helperText="支持 borderColor、fontFamily、textAlign、mixBlendMode、boxShadow 等；空对象继承共享样式。"
+                  InputProps={{
+                    endAdornment: (
+                      <HelpTip label="元素样式覆盖">
+                        可设置
+                        borderColor、fontFamily、textAlign、mixBlendMode、boxShadow
+                        等属性。空对象使用共享样式。
+                      </HelpTip>
+                    ),
+                  }}
                 />
                 <Stack direction="row">
                   <Button
@@ -931,10 +948,10 @@ export function UIEditorPanel({
                   </TextField>
                 )}
                 {h.kind === "richtext" && (
-                  <Typography variant="caption">
-                    仅支持 [b]、[i]、[color=#RRGGBB]
-                    与对应闭合标签。画布预览文本，运行时显示样式。
-                  </Typography>
+                  <PanelHeading
+                    title="富文本格式"
+                    help="支持 [b]、[i]、[color=#RRGGBB] 和对应闭合标签。格式在游戏运行时显示。"
+                  />
                 )}
                 {h.kind === "button" && (
                   <TextField

@@ -5,6 +5,7 @@ import ContentPanel from "./ContentPanel";
 import DiagnosticsPanel from "./DiagnosticsPanel";
 import AssetBrowser from "./AssetBrowser";
 import CodeEditor from "./CodeEditor";
+import { PanelHeading } from "./PanelHeading";
 import { useEditorStore } from "../../store/useEditorStore";
 
 // 控制台面板：渲染 iframe 转发的 consoleLogs（远程调试台）
@@ -31,9 +32,10 @@ function ConsolePanel() {
           borderBottom: "1px solid #333333",
         }}
       >
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          控制台 ({consoleLogs.length})
-        </Typography>
+        <PanelHeading
+          title={"控制台 (" + consoleLogs.length + ")"}
+          help="播放时在这里查看脚本日志。点击日志的文件名可跳转到对应代码。"
+        />
         <Tooltip title="清空">
           <IconButton size="small" onClick={clearConsoleLogs}>
             <DeleteSweep />
@@ -51,7 +53,7 @@ function ConsolePanel() {
       >
         {consoleLogs.length === 0 && (
           <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-            {"> 暂无日志（点击播放运行脚本，console.log 会转发到这里）"}
+            暂无日志
           </Typography>
         )}
         {consoleLogs.map((log) => (
@@ -93,8 +95,8 @@ function ConsolePanel() {
                 }}
               >
                 {log.location.file}
-                {log.location.line ? ":" + log.location.line : ""} ·{" "}
-                {log.location.hook}
+                {log.location.line ? ":" + log.location.line : ""}{" "}
+                {log.location.hook ? "[" + log.location.hook + "]" : ""}
               </Box>
             )}
             {log.text}

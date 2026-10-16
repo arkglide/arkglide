@@ -21,6 +21,7 @@ import {
   type HUDItem,
 } from "../../types/gameplay";
 import { importAudioFile } from "../../utils/audioImport";
+import { PanelHeading } from "./PanelHeading";
 function NumberField({
   label,
   value,
@@ -78,7 +79,10 @@ export function NodeGameplayInspector({ node }: { node: SceneNode }) {
       {error && <Alert severity="warning">{error}</Alert>}
       {["mesh", "model", "empty"].includes(node.type) && (
         <>
-          <Typography variant="caption">刚体与碰撞体 · Jolt WASM</Typography>
+          <PanelHeading
+            title="刚体与碰撞体"
+            help="配置物体的运动方式和碰撞形状。"
+          />
           <Button
             size="small"
             onClick={() =>
@@ -135,9 +139,10 @@ export function NodeGameplayInspector({ node }: { node: SceneNode }) {
                   ))}
                 </TextField>
               </Stack>
-              <Typography variant="caption">
-                尺寸为局部单位；球体 X 为直径，胶囊 X 为直径、Y 为总高度。
-              </Typography>
+              <PanelHeading
+                title="碰撞尺寸"
+                help="尺寸使用局部单位。球体的 X 是直径；胶囊的 X 是直径，Y 是总高度。"
+              />
               <Stack direction="row" spacing={1}>
                 {(["x", "y", "z"] as const).map((k) => (
                   <NumberField
@@ -420,16 +425,17 @@ export function AudioPanel() {
           }}
         />
       </Button>
-      <Typography variant="caption">
-        单文件最大 32 MiB。播放预览后点击「启用音频」允许浏览器发声。
-      </Typography>
+      <PanelHeading
+        title="音频资源"
+        help="单文件最大 32 MiB。浏览器阻止播放时，点击游戏中的「启用音频」。"
+      />
       {assets.map((a) => (
         <Box
           key={a.id}
           sx={{ p: 1, border: "1px solid #444", borderRadius: 1 }}
         >
           <Typography>
-            {a.name} · {(a.byteLength / 1024).toFixed(1)} KiB
+            {a.name}（{(a.byteLength / 1024).toFixed(1)} KiB）
           </Typography>
           <Typography variant="caption" sx={{ overflowWrap: "anywhere" }}>
             资源 ID：{a.id}
@@ -524,13 +530,11 @@ export function GameplayPanel() {
   }, [capture, config]);
   function save(next: GameplayConfig) {
     try {
-      useEditorStore
-        .getState()
-        .updateGameplay({
-          ...next,
-          defaults:
-            next.defaults || config.defaults || structuredClone(config.actions),
-        });
+      useEditorStore.getState().updateGameplay({
+        ...next,
+        defaults:
+          next.defaults || config.defaults || structuredClone(config.actions),
+      });
       setError("");
     } catch (e) {
       setError(String(e));
@@ -545,7 +549,10 @@ export function GameplayPanel() {
   return (
     <Stack spacing={1} data-testid="input-hud-panel">
       {error && <Alert severity="warning">{error}</Alert>}
-      <Typography>动作映射</Typography>
+      <PanelHeading
+        title="动作映射"
+        help="按键使用 KeyboardEvent.code，例如 KeyW、Space、ArrowLeft。多个按键用逗号分隔；触屏按钮可绑定同一动作。"
+      />
       {capture && (
         <Alert severity="info">
           按下要绑定的按键，Esc 取消：{capture.name}
@@ -578,10 +585,6 @@ export function GameplayPanel() {
       >
         将当前映射设为默认
       </Button>
-      <Typography variant="caption">
-        使用 KeyboardEvent.code，如
-        KeyW、Space、ArrowLeft。逗号分隔多个按键；触屏按钮可绑定同一动作。
-      </Typography>
       <FormControlLabel
         label="拦截映射按键的浏览器默认行为"
         control={
@@ -822,11 +825,10 @@ export function GameplayPanel() {
         添加动作
       </Button>
       <Divider />
-      <Typography>游戏 HUD</Typography>
-      <Typography variant="caption">
-        位置按运行区域百分比排列。文本支持脚本
-        ui.get(id).setText()；按钮支持键鼠与多点触屏。
-      </Typography>
+      <PanelHeading
+        title="游戏 HUD"
+        help="位置使用运行区域的百分比。脚本可通过 ui.get(id).setText() 修改文本；按钮支持键鼠和多点触屏。"
+      />
       <Stack direction="row">
         {(["text", "button"] as const).map((kind) => (
           <Button

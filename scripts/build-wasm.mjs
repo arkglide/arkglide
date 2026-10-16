@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Build cpp/math and cpp/runtime into src/wasm/arkglide_math.js via pinned emsdk.
+ * Build cpp/math, cpp/runtime and cpp/render into one WASM library via pinned emsdk.
  * Needs Node 20+, git, Python 3.
  * Toolchain cache: $EMSDK_DIR or ~/.cache/arkglide-emsdk
  */
@@ -26,6 +26,7 @@ const sources = [
   "cpp/math/matrix4.cpp",
   "cpp/math/quaternion.cpp",
   "cpp/runtime/core.cpp",
+  "cpp/render/batch.cpp",
 ];
 
 const emFlags = [

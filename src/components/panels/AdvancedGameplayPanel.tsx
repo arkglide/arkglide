@@ -12,6 +12,7 @@ import {
   Box,
 } from "@mui/material";
 import { useEditorStore, type SceneNode } from "../../store/useEditorStore";
+import { PanelHeading } from "./PanelHeading";
 import {
   defaultPhysicsConfig,
   defaultCharacter,
@@ -70,7 +71,10 @@ export function PhysicsProjectEditor() {
     );
   return (
     <Stack spacing={1} data-testid="physics-project-editor">
-      <Typography>碰撞分组与查询过滤</Typography>
+      <PanelHeading
+        title="碰撞分组"
+        help="两个组都允许对方时才会碰撞。射线和形状查询也使用这些组。删除前需解除实体和预制体中的引用。"
+      />
       {action.error && <Alert severity="warning">{action.error}</Alert>}
       <FormControlLabel
         label="预览中显示碰撞体、速度和接触点"
@@ -163,9 +167,6 @@ export function PhysicsProjectEditor() {
       >
         添加碰撞分组
       </Button>
-      <Typography variant="caption">
-        两个组都允许对方时才碰撞。引用中的分组不能直接删除；先修改对应实体和预制体。射线和形状查询使用同一组名称。
-      </Typography>
     </Stack>
   );
 }
@@ -277,7 +278,7 @@ export function AdvancedNodeInspector({ node }: { node: SceneNode }) {
       )}
       {node.physics && (
         <>
-          <Typography>关节 · 锚点为各刚体局部坐标</Typography>
+          <PanelHeading title="关节" help="锚点使用各自刚体的局部坐标。" />
           {node.joints?.map((j) => (
             <Stack
               key={j.id}

@@ -1514,6 +1514,8 @@
           false,
         );
         texture.activeCamera = camera;
+        if (o.renderCompute) texture.getCustomRenderList = (_pass, list, length) =>
+          scene.activeCamera === camera ? o.renderCompute.select(list, scene.frustumPlanes, length) : null;
         texture.ignoreCameraViewport = true;
         texture.renderParticles = false;
         texture.samples = Math.min(quality.samples, Math.max(1, scene.getEngine().getCaps().maxMSAASamples || 1));

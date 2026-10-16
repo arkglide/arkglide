@@ -52,7 +52,7 @@ test('batch one: clock, cleanup, diagnostics and crash recovery',async({page})=>
     const location=await page.evaluate(()=>(window as any).batchStore.getState().consoleLogs.find((l:any)=>l.text==='定位测试').location);
     expect(location.file).toBe('main.js');expect(location.line).toBe(3);expect(location.hook).toBe('onUpdate');
     await page.getByRole('tab',{name:'控制台',exact:true}).click();
-    await page.getByRole('button',{name:'main.js:3 · onUpdate',exact:true}).click();
+    await page.getByRole('button',{name:'main.js:3 [onUpdate]',exact:true}).click();
     await expect(page.getByRole('tab',{name:'代码编辑器',exact:true})).toHaveAttribute('aria-selected','true');
     await expect.poll(()=>page.evaluate(async()=>{
       const url=performance.getEntriesByType('resource').map(r=>r.name).find(n=>n.includes('/monaco-editor.js?'));if(!url)return null;

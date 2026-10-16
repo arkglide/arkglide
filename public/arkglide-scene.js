@@ -420,7 +420,7 @@
             (mat, slot) => {
               parts.push({
                 key: key + "/slot:" + slot,
-                name: mesh.name + " · " + (mat?.name || "材质 " + slot),
+                name: mesh.name + "（" + (mat?.name || "材质 " + slot) + "）",
               });
             },
           );

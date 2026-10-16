@@ -187,7 +187,7 @@ try {
     "play dirtied source scene",
   );
   await page
-    .getByRole("button", { name: "恢复副本已保存 · 恢复", exact: true })
+    .getByRole("button", { name: "恢复记录（恢复副本已保存）", exact: true })
     .waitFor();
   await page.reload();
   await page.waitForSelector("#viewport");

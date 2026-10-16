@@ -332,9 +332,12 @@
       return;
     }
     if (msg.type === "diagnostic") {
-      const text = [msg.file, msg.line, msg.hook, msg.message]
+      const location = msg.file
+        ? msg.file + (msg.line ? ":" + msg.line : "")
+        : msg.line;
+      const text = [location, msg.hook && "[" + msg.hook + "]", msg.message]
         .filter(Boolean)
-        .join(" · ");
+        .join(" ");
       if (state === "initializing") fail(Error(text));
       else gameLog(text);
       return;

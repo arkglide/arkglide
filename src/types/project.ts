@@ -11,6 +11,13 @@ export interface AssetRef {
 
 // 项目设置：重力/背景色/环境光/帧率上限等运行时配置
 export interface ProjectSettings {
+  renderCompute?: {
+    enabled?: boolean;
+    normalsMinVertices?: number;
+    cullMinMeshes?: number;
+    maxBatchMeshes?: number;
+    epsilon?: number;
+  };
   maxFrameDelta?: number; // 最大单帧模拟增量（秒），默认 .25
   build?: import("../export/static-game.mjs").StaticExportSettings;
   gravity: { x: number; y: number; z: number }; // 重力向量（默认 0,-9.8,0）

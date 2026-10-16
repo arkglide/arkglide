@@ -24,6 +24,7 @@ export const RUNTIME_FILES = [
   "arkglide-api.js",
   "arkglide-lifecycle.js",
   "arkglide-timing.js",
+  "arkglide-render-compute.js",
   "arkglide-scene.js",
   "arkglide-prefabs.js",
   "arkglide-physics-tools.js",
