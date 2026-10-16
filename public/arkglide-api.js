@@ -12,71 +12,357 @@
     const entities = new Map();
     const handles = new WeakMap();
     const nativeEntities = new Map();
-    function syncEntity(entity) {
-      const h = handles.get(entity);
-      if (!h?.native || !h.mesh) return;
-      const n = h.mesh,
-        angles = n.rotationQuaternion?.toEulerAngles() || n.rotation,
+    const transformScratch = new Float64Array(11),
+      pendingSync = [];
+    let syncCore,
+      syncCapacity = 0,
+      syncIds,
+      syncData;
+    let boundsCore,
+      boundsCapacity = 0,
+      boundsIds,
+      boundsData,
+      boundsOutput,
+      boundsLength = -1,
+      boundsRevision = -1,
+      boundsEpoch = 0,
+      boundsCacheHits = 0;
+    let boundsDecisionFrame = -1,
+      boundsDecisionThreshold = -1,
+      boundsUseNative = true,
+      boundsLastMatrices = 0;
+    const compatibleNodes = new WeakMap(),
+      compatibleChain = [];
+    function readTransform(n, t, at = 0) {
+      const p = n.position,
+        r = n.rotationQuaternion || n.rotation,
+        s = n.scaling;
+      t[at] = p.x;
+      t[at + 1] = p.y;
+      t[at + 2] = p.z;
+      t[at + 3] = r.x;
+      t[at + 4] = r.y;
+      t[at + 5] = r.z;
+      t[at + 6] = n.rotationQuaternion ? r.w : 0;
+      t[at + 7] = s.x;
+      t[at + 8] = s.y;
+      t[at + 9] = s.z;
+      t[at + 10] = n.rotationQuaternion ? 1 : 0;
+    }
+    function changedTransform(h) {
+      const t = h.syncedTransform,
+        n = h.mesh,
         p = n.position,
-        s = n.scaling,
-        t = h.syncedTransform;
-      // Physics and animation can mutate Babylon objects without the facade.
-      // Compare live values on every query, but cross into WASM only if dirty.
-      if (
+        r = n.rotationQuaternion || n.rotation,
+        s = n.scaling;
+      return (
         !t ||
         t[0] !== p.x ||
         t[1] !== p.y ||
         t[2] !== p.z ||
-        t[3] !== angles.x ||
-        t[4] !== angles.y ||
-        t[5] !== angles.z ||
-        t[6] !== s.x ||
-        t[7] !== s.y ||
-        t[8] !== s.z
-      ) {
-        if (
-          !h.native.transform(
-            h.nativeId,
-            p.x,
-            p.y,
-            p.z,
-            angles.x,
-            angles.y,
-            angles.z,
-            s.x,
-            s.y,
-            s.z,
-          )
-        )
-          throw Error("Invalid logical entity transform");
-        const cache =
-          h.syncedTransform || (h.syncedTransform = new Float64Array(9));
-        cache[0] = p.x;
-        cache[1] = p.y;
-        cache[2] = p.z;
-        cache[3] = angles.x;
-        cache[4] = angles.y;
-        cache[5] = angles.z;
-        cache[6] = s.x;
-        cache[7] = s.y;
-        cache[8] = s.z;
+        t[3] !== r.x ||
+        t[4] !== r.y ||
+        t[5] !== r.z ||
+        t[6] !== (n.rotationQuaternion ? r.w : 0) ||
+        t[7] !== s.x ||
+        t[8] !== s.y ||
+        t[9] !== s.z ||
+        t[10] !== (n.rotationQuaternion ? 1 : 0)
+      );
+    }
+    function rememberTransform(h, t, at = 0) {
+      const cache =
+        h.syncedTransform || (h.syncedTransform = new Float64Array(11));
+      for (let i = 0; i < 11; i++) cache[i] = t[at + i];
+    }
+    function parentId(h) {
+      const parent = entities.get(h.mesh.parent?.metadata?.arkglideId),
+        p = parent && handles.get(parent);
+      return p && p.mesh === h.mesh.parent && p.native === h.native
+        ? p.nativeId
+        : 0;
+    }
+    function syncEntity(entity) {
+      const h = handles.get(entity);
+      if (!h?.native || !h.mesh) return;
+      const t = transformScratch;
+      // Physics and animation can mutate Babylon objects without the facade.
+      // Compare live values on every query, but cross into WASM only if dirty.
+      if (changedTransform(h)) {
+        readTransform(h.mesh, t);
+        const ok = t[10]
+          ? h.native.transformQuaternion(
+              h.nativeId,
+              t[0],
+              t[1],
+              t[2],
+              t[3],
+              t[4],
+              t[5],
+              t[6],
+              t[7],
+              t[8],
+              t[9],
+            )
+          : h.native.transform(
+              h.nativeId,
+              t[0],
+              t[1],
+              t[2],
+              t[3],
+              t[4],
+              t[5],
+              t[7],
+              t[8],
+              t[9],
+            );
+        if (!ok) throw Error("Invalid logical entity transform");
+        rememberTransform(h, t);
       }
-      const parent = entities.get(n.parent?.metadata?.arkglideId),
-        parentHandle = parent && handles.get(parent),
-        parentId = parentHandle?.mesh === n.parent ? parentHandle.nativeId : 0;
-      if (h.syncedParent !== parentId) {
-        if (!h.native.setParent(h.nativeId, parentId))
+      const parent = parentId(h);
+      if (h.syncedParent !== parent) {
+        if (!h.native.setParent(h.nativeId, parent))
           throw Error("Invalid logical scene hierarchy");
-        h.syncedParent = parentId;
+        h.syncedParent = parent;
       }
     }
     function sync() {
-      for (const e of entities.values()) syncEntity(e);
+      const core = options.getWorld?.();
+      if (
+        !core?.applySync ||
+        entities.size < (options.getBatchMinEntities?.() ?? 32)
+      ) {
+        for (const e of entities.values()) syncEntity(e);
+        return;
+      }
+      if (syncCore !== core) {
+        syncCore = core;
+        syncCapacity = 0;
+        syncIds = syncData = null;
+      }
+      if (entities.size > syncCapacity) {
+        syncCapacity = Math.max(entities.size, syncCapacity * 2);
+        core.reserveSync(syncCapacity);
+        syncIds = syncData = null;
+      }
+      if (!syncIds?.buffer.byteLength) syncIds = core.syncIdsView();
+      if (!syncData?.buffer.byteLength) syncData = core.syncDataView();
+      pendingSync.length = 0;
+      for (const entity of entities.values()) {
+        const h = handles.get(entity);
+        if (h.native !== core || !h.mesh) {
+          syncEntity(entity);
+          if (!syncIds.buffer.byteLength) syncIds = core.syncIdsView();
+          if (!syncData.buffer.byteLength) syncData = core.syncDataView();
+          continue;
+        }
+        const at = pendingSync.length * 11,
+          parent = parentId(h);
+        if (!changedTransform(h) && h.syncedParent === parent) continue;
+        readTransform(h.mesh, syncData, at);
+        syncIds[pendingSync.length * 2] = h.nativeId;
+        syncIds[pendingSync.length * 2 + 1] = parent;
+        pendingSync.push(h);
+      }
+      if (pendingSync.length) {
+        if (!core.applySync(pendingSync.length)) {
+          pendingSync.length = 0;
+          throw Error("Invalid logical scene transform batch");
+        }
+        // Native validation/hierarchy allocations can grow the WASM heap.
+        if (!syncIds.buffer.byteLength) syncIds = core.syncIdsView();
+        if (!syncData.buffer.byteLength) syncData = core.syncDataView();
+        for (let i = 0; i < pendingSync.length; i++) {
+          rememberTransform(pendingSync[i], syncData, i * 11);
+          pendingSync[i].syncedParent = syncIds[i * 2 + 1];
+        }
+        pendingSync.length = 0;
+      }
+      core.update();
+    }
+    function compatibleTransform(node) {
+      compatibleChain.length = 0;
+      let current = node,
+        valid = true;
+      while (current && compatibleNodes.get(current)?.epoch !== boundsEpoch) {
+        const entity = entities.get(current.metadata?.arkglideId),
+          h = entity && handles.get(entity),
+          proto = Babylon.TransformNode.prototype;
+        if (
+          !h?.native ||
+          h.native !== boundsCore ||
+          h.mesh !== current ||
+          current.isDisposed() ||
+          current.computeWorldMatrix !== proto.computeWorldMatrix ||
+          (current._afterComputeWorldMatrix !==
+            proto._afterComputeWorldMatrix &&
+            current._afterComputeWorldMatrix !==
+              Babylon.AbstractMesh.prototype._afterComputeWorldMatrix &&
+            current._afterComputeWorldMatrix !==
+              Babylon.Mesh.prototype._afterComputeWorldMatrix) ||
+          (current._getEffectiveParent !== proto._getEffectiveParent &&
+            current._getEffectiveParent !==
+              Babylon.AbstractMesh.prototype._getEffectiveParent) ||
+          current.isWorldMatrixFrozen ||
+          current._masterMesh ||
+          current._transformToBoneReferal ||
+          current.isUsingPivotMatrix() ||
+          current.isWorldMatrixCameraDependent() ||
+          current.scalingDeterminant !== 1 ||
+          current.reIntegrateRotationIntoRotationQuaternion ||
+          current.onAfterWorldMatrixUpdateObservable?.hasObservers()
+        ) {
+          const entry = compatibleNodes.get(current) || {};
+          entry.epoch = boundsEpoch;
+          entry.valid = false;
+          compatibleNodes.set(current, entry);
+          valid = false;
+          break;
+        }
+        compatibleChain.push(current);
+        current = current.parent;
+      }
+      if (current && compatibleNodes.get(current)?.epoch === boundsEpoch)
+        valid = compatibleNodes.get(current).valid;
+      for (const item of compatibleChain) {
+        const entry = compatibleNodes.get(item) || {};
+        entry.epoch = boundsEpoch;
+        entry.valid = valid;
+        compatibleNodes.set(item, entry);
+      }
+      return valid;
+    }
+    // Engine-only batch query. No native views or renderer objects are exposed
+    // through the script-facing scene API. Unknown transforms return NaN boxes.
+    function worldBounds(
+      meshes,
+      length = meshes.length,
+      minChangedFraction = 0,
+      frame = -1,
+    ) {
+      const core = options.getWorld?.();
+      if (!core?.gatherBounds) return null;
+      if (boundsCore !== core) {
+        boundsCore = core;
+        boundsCapacity = 0;
+        boundsIds = boundsData = boundsOutput = null;
+        boundsLength = -1;
+        boundsRevision = -1;
+        boundsDecisionFrame = -1;
+        boundsLastMatrices = 0;
+      }
+      const decisionValid =
+        boundsCore === core &&
+        boundsDecisionFrame === frame &&
+        boundsDecisionThreshold === minChangedFraction;
+      // A fallback decision can serve every view in this frame: Babylon still
+      // checks live transforms, including changes made between two views.
+      if (minChangedFraction > 0 && decisionValid && !boundsUseNative)
+        return null;
+      sync();
+      if (minChangedFraction > 0 && !decisionValid) {
+        core.update();
+        const matrices = core.matrixUpdates();
+        boundsUseNative =
+          (matrices - boundsLastMatrices) / Math.max(1, entities.size) >=
+          minChangedFraction;
+        boundsLastMatrices = matrices;
+        boundsDecisionFrame = frame;
+        boundsDecisionThreshold = minChangedFraction;
+        if (!boundsUseNative) return null;
+      }
+      if (length > boundsCapacity) {
+        boundsCapacity = Math.max(length, boundsCapacity * 2);
+        core.reserveBounds(boundsCapacity);
+        boundsIds = boundsData = boundsOutput = null;
+      }
+      if (!boundsIds?.buffer.byteLength) boundsIds = core.boundsIdsView();
+      if (!boundsData?.buffer.byteLength) boundsData = core.boundsDataView();
+      boundsEpoch++;
+      try {
+        let known = 0;
+        const revision = core.changeRevision();
+        let dirty =
+          boundsLength !== length ||
+          boundsRevision !== revision ||
+          !boundsOutput;
+        for (let i = 0; i < length; i++) {
+          const mesh = meshes[i],
+            info = mesh?._boundingInfo;
+          if (
+            !info ||
+            info.isLocked ||
+            mesh._masterMesh ||
+            mesh.skeleton ||
+            mesh.morphTargetManager ||
+            mesh.hasThinInstances ||
+            mesh.hasInstances ||
+            mesh.isAnInstance ||
+            mesh.doNotSyncBoundingInfo ||
+            mesh.getBoundingInfo !==
+              Babylon.AbstractMesh.prototype.getBoundingInfo ||
+            mesh._updateBoundingInfo !==
+              Babylon.AbstractMesh.prototype._updateBoundingInfo ||
+            !compatibleTransform(mesh)
+          ) {
+            if (boundsIds[i] !== 0) dirty = true;
+            boundsIds[i] = 0;
+            continue;
+          }
+          const entity = entities.get(mesh.metadata?.arkglideId),
+            h = handles.get(entity),
+            box = info.boundingBox,
+            at = i * 6;
+          if (boundsIds[i] !== h.nativeId) dirty = true;
+          boundsIds[i] = h.nativeId;
+          known++;
+          const min = box.minimum,
+            max = box.maximum;
+          if (
+            boundsData[at] !== min.x ||
+            boundsData[at + 1] !== min.y ||
+            boundsData[at + 2] !== min.z ||
+            boundsData[at + 3] !== max.x ||
+            boundsData[at + 4] !== max.y ||
+            boundsData[at + 5] !== max.z
+          ) {
+            dirty = true;
+            boundsData[at] = min.x;
+            boundsData[at + 1] = min.y;
+            boundsData[at + 2] = min.z;
+            boundsData[at + 3] = max.x;
+            boundsData[at + 4] = max.y;
+            boundsData[at + 5] = max.z;
+          }
+        }
+        if (!known) return null;
+        if (dirty) {
+          if (!core.gatherBounds(length))
+            throw Error("Invalid logical bounds batch");
+          boundsOutput = core.boundsOutputView();
+          boundsLength = length;
+          boundsRevision = revision;
+        } else {
+          if (!boundsOutput.buffer.byteLength)
+            boundsOutput = core.boundsOutputView();
+          boundsCacheHits++;
+        }
+        return boundsOutput;
+      } finally {
+        compatibleChain.length = 0;
+      }
     }
     function releaseNative(h) {
       if (h.native) {
         h.native.erase(h.nativeId);
         nativeEntities.delete(h.nativeId);
+        if (!nativeEntities.size) {
+          boundsCacheHits = 0;
+          boundsLength = -1;
+          boundsRevision = -1;
+          boundsDecisionFrame = -1;
+          boundsLastMatrices = 0;
+        }
       }
     }
 
@@ -485,6 +771,7 @@
       entities,
       register,
       sync,
+      worldBounds,
       stats() {
         const core = options.getWorld?.();
         return {
@@ -492,6 +779,12 @@
           nativeEntities: core?.count() || 0,
           nativeSceneSlots: core?.capacity() || 0,
           nativeMatrixUpdates: core?.matrixUpdates() || 0,
+          nativeTransformBatches: core?.transformBatches() || 0,
+          nativeTransformWrites: core?.transformWrites() || 0,
+          nativeBoundsBatches: core?.boundBatches() || 0,
+          nativeBoundsUpdates: core?.boundUpdates() || 0,
+          nativeBoundsEntries: core?.boundEntries() || 0,
+          nativeBoundsCacheHits: boundsCacheHits,
         };
       },
       getObject: (id) => {

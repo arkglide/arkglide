@@ -131,7 +131,7 @@
         typeof createArkGlideMath === "function"
           ? createArkGlideMath().then(function (module) {
               math = ArkGlideMath.createMathAPI(module);
-              if(!module.RuntimeWorld||!module.RuntimeClock||!module.RenderBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
+              if(!module.RuntimeWorld?.prototype.applySync||!module.RuntimeWorld?.prototype.gatherBounds||!module.RuntimeClock||!module.RenderBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
               coreModule=module;logicalWorld=new module.RuntimeWorld();
             })
           : Promise.resolve();
@@ -159,6 +159,7 @@
         },
         {
           getWorld:()=>logicalWorld,
+          getBatchMinEntities:()=>runtimeSettings?.renderCompute?.transformsMinEntities ?? 32,
           onBeforeMutate: function () { physicsRuntime?.assertMutable(); },
           onBeforeDestroy: function (id) {
             prefabLibrary?.onEntityDestroyed(id);
@@ -286,7 +287,7 @@
         animationRuntime?.attach(nodes);
       }
       function initGameplay(content, audioData) {
-        renderCompute = ArkGlideRenderCompute.create(BABYLON, coreModule, runtimeSettings.renderCompute);
+        renderCompute = ArkGlideRenderCompute.create(BABYLON, coreModule, runtimeSettings.renderCompute, entityAPI);
         inputRuntime = ArkGlideInputUI.createInputUI({
           canvas: document.getElementById("renderCanvas"),
           layer: document.getElementById("hudLayer"),
@@ -595,7 +596,7 @@
           if (!scene.activeCamera || scene.activeCamera.isDisposed())
             scene.activeCamera = camera;
           var renderStart = performance.now();
-          try { portalRuntime?.updateVisuals(); portalRuntime?.render(); } catch (error) { reportScriptError({hook:"portals.render",error}); }
+          try { portalRuntime?.updateVisuals(); renderCompute?.beginFrame(); portalRuntime?.render(); } catch (error) { reportScriptError({hook:"portals.render",error}); }
           scene.render();
           renderMs = performance.now() - renderStart;
           _renderFrames++;

@@ -14,6 +14,9 @@ export interface ProjectSettings {
   renderCompute?: {
     enabled?: boolean;
     normalsMinVertices?: number;
+    transformsMinEntities?: number;
+    worldBounds?: boolean;
+    boundsMinChangedFraction?: number;
     cullMinMeshes?: number;
     maxBatchMeshes?: number;
     epsilon?: number;

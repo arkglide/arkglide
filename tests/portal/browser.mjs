@@ -20,7 +20,7 @@ execFileSync(process.execPath, ["scripts/sync-runtime.mjs"], { cwd: root });
 const temporary = await fs.mkdtemp(path.join(tmpdir(),"arkglide-render-portal-"));
 try {
   const archive=unzipSync(new Uint8Array(await fs.readFile(new URL("examples/portal-lab.arkglide",root)))), project=JSON.parse(strFromU8(archive["project.json"]));
-  project.settings.renderCompute={normalsMinVertices:0,cullMinMeshes:0};
+  project.settings.renderCompute={normalsMinVertices:0,cullMinMeshes:0,boundsMinChangedFraction:0};
   archive["project.json"]=strToU8(JSON.stringify(project));
   const source=path.join(temporary,"native-render.arkglide");
   await fs.writeFile(source,zipSync(archive));
@@ -76,6 +76,7 @@ test(
       assert.equal(await frame.evaluate(() => scriptErrors), 0);
       assert.equal(await frame.evaluate(() => renderCompute.stats().renderComputeBackend),"cpp-wasm");
       assert.ok(await frame.evaluate(() => renderCompute.stats().renderCullBatches)>0);
+      assert.ok(await frame.evaluate(() => renderCompute.stats().renderNativeBounds)>0);
       const before = await frame.evaluate(() => ({
         view: scene.activeCamera.getViewMatrix().asArray(),
         clip: scene.clipPlane,

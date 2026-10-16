@@ -93,5 +93,305 @@
     "types": "npx tsc --noEmit passed",
     "wasm": "Built cpp/math, cpp/runtime and cpp/render with EMXX override; synchronized classic runtime library",
     "frontendProductionBuild": "Not run"
+  },
+  "sceneBatchMigration": {
+    "baselineCommit": "551ad2df13016a7889677048938d9c81324867a0",
+    "recordedAtUtc": "2026-10-16T12:54:51.672Z",
+    "compiler": "Emscripten 3.1.69 / LLVM 19, -O3, same local toolchain as the prior native core",
+    "wasmModuleSha256": "7578a8d5785f9469ecb17ece84101b107512caedcaa4eab645f29d5e87438e03",
+    "transformSync": {
+      "before": {
+        "runtime": "v24.19.0",
+        "entities": 1000,
+        "frames": 60,
+        "samples": 5,
+        "backend": "cpp-wasm",
+        "cases": [
+          {
+            "dirtyFraction": 0,
+            "medianFrameMs": 1.225385266666664,
+            "callsPerFrame": {
+              "transform": 0,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 0
+            }
+          },
+          {
+            "dirtyFraction": 0.01,
+            "medianFrameMs": 1.0734454500000008,
+            "callsPerFrame": {
+              "transform": 10,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 0
+            }
+          },
+          {
+            "dirtyFraction": 0.1,
+            "medianFrameMs": 1.1956510500000035,
+            "callsPerFrame": {
+              "transform": 100,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 0
+            }
+          },
+          {
+            "dirtyFraction": 1,
+            "medianFrameMs": 1.4970157000000048,
+            "callsPerFrame": {
+              "transform": 1000,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 0
+            }
+          }
+        ]
+      },
+      "after": {
+        "runtime": "v24.19.0",
+        "entities": 1000,
+        "frames": 60,
+        "samples": 5,
+        "backend": "cpp-wasm",
+        "cases": [
+          {
+            "dirtyFraction": 0,
+            "medianFrameMs": 1.1607272000000004,
+            "callsPerFrame": {
+              "transform": 0,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 0
+            }
+          },
+          {
+            "dirtyFraction": 0.01,
+            "medianFrameMs": 1.2035634500000014,
+            "callsPerFrame": {
+              "transform": 0,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 1
+            }
+          },
+          {
+            "dirtyFraction": 0.1,
+            "medianFrameMs": 1.2486769500000037,
+            "callsPerFrame": {
+              "transform": 0,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 1
+            }
+          },
+          {
+            "dirtyFraction": 1,
+            "medianFrameMs": 1.5436845333333318,
+            "callsPerFrame": {
+              "transform": 0,
+              "transformQuaternion": 0,
+              "setParent": 0,
+              "applySync": 1
+            }
+          }
+        ]
+      },
+      "limits": "Same current native library; baseline JS adapter from 551ad2d. Counts cover transform, quaternion, parenting and batch submission, not all WASM calls."
+    },
+    "offscreenPreparation": {
+      "runtime": "v24.19.0",
+      "entities": 2000,
+      "frames": 20,
+      "samples": 5,
+      "views": 4,
+      "hierarchyDepth": 10,
+      "scalarBabylonBounds": [
+        {
+          "dirtyFraction": 0,
+          "medianFrameMs": 3.9455796500000018,
+          "rendererMatrixCalls": 0,
+          "nativeTransformBatches": 0,
+          "nativeTransformWrites": 0,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        },
+        {
+          "dirtyFraction": 0.01,
+          "medianFrameMs": 4.200112300000001,
+          "rendererMatrixCalls": 110,
+          "nativeTransformBatches": 0,
+          "nativeTransformWrites": 0,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        },
+        {
+          "dirtyFraction": 0.1,
+          "medianFrameMs": 4.183701700000006,
+          "rendererMatrixCalls": 1100,
+          "nativeTransformBatches": 0,
+          "nativeTransformWrites": 0,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        },
+        {
+          "dirtyFraction": 1,
+          "medianFrameMs": 17.78912875000001,
+          "rendererMatrixCalls": 11000,
+          "nativeTransformBatches": 0,
+          "nativeTransformWrites": 0,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        }
+      ],
+      "batchNativeBounds": [
+        {
+          "dirtyFraction": 0,
+          "medianFrameMs": 3.5273773000000346,
+          "rendererMatrixCalls": 0,
+          "nativeTransformBatches": 0,
+          "nativeTransformWrites": 0,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        },
+        {
+          "dirtyFraction": 0.01,
+          "medianFrameMs": 3.379238750000013,
+          "rendererMatrixCalls": 110,
+          "nativeTransformBatches": 1,
+          "nativeTransformWrites": 20,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        },
+        {
+          "dirtyFraction": 0.1,
+          "medianFrameMs": 4.10602915000004,
+          "rendererMatrixCalls": 1100,
+          "nativeTransformBatches": 1,
+          "nativeTransformWrites": 200,
+          "nativeBoundsUpdates": 0,
+          "nativeBoundsQueries": 0,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        },
+        {
+          "dirtyFraction": 1,
+          "medianFrameMs": 8.308779249999997,
+          "rendererMatrixCalls": 0,
+          "nativeTransformBatches": 1,
+          "nativeTransformWrites": 2000,
+          "nativeBoundsUpdates": 2000,
+          "nativeBoundsQueries": 1,
+          "selectedPerView": [
+            1000,
+            1000,
+            1000,
+            1000
+          ]
+        }
+      ],
+      "limits": "Steady-state CPU scene synchronization and offscreen preparation, including JS checks and input/output copies. Same native library in both variants; excludes main-view rendering, GPU work, physics and production FPS."
+    },
+    "browser": {
+      "fullDraws": 41,
+      "nativeDraws": 1,
+      "selectedCount": 1,
+      "difference": 0,
+      "colored": 3360,
+      "stats": {
+        "renderComputeBackend": "cpp-wasm",
+        "renderCullBatches": 2,
+        "renderCullCandidates": 82,
+        "renderCulledMeshes": 80,
+        "renderNormalBatches": 0,
+        "renderNormalVertices": 0,
+        "renderNativeBounds": 82,
+        "renderBoundsFallbacks": 0
+      },
+      "firstBounds": 41,
+      "reusedBounds": 41,
+      "sceneStats": {
+        "sceneBackend": "cpp-wasm",
+        "nativeEntities": 45,
+        "nativeSceneSlots": 45,
+        "nativeMatrixUpdates": 45,
+        "nativeTransformBatches": 1,
+        "nativeTransformWrites": 40,
+        "nativeBoundsBatches": 1,
+        "nativeBoundsUpdates": 41,
+        "nativeBoundsEntries": 41,
+        "nativeBoundsCacheHits": 1
+      }
+    },
+    "adapterSha256": "9032a0c2f0f1732f9ae25fee19b56cf9ef26252d40d3ab75293ec4fd0ece4951",
+    "renderComputeSha256": "8d559452a1d4b3a0b57a6505b2bf126be1463cb6d2fed2a991b7dcd02a942120",
+    "validation": {
+      "unitTests": {
+        "passed": 556,
+        "command": "npm test"
+      },
+      "editorBrowser": {
+        "passed": 34,
+        "coldViteCache": true,
+        "command": "npm run test:browser -- --reporter=list"
+      },
+      "finalRenderAndExport": {
+        "passed": 2,
+        "command": "npm run test:browser -- --project=core-ui --project=render-compute --reporter=list"
+      },
+      "staticBrowser": {
+        "passed": 7,
+        "command": "npm run test:static -- --reporter=list"
+      },
+      "gameplayBrowser": {
+        "passed": 10,
+        "command": "node --test --test-concurrency=1 tests/composition/browser.mjs tests/foundations/browser.mjs tests/package/browser.mjs tests/portal/browser.mjs",
+        "forcedNativePortalBounds": true
+      },
+      "types": "npx tsc --noEmit passed",
+      "wasm": "Rebuilt and synchronized with Emscripten 3.1.69 / LLVM 19",
+      "frontendProductionBuild": "Not run"
+    }
   }
 }

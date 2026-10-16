@@ -106,6 +106,14 @@ export interface RuntimeStats {
   renderCulledMeshes?: number;
   renderNormalBatches?: number;
   renderNormalVertices?: number;
+  renderNativeBounds?: number;
+  renderBoundsFallbacks?: number;
+  nativeTransformBatches?: number;
+  nativeTransformWrites?: number;
+  nativeBoundsBatches?: number;
+  nativeBoundsUpdates?: number;
+  nativeBoundsEntries?: number;
+  nativeBoundsCacheHits?: number;
   sceneBackend?:string;lifecycleBackend?:string;
   nativeEntities?:number;nativeSceneSlots?:number;nativeMatrixUpdates?:number;
   nativeOwners?:number;nativeTimers?:number;coreWasmHeapBytes?:number;

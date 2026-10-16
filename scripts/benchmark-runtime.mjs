@@ -21,7 +21,7 @@ const module = await factory(),
   engine = new B.NullEngine(),
   scene = new B.Scene(engine),
   world = new module.RuntimeWorld(),
-  calls = { transform: 0, setParent: 0 };
+  calls = { transform: 0, transformQuaternion: 0, setParent: 0, applySync: 0 };
 const api = ArkGlideRuntime.createEntityAPI(
     B,
     () => scene,

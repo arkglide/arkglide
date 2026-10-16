@@ -23,6 +23,18 @@ export default function DiagnosticsPanel() {
         ["FPS", stats.fps.toFixed(1)],
         ["渲染计算后端", stats.renderComputeBackend || "—"],
         [
+          "变换提交批次 / 实体",
+          `${stats.nativeTransformBatches || 0} / ${stats.nativeTransformWrites || 0}`,
+        ],
+        [
+          "包围盒更新 / 查询批次",
+          `${stats.nativeBoundsUpdates || 0} / ${stats.nativeBoundsBatches || 0}`,
+        ],
+        [
+          "离屏包围盒原生 / 兼容",
+          `${stats.renderNativeBounds || 0} / ${stats.renderBoundsFallbacks || 0}`,
+        ],
+        [
           "离屏筛选批次 / 剔除网格",
           `${stats.renderCullBatches || 0} / ${stats.renderCulledMeshes || 0}`,
         ],

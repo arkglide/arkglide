@@ -80,6 +80,7 @@ test("panel help supports hover and keyboard; native offscreen culling preserves
       m.material = material;
       meshes.push(m);
     }
+    for (const mesh of meshes) w.entityAPI.register(mesh, mesh.name);
     const target = new B.RenderTargetTexture(
       "generic-offscreen-batch",
       128,
@@ -100,6 +101,8 @@ test("panel help supports hover and keyboard; native offscreen culling preserves
       draw();
       const fullDraws = draw(),
         full = await target.readPixels();
+      // Renderer/physics-style writes must reach C++ as one sparse batch.
+      for (const mesh of meshes.slice(1)) mesh.position.x += 1;
       let selectedCount = 0;
       target.getCustomRenderList = (
         _pass: any,
@@ -117,6 +120,9 @@ test("panel help supports hover and keyboard; native offscreen culling preserves
       };
       const nativeDraws = draw(),
         selected = await target.readPixels();
+      const firstBounds = w.entityAPI.stats().nativeBoundsUpdates;
+      draw();
+      const reusedBounds = w.entityAPI.stats().nativeBoundsUpdates;
       let difference = 0,
         colored = 0;
       for (let i = 0; i < full.length; i++)
@@ -130,6 +136,9 @@ test("panel help supports hover and keyboard; native offscreen culling preserves
         difference,
         colored,
         stats: w.renderCompute.stats(),
+        firstBounds,
+        reusedBounds,
+        sceneStats: w.entityAPI.stats(),
       };
     } finally {
       target.dispose();
@@ -143,6 +152,10 @@ test("panel help supports hover and keyboard; native offscreen culling preserves
   expect(result.colored).toBeGreaterThan(100);
   expect(result.nativeDraws).toBeLessThan(result.fullDraws);
   expect(result.stats.renderCulledMeshes).toBeGreaterThanOrEqual(40);
+  expect(result.stats.renderNativeBounds).toBeGreaterThanOrEqual(41);
+  expect(result.firstBounds).toBe(41);
+  expect(result.reusedBounds).toBe(result.firstBounds);
+  expect(result.sceneStats.nativeTransformBatches).toBeGreaterThan(0);
   const report = info.outputPath("native-offscreen-render.json");
   await fs.writeFile(report, JSON.stringify(result, null, 2));
   await info.attach("native-offscreen-render.json", {
@@ -151,5 +164,10 @@ test("panel help supports hover and keyboard; native offscreen culling preserves
   });
   await page.evaluate(() => (window as any).renderStore.getState().stop());
   await runtime.waitForFunction(() => (window as any).renderCompute === null);
+  expect(
+    await runtime.evaluate(
+      () => (window as any).entityAPI.stats().nativeBoundsEntries,
+    ),
+  ).toBe(0);
   expect(errors).toEqual([]);
 });

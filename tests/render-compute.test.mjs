@@ -273,6 +273,8 @@ test("render budgets are configurable and invalid settings cannot enable uncheck
     { epsilon: -1 },
     { maxBatchMeshes: 0 },
     { normalsMinVertices: 1.5 },
+    { boundsMinChangedFraction: -1 },
+    { boundsMinChangedFraction: 1.1 },
     { extra: 1 },
   ])
     assert.throws(() => ArkGlideRenderCompute.settings(bad));

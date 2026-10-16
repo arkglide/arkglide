@@ -4,6 +4,9 @@
   const defaults = {
     enabled: true,
     normalsMinVertices: 256,
+    transformsMinEntities: 32,
+    worldBounds: true,
+    boundsMinChangedFraction: 0.25,
     cullMinMeshes: 32,
     maxBatchMeshes: 65536,
     epsilon: 1e-7,
@@ -26,9 +29,16 @@
     const result = { ...defaults, ...input };
     if (
       typeof result.enabled !== "boolean" ||
-      !["normalsMinVertices", "cullMinMeshes", "maxBatchMeshes"].every(
-        (k) => Number.isSafeInteger(result[k]) && result[k] >= 0,
-      ) ||
+      typeof result.worldBounds !== "boolean" ||
+      !Number.isFinite(result.boundsMinChangedFraction) ||
+      result.boundsMinChangedFraction < 0 ||
+      result.boundsMinChangedFraction > 1 ||
+      ![
+        "normalsMinVertices",
+        "transformsMinEntities",
+        "cullMinMeshes",
+        "maxBatchMeshes",
+      ].every((k) => Number.isSafeInteger(result[k]) && result[k] >= 0) ||
       result.maxBatchMeshes < 1 ||
       !Number.isFinite(result.epsilon) ||
       result.epsilon < 0
@@ -36,7 +46,7 @@
       throw Error("Invalid render compute budget");
     return result;
   }
-  function create(B, module, options) {
+  function create(B, module, options, entities) {
     const config = settings(options),
       native =
         config.enabled && module?.RenderBatch ? new module.RenderBatch() : null;
@@ -50,12 +60,15 @@
       positions,
       indices,
       output;
+    let frame = 0;
     const counters = {
       renderCullBatches: 0,
       renderCullCandidates: 0,
       renderCulledMeshes: 0,
       renderNormalBatches: 0,
       renderNormalVertices: 0,
+      renderNativeBounds: 0,
+      renderBoundsFallbacks: 0,
     };
     const live = () => {
       if (dead) throw Error("Render compute disposed");
@@ -102,12 +115,24 @@
           native.reserveBoxes(boxCapacity);
           boxes = null;
         }
+        const batchBounds =
+          config.worldBounds &&
+          entities?.worldBounds(
+            meshes,
+            length,
+            config.boundsMinChangedFraction,
+            frame,
+          );
+        if (!boxes?.buffer.byteLength) boxes = native.boxView();
+        if (batchBounds) boxes.set(batchBounds.subarray(0, length * 6));
         for (let i = 0; i < length; i++) {
-          const mesh = meshes[i];
+          const mesh = meshes[i],
+            at = i * 6,
+            nativeBounds = batchBounds && Number.isFinite(boxes[at]);
           // Deforming bounds, instance batches, camera-dependent transforms and
           // custom activation/LOD stay on the renderer's conservative path.
           let cameraDependent = false;
-          for (let node = mesh; node; node = node.parent)
+          for (let node = nativeBounds ? null : mesh; node; node = node.parent)
             if (
               node.isWorldMatrixCameraDependent?.() ||
               node.onAfterWorldMatrixUpdateObservable?.hasObservers()
@@ -141,12 +166,17 @@
             mesh.onBeforeBindObservable?.hasObservers() ||
             mesh.onBeforeDrawObservable?.hasObservers();
           let bounds;
+          if (!bypass && nativeBounds) {
+            counters.renderNativeBounds++;
+            continue;
+          }
           if (!bypass && !mesh.isDisposed()) {
-            mesh.computeWorldMatrix(!mesh.isSynchronized());
+            if (mesh._isDirty || !mesh.isSynchronized())
+              mesh.computeWorldMatrix(true);
             bounds = mesh.getBoundingInfo()?.boundingBox;
+            counters.renderBoundsFallbacks++;
           }
           if (!boxes?.buffer.byteLength) boxes = native.boxView();
-          const at = i * 6;
           if (!bounds) {
             boxes[at] = NaN;
             continue;
@@ -183,6 +213,10 @@
     return {
       normalData,
       select,
+      beginFrame() {
+        live();
+        frame++;
+      },
       stats: () => ({
         renderComputeBackend: native && !dead ? "cpp-wasm" : "javascript",
         ...counters,

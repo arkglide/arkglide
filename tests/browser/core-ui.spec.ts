@@ -125,7 +125,11 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
       nodes,
       settings: {
         ...state.settings,
-        renderCompute: { normalsMinVertices: 0, cullMinMeshes: 0 },
+        renderCompute: {
+          normalsMinVertices: 0,
+          cullMinMeshes: 0,
+          transformsMinEntities: 0,
+        },
       },
       scripts: {
         "probe.js":
@@ -238,6 +242,16 @@ test("C++ logical runtime and styled HUD work in the editor and an independently
         () => (window as any).renderCompute.stats().renderNormalBatches,
       ),
     ).toBeGreaterThan(0);
+    const exportedBounds = await runtime.evaluate(() => {
+      const w = window as any;
+      w.renderCompute.select(
+        w.scene.meshes,
+        w.BABYLON.Frustum.GetPlanes(w.BABYLON.Matrix.Identity()),
+      );
+      return { render: w.renderCompute.stats(), scene: w.entityAPI.stats() };
+    });
+    expect(exportedBounds.render.renderNativeBounds).toBeGreaterThan(0);
+    expect(exportedBounds.scene.nativeBoundsEntries).toBeGreaterThan(0);
     const crosshair = runtime.locator(`[data-hud-id="${ids.root}"]`),
       ring = runtime.locator(`[data-hud-id="${ids.ring}"]`);
     await expect(crosshair).toHaveCSS("pointer-events", "none");
