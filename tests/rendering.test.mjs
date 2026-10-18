@@ -142,17 +142,20 @@ test("local probes isolate shared managed materials, follow moving meshes and di
 });
 test("baked texture dependencies participate in validation, clipboard restoration and static resource acquisition", async () => {
   const s = () => store.getState(); s().newProject();
-  for (const id of ["ao", "baked"])
+  for (const id of ["ao", "baked", "emissive"])
     s().importTexture({ id, name: id + ".png", mime: "image/png", byteLength: 3 }, new Uint8Array([1, 2, 3]).buffer);
   const id = s().createMaterial("Baked");
-  s().updateMaterial(id, { aoTextureId: "ao", lightmapTextureId: "baked", lightmapUV: 1, lightmapIntensity: 2 });
+  s().updateMaterial(id, { aoTextureId: "ao", lightmapTextureId: "baked", lightmapUV: 1, lightmapIntensity: 2, emissiveTextureId: "emissive", emissiveIntensity: 4 });
   s().setNodeMaterial("cube", id);
   assert.throws(() => s().deleteTexture("ao"), /引用/);
   assert.throws(() => s().updateMaterial(id, { lightmapUV: 2 }), /UV/);
   assert.throws(() => s().updateMaterial(id, { aoStrength: -1 }), /强度/);
-  s().selectNode("cube"); s().copyToClipboard(); s().removeNode("cube"); s().deleteMaterial(id); s().deleteTexture("ao"); s().deleteTexture("baked"); s().pasteFromClipboard();
+  assert.throws(() => s().updateMaterial(id, { emissiveIntensity: 101 }), /自发光强度/);
+  assert.throws(() => s().deleteTexture("emissive"), /引用/);
+  s().selectNode("cube"); s().copyToClipboard(); s().removeNode("cube"); s().deleteMaterial(id); s().deleteTexture("ao"); s().deleteTexture("baked"); s().deleteTexture("emissive"); s().pasteFromClipboard();
   assert.ok(s().textureBuffers.has("baked"));
   assert.ok(s().textureBuffers.has("ao"));
+  assert.ok(s().textureBuffers.has("emissive"));
   const files = unzipSync(archive.createProjectArchive());
   assert.equal(files["textures/baked.bin"].length, 3);
   const runtime = Object.fromEntries(await Promise.all(RUNTIME_FILES.map(async p => [p, new Uint8Array(await readFile(new URL("../public/" + p, import.meta.url)))])));
@@ -162,5 +165,6 @@ test("baked texture dependencies participate in validation, clipboard restoratio
     const result = await client.initialize(game.manifest.boot);
     assert.equal(result.textureData.baked.byteLength, 3);
     assert.equal(result.textureData.ao.byteLength, 3);
+    assert.equal(result.textureData.emissive.byteLength, 3);
   } finally { client.dispose(); }
 });

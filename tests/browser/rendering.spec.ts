@@ -51,6 +51,69 @@ test("soft shadows, environment IBL and exposure change actual WebGL pixels", as
   expect(result.cleared.environmentTextures).toBe(0);
 });
 
+test("emissive textures bloom and grade once, including through a real portal view", async ({ page }) => {
+  await page.goto("/runtime.html");
+  await page.waitForFunction(() => !!(window as any).ArkGlideRendering);
+  const result = await page.evaluate(async () => {
+    const w = window as any, B = w.BABYLON;
+    const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 128; document.body.append(canvas);
+    const engine = new B.Engine(canvas, false, { preserveDrawingBuffer: true });
+    const scene = new B.Scene(engine); scene.clearColor = new B.Color4(0, 0, 0, 1);
+    const camera = new B.FreeCamera("view", new B.Vector3(0, 0, 5), scene); camera.setTarget(B.Vector3.Zero());
+    const adapter = w.ArkGlideScene.createSceneAdapter(B, scene);
+    const image = document.createElement("canvas"); image.width = image.height = 2;
+    image.getContext("2d")!.fillStyle = "rgb(255,70,15)"; image.getContext("2d")!.fillRect(0, 0, 2, 2);
+    const blob = await new Promise<Blob>(r => image.toBlob(b => r(b!))), bytes = await blob.arrayBuffer();
+    const content: any = { textures: [{ id: "emit", mime: "image/png" }], materials: { mat: { id: "mat", name: "lamp", baseColor: "#000000", emissiveColor: "#FFFFFF", emissiveIntensity: 4, metallic: 0, roughness: 1, alpha: 1, doubleSided: false, uvScale: { u: 1, v: 1 } } } };
+    const nodes = [{ id: "reference", name: "reference", type: "mesh", materialId: "mat", transform: { x: -2.5, y: 0, z: -2 } }, { id: "destination", name: "destination", type: "mesh", materialId: "mat", transform: { x: 10, y: 0, z: -2 } }];
+    adapter.rendering.configure({ color: { toneMapping: "aces", exposure: 0.7 } });
+    await adapter.sync(nodes, {}, content, { emit: bytes });
+    const portals = w.ArkGlidePortals.create(B, { scene, physics: {}, getObject: () => null, find: () => null });
+    const api = portals.forOwner({ record: { active: true }, track: () => () => {} });
+    const a = api.create({ id: "a", shape: "rectangle", width: 2, height: 2, position: { x: 0, y: 0, z: 0 } });
+    const b = api.create({ id: "b", shape: "rectangle", width: 2, height: 2, position: { x: 10, y: 0, z: 0 }, rotation: { x: 0, y: 1, z: 0, w: 0 } });
+    a.link(b); api.setQuality({ depth: 1, samples: 1, maxViews: 2 });
+    const draw = async () => {
+      adapter.rendering.prepareFrame();
+      await scene.whenReadyAsync();
+      for (let i = 0; i < 8; i++) { portals.updateVisuals(); portals.render(); scene.render(); await new Promise(r => setTimeout(r, 20)); }
+      return Array.from(await engine.readPixels(0, 0, 256, 128)) as number[];
+    };
+    const diff = (a: number[], b: number[]) => a.reduce((n, v, i) => n + (i % 4 === 3 ? 0 : Math.abs(v - b[i])), 0);
+    try {
+      const white = await draw();
+      content.materials.mat.emissiveTextureId = "emit";
+      await adapter.sync(nodes, {}, content, { emit: bytes });
+      const orange = await draw();
+      const projected = B.Vector3.Project(new B.Vector3(-2.5, 0, -2), B.Matrix.Identity(), scene.getTransformMatrix(), camera.viewport.toGlobal(256, 128));
+      const sample = (data: number[], x: number, y: number) => data.slice((Math.round(y) * 256 + Math.round(x)) * 4, (Math.round(y) * 256 + Math.round(x)) * 4 + 3);
+      const direct = sample(orange, projected.x, 64), through = sample(orange, 128, 64);
+      const targets = scene.textures.filter((t: any) => t.name.startsWith("__portal:target:"));
+      const linearTargets = targets.every((t: any) => t.gammaSpace === false);
+      adapter.rendering.configure({ color: { toneMapping: "aces", exposure: 0.7 }, bloom: { enabled: true, threshold: 0.1, weight: 0.6 } });
+      const bloom = await draw();
+      const bloomStats = adapter.rendering.stats(), bloomPasses = camera._postProcesses.filter(Boolean).map((p: any) => ({ name: p.name, ready: p.isReady() }));
+      adapter.rendering.configure({ color: { toneMapping: "aces", exposure: 0.7, saturation: -100 } });
+      const gray = await draw();
+      const grayPixel = sample(gray, projected.x, 64);
+      for (let i = 0; i < 3; i++) { adapter.rendering.configure({ bloom: { enabled: true } }); await draw(); adapter.rendering.configure(); await draw(); }
+      const final = adapter.rendering.stats(), postCount = camera._postProcesses.filter(Boolean).length;
+      return { emissiveDifference: diff(white, orange), bloomDifference: diff(orange, bloom), gradeDifference: diff(orange, gray), direct, through, grayPixel, linearTargets, emissiveGamma: adapter.materials.get("mat").emissiveTexture.gammaSpace, bloomStats, bloomPasses, final, postCount };
+    } finally { portals.dispose(); adapter.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); }
+  });
+  await test.info().attach("emissive-portal-pixels.json", { body: JSON.stringify(result, null, 2), contentType: "application/json" });
+  expect(result.emissiveDifference).toBeGreaterThan(1000);
+  expect(result.bloomDifference).toBeGreaterThan(1000);
+  expect(result.gradeDifference).toBeGreaterThan(1000);
+  expect(Math.max(...result.direct.map((n, i) => Math.abs(n - result.through[i])))).toBeLessThanOrEqual(3);
+  expect(result.through[0]).toBeGreaterThan(50);
+  expect(Math.max(...result.grayPixel) - Math.min(...result.grayPixel)).toBeLessThanOrEqual(3);
+  expect(result.linearTargets).toBe(true);
+  expect(result.emissiveGamma).toBe(true);
+  expect(result.final.picturePipelines).toBe(0);
+  expect(result.postCount).toBe(0);
+});
+
 test("baked lighting, AO and local reflection probes work through the shared scene adapter", async ({ page }) => {
   await page.goto("/runtime.html");
   await page.waitForFunction(() => !!(window as any).ArkGlideRendering);

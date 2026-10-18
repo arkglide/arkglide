@@ -4,7 +4,8 @@
   const defaults = {
     shadows: { enabled: false, mapSize: 1024, filter: "pcf", bias: 0.0005, normalBias: 0.02, darkness: 0, maxDistance: 100, maxLights: 2 },
     environment: { textureId: null, intensity: 1, rotation: 0, skybox: false },
-    color: { toneMapping: "none", exposure: 1, contrast: 1 },
+    color: { toneMapping: "none", exposure: 1, contrast: 1, saturation: 0, hue: 30, tint: 0 },
+    bloom: { enabled: false, threshold: 1, weight: 0.3, kernel: 32, scale: 0.5 },
     ao: { enabled: false, ratio: 0.5, radius: 1, strength: 1, samples: 8 },
     probes: [],
   };
@@ -40,6 +41,10 @@
     number(c.environment.rotation, -Math.PI * 2, Math.PI * 2, "IBL rotation");
     number(c.color.exposure, 0.01, 20, "exposure");
     number(c.color.contrast, 0, 4, "contrast");
+    number(c.color.saturation, -100, 100, "saturation"); number(c.color.hue, 0, 360, "hue"); number(c.color.tint, 0, 100, "tint");
+    if (typeof c.bloom.enabled !== "boolean") throw Error("无效 Bloom 配置");
+    number(c.bloom.threshold, 0, 20, "Bloom threshold"); number(c.bloom.weight, 0, 1, "Bloom weight");
+    number(c.bloom.kernel, 8, 128, "Bloom kernel"); number(c.bloom.scale, 0.25, 1, "Bloom scale");
     if (typeof c.ao.enabled !== "boolean" || ![4, 8, 16, 32].includes(c.ao.samples)) throw Error("无效 AO 配置");
     number(c.ao.ratio, 0.25, 1, "AO ratio"); number(c.ao.radius, 0.01, 10, "AO radius"); number(c.ao.strength, 0, 5, "AO strength");
     if (!Array.isArray(c.probes) || c.probes.length > 32) throw Error("反射探针数量超过上限");
@@ -78,6 +83,6 @@
     }
     return selected;
   }
-  const materialTextureFields = ["albedoTextureId", "normalTextureId", "metallicRoughnessTextureId", "aoTextureId", "lightmapTextureId"];
+  const materialTextureFields = ["albedoTextureId", "normalTextureId", "metallicRoughnessTextureId", "aoTextureId", "lightmapTextureId", "emissiveTextureId"];
   root.ArkGlideRenderingConfig = { settings, validateResources, validateNode, selectProbe, materialTextureFields, environmentMimes, imageMimes };
 })(globalThis);

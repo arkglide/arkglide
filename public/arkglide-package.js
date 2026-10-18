@@ -263,6 +263,7 @@
             "metallicRoughnessTextureId",
             "aoTextureId",
             "lightmapTextureId",
+            "emissiveTextureId",
           ]) {
             const id = content.materials[d.id]?.[field];
             if (id) await acquire("texture:" + id);

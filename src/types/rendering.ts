@@ -12,7 +12,8 @@ export interface RenderingSettings {
     maxLights?: number;
   };
   environment?: { textureId?: string | null; intensity?: number; rotation?: number; skybox?: boolean };
-  color?: { toneMapping?: "none" | "standard" | "aces"; exposure?: number; contrast?: number };
+  color?: { toneMapping?: "none" | "standard" | "aces"; exposure?: number; contrast?: number; saturation?: number; hue?: number; tint?: number };
+  bloom?: { enabled?: boolean; threshold?: number; weight?: number; kernel?: number; scale?: number };
 }
 export interface ReflectionProbeSettings {
   id: string;

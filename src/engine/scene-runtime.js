@@ -91,7 +91,7 @@
           throw error;
         }
         item.texture.name = "arkglide:texture:" + key;
-        item.texture.gammaSpace = role === "albedo";
+        item.texture.gammaSpace = role === "albedo" || role === "emissive";
         old = item;
       }
       old.texture.uScale = definition.uvScale.u;
@@ -121,6 +121,8 @@
         }
         mat.albedoColor = B.Color3.FromHexString(d.baseColor);
         mat.emissiveColor = B.Color3.FromHexString(d.emissiveColor);
+        mat.emissiveIntensity = d.emissiveIntensity ?? 1;
+        mat.emissiveTexture = texture(id, "emissive", d, d.emissiveTextureId);
         mat.metallic = d.metallic;
         mat.roughness = d.roughness;
         mat.alpha = d.alpha;

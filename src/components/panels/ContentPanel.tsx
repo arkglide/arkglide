@@ -114,15 +114,16 @@ export function MaterialEditor({ id }: { id: string }) {
           "metallicRoughnessTextureId",
           "aoTextureId",
           "lightmapTextureId",
+          "emissiveTextureId",
         ] as const
       ).map((slot, i) => (
         <TextField
           key={slot}
           select
           size="small"
-          label={["颜色贴图", "法线贴图", "金属粗糙度贴图", "环境遮蔽贴图", "烘焙光照贴图"][i]}
+          label={["颜色贴图", "法线贴图", "金属粗糙度贴图", "环境遮蔽贴图", "烘焙光照贴图", "自发光贴图"][i]}
           value={m[slot] || ""}
-          onChange={(e) => void update({ [slot]: e.target.value || undefined })}
+          onChange={(e) => void update({ [slot]: e.target.value || undefined, ...(slot === "emissiveTextureId" && e.target.value && m.emissiveColor === "#000000" ? { emissiveColor: "#FFFFFF" } : {}) })}
         >
           <MenuItem value="">无贴图</MenuItem>
           {content.textures.filter(t => t.mime.startsWith("image/") && t.mime !== "image/vnd.radiance").map((t) => (
@@ -139,6 +140,7 @@ export function MaterialEditor({ id }: { id: string }) {
       <TextField label="烘焙光照 UV" select size="small" value={m.lightmapUV ?? 1} onChange={e => void update({ lightmapUV: Number(e.target.value) as 0 | 1 })}>
         <MenuItem value={0}>UV1（通道 0）</MenuItem><MenuItem value={1}>UV2（通道 1）</MenuItem>
       </TextField>
+      <TextField label="自发光强度" type="number" size="small" value={m.emissiveIntensity ?? 1} inputProps={{ min: 0, max: 100, step: 0.1 }} onChange={e => void update({ emissiveIntensity: Number(e.target.value) })} />
       <PanelHeading
         title="贴图通道"
         help="金属粗糙度贴图的 G 通道存储粗糙度，B 通道存储金属度。"

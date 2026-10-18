@@ -29,6 +29,8 @@ export interface MaterialAsset {
   lightmapTextureId?: string;
   lightmapIntensity?: number;
   lightmapUV?: 0 | 1;
+  emissiveTextureId?: string;
+  emissiveIntensity?: number;
   uvScale: { u: number; v: number };
 }
 export interface TextureAsset {

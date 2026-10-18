@@ -15,6 +15,7 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     environment: { ...defaults.environment, ...value?.environment },
     color: { ...defaults.color, ...value?.color },
     ao: { ...defaults.ao, ...value?.ao },
+    bloom: { ...defaults.bloom, ...value?.bloom },
   };
   const change = (section: keyof typeof c, patch: object) => onChange({ ...value, [section]: { ...c[section], ...patch } });
   const number = (section: keyof typeof c, field: string, label: string, min: number, max: number, step = 0.1) => (
@@ -43,6 +44,10 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <FormControlLabel label="显示环境天空盒" control={<Switch checked={c.environment.skybox} onChange={e => change("environment", { skybox: e.target.checked })} />} />
     <TextField label="色调映射" select size="small" value={c.color.toneMapping} onChange={e => change("color", { toneMapping: e.target.value })}>{[["none", "关闭"], ["standard", "标准"], ["aces", "ACES 电影色调"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
     <Stack direction="row" spacing={1}>{number("color", "exposure", "曝光", 0.01, 20)}{number("color", "contrast", "对比度", 0, 4)}</Stack>
+    <Stack direction="row" spacing={1}>{number("color", "saturation", "饱和度", -100, 100, 1)}{number("color", "hue", "染色色相（度）", 0, 360, 1)}{number("color", "tint", "染色强度", 0, 100, 1)}</Stack>
+    <FormControlLabel label="高光泛光（Bloom）" control={<Switch checked={c.bloom.enabled} onChange={e => change("bloom", { enabled: e.target.checked })} />} />
+    <Stack direction="row" spacing={1}>{number("bloom", "threshold", "泛光阈值", 0, 20)}{number("bloom", "weight", "泛光强度", 0, 1)}</Stack>
+    <Stack direction="row" spacing={1}>{number("bloom", "kernel", "泛光范围", 8, 128, 1)}{number("bloom", "scale", "泛光分辨率比例", 0.25, 1, 0.05)}</Stack>
     <FormControlLabel label="屏幕空间环境遮蔽（AO）" control={<Switch checked={c.ao.enabled} onChange={e => change("ao", { enabled: e.target.checked })} />} />
     <Stack direction="row" spacing={1}>{number("ao", "radius", "AO 半径", 0.01, 10)}{number("ao", "strength", "AO 强度", 0, 5)}</Stack>
     <TextField label="AO 采样" size="small" select value={c.ao.samples} onChange={e => change("ao", { samples: Number(e.target.value) })}>{[4, 8, 16, 32].map(n => <MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>

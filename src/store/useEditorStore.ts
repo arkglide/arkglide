@@ -744,6 +744,7 @@ function restoreClipboardResources(
       m.metallicRoughnessTextureId,
       m.aoTextureId,
       m.lightmapTextureId,
+      m.emissiveTextureId,
     ])
       if (textureId && !content.textures.some((t) => t.id === textureId)) {
         const t = snapshot?.textures.find((t) => t.id === textureId);
@@ -2127,6 +2128,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           m.metallicRoughnessTextureId,
           m.aoTextureId,
           m.lightmapTextureId,
+          m.emissiveTextureId,
         ].includes(id),
       )
     )

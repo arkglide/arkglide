@@ -430,7 +430,7 @@
       vertexSource:
         "precision highp float; attribute vec3 position; uniform mat4 world; uniform mat4 worldViewProjection; varying vec4 screenPosition; varying vec3 worldPosition; void main(){vec4 p=vec4(position,1.0);screenPosition=worldViewProjection*p;worldPosition=(world*p).xyz;gl_Position=screenPosition;if(gl_Position.w>0.0)gl_Position.z=max(gl_Position.z,-gl_Position.w);}",
       fragmentSource:
-        "precision highp float; varying vec4 screenPosition; varying vec3 worldPosition; uniform sampler2D portalView; uniform vec3 fallback; uniform vec4 clipping; uniform float clipEnabled; uniform float hasView; uniform vec2 portalSize; uniform float ellipse; uniform mat4 worldInverse; void main(){if(clipEnabled>0.5&&dot(vec4(worldPosition,1.0),clipping)>0.0)discard;vec3 p=(worldInverse*vec4(worldPosition,1.0)).xyz;if(ellipse>0.5&&dot(p.xy/portalSize*2.0,p.xy/portalSize*2.0)>1.0)discard;vec2 uv=screenPosition.xy/screenPosition.w*0.5+0.5;gl_FragColor=hasView>0.5?texture2D(portalView,uv):vec4(fallback,1.0);}",
+        "precision highp float; varying vec4 screenPosition; varying vec3 worldPosition; uniform sampler2D portalView; uniform vec3 fallback; uniform vec4 clipping; uniform float clipEnabled; uniform float hasView; uniform float linearOutput; uniform vec2 portalSize; uniform float ellipse; uniform mat4 worldInverse; void main(){if(clipEnabled>0.5&&dot(vec4(worldPosition,1.0),clipping)>0.0)discard;vec3 p=(worldInverse*vec4(worldPosition,1.0)).xyz;if(ellipse>0.5&&dot(p.xy/portalSize*2.0,p.xy/portalSize*2.0)>1.0)discard;vec2 uv=screenPosition.xy/screenPosition.w*0.5+0.5;gl_FragColor=hasView>0.5?texture2D(portalView,uv):vec4(linearOutput>0.5?pow(fallback,vec3(2.2)):fallback,1.0);}",
     };
     function createPortal(options, owner) {
       guard(owner); physics.assertMutable?.();
@@ -469,6 +469,7 @@
           "clipping",
           "clipEnabled",
           "hasView",
+          "linearOutput",
           "portalSize",
           "ellipse",
         ],
@@ -1488,8 +1489,13 @@
       } finally { physics.endFrame(); }
     }
     function target(index, width, height) {
+      const linear = !!scene._arkglideRendering?.linearOutput();
+      const caps = scene.getEngine().getCaps();
+      const type = linear && caps.textureHalfFloatRender && caps.textureHalfFloatLinearFiltering
+        ? B.Constants.TEXTURETYPE_HALF_FLOAT
+        : linear && caps.textureFloatRender && caps.textureFloatLinearFiltering ? B.Constants.TEXTURETYPE_FLOAT : B.Constants.TEXTURETYPE_UNSIGNED_BYTE;
       let v = views[index];
-      if (v && (v.width !== width || v.height !== height)) {
+      if (v && (v.width !== width || v.height !== height || v.type !== type || v.linear !== linear)) {
         v.texture.dispose();
         v.camera.dispose();
         v = null;
@@ -1507,7 +1513,7 @@
           scene,
           false,
           true,
-          B.Constants.TEXTURETYPE_UNSIGNED_BYTE,
+          type,
           false,
           B.Texture.BILINEAR_SAMPLINGMODE,
           true,
@@ -1517,9 +1523,10 @@
         if (o.renderCompute) texture.getCustomRenderList = (_pass, list, length) =>
           scene.activeCamera === camera ? o.renderCompute.select(list, scene.frustumPlanes, length) : null;
         texture.ignoreCameraViewport = true;
+        texture.gammaSpace = !linear;
         texture.renderParticles = false;
         texture.samples = Math.min(quality.samples, Math.max(1, scene.getEngine().getCaps().maxMSAASamples || 1));
-        v = { camera, texture, width, height };
+        v = { camera, texture, width, height, type, linear };
         views[index] = v;
       }
       return v;
@@ -1538,6 +1545,8 @@
     }
     function render() {
       if (disposed || rendering || !scene.activeCamera) return;
+      scene._arkglideRendering?.prepareFrame();
+      for (const p of portals.values()) p.material.setFloat("linearOutput", scene._arkglideRendering?.linearOutput() ? 1 : 0);
       rendering = true;
       renderCount = 0;
       const main = scene.activeCamera,

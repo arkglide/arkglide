@@ -317,6 +317,7 @@ function validateContent(
       m.metallicRoughnessTextureId,
       m.aoTextureId,
       m.lightmapTextureId,
+      m.emissiveTextureId,
     ])
       if (ref !== undefined && !textureIds.has(ref))
         throw new Error("材质引用的贴图不存在");
@@ -325,6 +326,7 @@ function validateContent(
     for (const key of ["aoStrength", "lightmapIntensity"] as const)
       if (m[key] !== undefined && (!Number.isFinite(m[key]) || m[key]! < 0 || m[key]! > 20)) throw new Error("无效烘焙光照或 AO 强度");
     if (m.lightmapUV !== undefined && ![0, 1].includes(m.lightmapUV)) throw new Error("无效 Lightmap UV 通道");
+    if (m.emissiveIntensity !== undefined && (!Number.isFinite(m.emissiveIntensity) || m.emissiveIntensity < 0 || m.emissiveIntensity > 100)) throw new Error("无效自发光强度");
   }
   const checkNodes = (items: SceneNode[]) => {
     for (const n of items) {

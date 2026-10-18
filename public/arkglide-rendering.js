@@ -6,7 +6,7 @@
     let config = C.settings(), content = {}, buffers = new Map(), active = false, dead = false, dirty = true;
     let environment = null, skybox = null, skyboxTexture = null, signature = "", syncGeneration = 0;
     const cubes = new Map(), probeTextures = new Map(), variants = new Map(), assignments = new Map();
-    let probeMeshes = [], probesReady = false, ao = null, postCamera = null, postSignature = "";
+    let probeMeshes = [], probesReady = false, ao = null, pipeline = null, byteColor = null, postCamera = null, postSignature = "";
     const observers = [];
     function watch(observable, fn) { const token = observable.add(fn); observers.push(() => observable.remove(token)); }
     function invalidate() { dirty = true; }
@@ -139,15 +139,30 @@
       }
     }
     function clearPost() {
+      byteColor?.dispose(postCamera); byteColor = null;
+      pipeline?.dispose(); pipeline = null;
       ao?.dispose(true); ao = null; postCamera = null; postSignature = "";
+      scene.imageProcessingConfiguration.applyByPostProcess = false;
     }
     function updatePost() {
-      const camera = scene.activeCamera, key = JSON.stringify(config.ao);
+      const needsPost = config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
+      const camera = scene.activeCamera, key = JSON.stringify([config.ao, config.bloom, needsPost]);
       if (postCamera === camera && postSignature === key) return;
       clearPost(); postCamera = camera; postSignature = key;
       if (config.ao.enabled && camera && engine.webGLVersion >= 2 && engine.getCaps().drawBuffersExtension) {
         ao = new B.SSAO2RenderingPipeline("arkglide:ao", scene, { ssaoRatio: config.ao.ratio, blurRatio: 1 }, [camera], true);
         ao.radius = config.ao.radius; ao.totalStrength = config.ao.strength; ao.samples = config.ao.samples;
+      }
+      if (needsPost && camera) {
+        const caps = engine.getCaps(), hdr = !!(caps.textureHalfFloatRender || caps.textureFloatRender);
+        pipeline = new B.DefaultRenderingPipeline("arkglide:picture", true, scene, [camera], false);
+        pipeline.imageProcessingEnabled = hdr;
+        pipeline.bloomEnabled = config.bloom.enabled;
+        pipeline.bloomThreshold = config.bloom.threshold; pipeline.bloomWeight = config.bloom.weight;
+        pipeline.bloomKernel = config.bloom.kernel; pipeline.bloomScale = config.bloom.scale;
+        pipeline.prepare();
+        if (!hdr) byteColor = new B.ImageProcessingPostProcess("arkglide:color", 1, camera, B.Texture.BILINEAR_SAMPLINGMODE, engine, false, B.Constants.TEXTURETYPE_UNSIGNED_BYTE, scene.imageProcessingConfiguration);
+        scene.imageProcessingConfiguration.applyByPostProcess = true;
       }
     }
     function applyColor() {
@@ -156,6 +171,11 @@
       c.contrast = config.color.contrast;
       c.toneMappingEnabled = config.color.toneMapping !== "none";
       c.toneMappingType = config.color.toneMapping === "aces" ? B.ImageProcessingConfiguration.TONEMAPPING_ACES : B.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
+      if (!c.colorCurves) c.colorCurves = new B.ColorCurves();
+      c.colorCurves.globalSaturation = config.color.saturation;
+      c.colorCurves.globalHue = config.color.hue;
+      c.colorCurves.globalDensity = config.color.tint;
+      c.colorCurvesEnabled = config.color.saturation !== 0 || config.color.tint !== 0;
     }
     function clearShadows() {
       for (const slot of shadows.values()) slot.generator.dispose();
@@ -197,18 +217,19 @@
     watch(scene.onMeshRemovedObservable, invalidate);
     watch(scene.onNewLightAddedObservable, invalidate);
     watch(scene.onLightRemovedObservable, invalidate);
-    watch(scene.onBeforeRenderObservable, () => {
+    function prepareFrame() {
       if (!active || dead) return;
       if (dirty) updateShadows();
       updateProbes(); updatePost();
-    });
+    }
+    watch(scene.onBeforeRenderObservable, prepareFrame);
     function clear() {
       active = false; dirty = true; signature = "";
       syncGeneration++; clearProbes(); clearPost(); clearShadows();
       for (const [id, slot] of cubes) releaseCube(id, slot);
       content = {}; buffers = new Map();
     }
-    return {
+    const api = {
       configure(input) { if (dead) throw Error("Rendering disposed"); config = C.settings(input); dirty = true; applyColor(); },
       sync(nextContent = {}, nextBuffers = new Map()) {
         if (dead) return Promise.resolve();
@@ -216,11 +237,15 @@
         return syncCubes();
       },
       invalidate,
+      prepareFrame,
+      linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension }),
+      stats: () => ({ shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender) }),
       clear,
-      dispose() { if (dead) return; clear(); dead = true; for (const remove of observers) remove(); },
+      dispose() { if (dead) return; clear(); dead = true; for (const remove of observers) remove(); if (scene._arkglideRendering === api) delete scene._arkglideRendering; },
     };
+    scene._arkglideRendering = api;
+    return api;
   }
   root.ArkGlideRendering = { create };
 })(globalThis);
