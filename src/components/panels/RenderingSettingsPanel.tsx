@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Alert, Button, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
 import { useEditorStore } from "../../store/useEditorStore";
 import { importTextureFile } from "../../utils/textureImport";
-import type { RenderingSettings } from "../../types/rendering";
+import type { RenderingSettings, ReflectionProbeSettings } from "../../types/rendering";
 import "../../engine/rendering-config.js";
 
 export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingSettings; onChange: (value: RenderingSettings) => void }) {
@@ -14,9 +14,10 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     shadows: { ...defaults.shadows, ...value?.shadows },
     environment: { ...defaults.environment, ...value?.environment },
     color: { ...defaults.color, ...value?.color },
+    ao: { ...defaults.ao, ...value?.ao },
   };
-  const change = (section: keyof RenderingSettings, patch: object) => onChange({ ...value, [section]: { ...c[section], ...patch } });
-  const number = (section: keyof RenderingSettings, field: string, label: string, min: number, max: number, step = 0.1) => (
+  const change = (section: keyof typeof c, patch: object) => onChange({ ...value, [section]: { ...c[section], ...patch } });
+  const number = (section: keyof typeof c, field: string, label: string, min: number, max: number, step = 0.1) => (
     <TextField key={section + field} label={label} size="small" type="number" value={c[section][field]} inputProps={{ min, max, step }} onChange={e => change(section, { [field]: e.target.value.trim() ? Number(e.target.value) : NaN })} />
   );
   return <Stack spacing={1.5} sx={{ mt: 3 }} data-testid="rendering-settings">
@@ -42,5 +43,24 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <FormControlLabel label="显示环境天空盒" control={<Switch checked={c.environment.skybox} onChange={e => change("environment", { skybox: e.target.checked })} />} />
     <TextField label="色调映射" select size="small" value={c.color.toneMapping} onChange={e => change("color", { toneMapping: e.target.value })}>{[["none", "关闭"], ["standard", "标准"], ["aces", "ACES 电影色调"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
     <Stack direction="row" spacing={1}>{number("color", "exposure", "曝光", 0.01, 20)}{number("color", "contrast", "对比度", 0, 4)}</Stack>
+    <FormControlLabel label="屏幕空间环境遮蔽（AO）" control={<Switch checked={c.ao.enabled} onChange={e => change("ao", { enabled: e.target.checked })} />} />
+    <Stack direction="row" spacing={1}>{number("ao", "radius", "AO 半径", 0.01, 10)}{number("ao", "strength", "AO 强度", 0, 5)}</Stack>
+    <TextField label="AO 采样" size="small" select value={c.ao.samples} onChange={e => change("ao", { samples: Number(e.target.value) })}>{[4, 8, 16, 32].map(n => <MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+    <Typography variant="subtitle2">局部反射探针</Typography>
+    {(value?.probes || []).map(p => <ProbeEditor key={p.id} value={p} textures={textures.filter(t => t.mime === "application/x-babylon-env")} onChange={next => onChange({ ...value, probes: value!.probes!.map(old => old.id === p.id ? next : old) })} onDelete={() => onChange({ ...value, probes: value!.probes!.filter(old => old.id !== p.id) })} />)}
+    <Button size="small" disabled={!(textures.some(t => t.mime === "application/x-babylon-env")) || (value?.probes?.length || 0) >= 32} onClick={() => onChange({ ...value, probes: [...(value?.probes || []), { id: crypto.randomUUID(), name: "房间反射", textureId: textures.find(t => t.mime === "application/x-babylon-env")!.id, position: { x: 0, y: 0, z: 0 }, size: { x: 10, y: 5, z: 10 }, priority: 0, intensity: 1 }] })}>添加局部反射探针</Button>
+  </Stack>;
+}
+
+function ProbeEditor({ value: p, textures, onChange, onDelete }: { value: ReflectionProbeSettings; textures: { id: string; name: string }[]; onChange: (p: ReflectionProbeSettings) => void; onDelete: () => void }) {
+  return <Stack spacing={1} sx={{ border: "1px solid", borderColor: "divider", p: 1 }}>
+    <TextField label="探针名称" size="small" value={p.name} onChange={e => onChange({ ...p, name: e.target.value })} />
+    <TextField label="探针环境贴图" size="small" select value={p.textureId} onChange={e => onChange({ ...p, textureId: e.target.value })}>{textures.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}</TextField>
+    {(["position", "size"] as const).map(field => <Stack key={field} direction="row" spacing={1}>{(["x", "y", "z"] as const).map(axis => <TextField key={axis} label={(field === "position" ? "中心 " : "范围 ") + axis.toUpperCase()} size="small" type="number" value={p[field][axis]} inputProps={{ min: field === "size" ? 0.001 : -1000000, max: 1000000 }} onChange={e => onChange({ ...p, [field]: { ...p[field], [axis]: e.target.value.trim() ? Number(e.target.value) : NaN } })} />)}</Stack>)}
+    <Stack direction="row" spacing={1}>
+      <TextField label="探针优先级" size="small" type="number" value={p.priority ?? 0} onChange={e => onChange({ ...p, priority: Number(e.target.value) })} />
+      <TextField label="探针亮度" size="small" type="number" value={p.intensity ?? 1} inputProps={{ min: 0, max: 20, step: 0.1 }} onChange={e => onChange({ ...p, intensity: Number(e.target.value) })} />
+    </Stack>
+    <Button color="error" size="small" onClick={onDelete}>删除探针</Button>
   </Stack>;
 }

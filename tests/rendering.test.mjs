@@ -99,3 +99,68 @@ test("shared scene adapter owns shadow maps, honors flags, updates models and re
     assert.equal(scene.textures.some(t => t.name.startsWith("sun")), false);
   } finally { adapter.dispose(); scene.dispose(); engine.dispose(); }
 });
+test("probe selection has deterministic overlap priorities and inclusive box boundaries", () => {
+  const probe = (id, x, size, priority = 0) => ({ id, name: id, textureId: "env", position: { x, y: 0, z: 0 }, size: { x: size, y: size, z: size }, priority });
+  const probes = C.settings({ probes: [probe("large", 0, 10), probe("small", 0, 2), probe("priority", 2, 4, 1)] }).probes;
+  assert.equal(C.selectProbe({ x: -1, y: 0, z: 0 }, probes), 1);
+  assert.equal(C.selectProbe({ x: 0, y: 0, z: 0 }, probes), 2);
+  assert.equal(C.selectProbe({ x: 20, y: 0, z: 0 }, probes), -1);
+  assert.throws(() => C.settings({ probes: [probe("same", 0, 2), probe("same", 1, 2)] }), /探针/);
+  assert.throws(() => C.settings({ probes: [{ ...probe("bad", 0, 2), size: { x: 0, y: 1, z: 1 } }] }), /probe size/);
+});
+test("local probes isolate shared managed materials, follow moving meshes and dispose variants without disposing source textures", async () => {
+  const engine = new B.NullEngine(), scene = new B.Scene(engine);
+  let disposedClones = 0;
+  class Cube {
+    constructor(_url, _scene, _ext, _mip, _files, load) { queueMicrotask(load); }
+    isReady() { return false; }
+    dispose() {}
+    clone() { return { dispose() { disposedClones++; } }; }
+  }
+  const manager = globalThis.ArkGlideRendering.create({ ...B, CubeTexture: Cube }, scene);
+  const source = new B.PBRMaterial("shared", scene); source.metadata = { arkglideManagedMaterial: true };
+  const a = B.MeshBuilder.CreateBox("a", {}, scene), b = B.MeshBuilder.CreateBox("b", {}, scene);
+  for (const m of [a, b]) { m.material = source; m.metadata = { arkglideRendering: {} }; }
+  b.position.x = 8;
+  manager.configure({ probes: [{ id: "room", name: "room", textureId: "env", position: { x: 0, y: 0, z: 0 }, size: { x: 4, y: 4, z: 4 } }] });
+  try {
+    await manager.sync({ textures: [{ id: "env", mime: "application/x-babylon-env" }] }, { env: new ArrayBuffer(1) });
+    scene.onBeforeRenderObservable.notifyObservers(scene);
+    assert.ok(a.material !== source, "a should use a probe variant");
+    assert.ok(b.material === source, "b should retain its original material");
+    assert.deepEqual(a.material.reflectionTexture.boundingBoxSize.asArray(), [4, 4, 4]);
+    a.position.x = 10; scene.onBeforeRenderObservable.notifyObservers(scene);
+    assert.ok(a.material === source, "a should restore its original material outside the probe");
+    b.position.x = 0; scene.onBeforeRenderObservable.notifyObservers(scene);
+    assert.ok(b.material !== source, "b should use a probe variant");
+    manager.clear();
+    assert.ok(b.material === source, "b should retain its original material");
+    assert.equal(disposedClones, 1);
+    assert.equal(scene.materials.includes(source), true);
+    assert.equal(manager.stats().probeMaterialVariants, 0);
+  } finally { manager.dispose(); scene.dispose(); engine.dispose(); }
+});
+test("baked texture dependencies participate in validation, clipboard restoration and static resource acquisition", async () => {
+  const s = () => store.getState(); s().newProject();
+  for (const id of ["ao", "baked"])
+    s().importTexture({ id, name: id + ".png", mime: "image/png", byteLength: 3 }, new Uint8Array([1, 2, 3]).buffer);
+  const id = s().createMaterial("Baked");
+  s().updateMaterial(id, { aoTextureId: "ao", lightmapTextureId: "baked", lightmapUV: 1, lightmapIntensity: 2 });
+  s().setNodeMaterial("cube", id);
+  assert.throws(() => s().deleteTexture("ao"), /引用/);
+  assert.throws(() => s().updateMaterial(id, { lightmapUV: 2 }), /UV/);
+  assert.throws(() => s().updateMaterial(id, { aoStrength: -1 }), /强度/);
+  s().selectNode("cube"); s().copyToClipboard(); s().removeNode("cube"); s().deleteMaterial(id); s().deleteTexture("ao"); s().deleteTexture("baked"); s().pasteFromClipboard();
+  assert.ok(s().textureBuffers.has("baked"));
+  assert.ok(s().textureBuffers.has("ao"));
+  const files = unzipSync(archive.createProjectArchive());
+  assert.equal(files["textures/baked.bin"].length, 3);
+  const runtime = Object.fromEntries(await Promise.all(RUNTIME_FILES.map(async p => [p, new Uint8Array(await readFile(new URL("../public/" + p, import.meta.url)))])));
+  const game = createStaticGame({ ...s(), scene: { nodes: s().nodes } }, { models: s().modelBuffers, textures: s().textureBuffers, audio: s().audioBuffers }, runtime);
+  const client = globalThis.ArkGlidePackage.create({ read: async d => game.files[d.path].slice(), importModule: async () => ({ default() {} }) });
+  try {
+    const result = await client.initialize(game.manifest.boot);
+    assert.equal(result.textureData.baked.byteLength, 3);
+    assert.equal(result.textureData.ao.byteLength, 3);
+  } finally { client.dispose(); }
+});

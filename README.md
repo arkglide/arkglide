@@ -2,6 +2,8 @@
 
 浏览器中的 3D 游戏编辑器：React、Dockview、Monaco、Babylon.js 与 C++/WASM。
 
+软阴影、HDR 环境光照、烘焙光照、AO 与局部反射探针见 [画面与光照](docs/rendering.md)。
+
 ```sh
 npm ci
 npm run dev

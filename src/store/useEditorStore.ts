@@ -742,6 +742,8 @@ function restoreClipboardResources(
       m.albedoTextureId,
       m.normalTextureId,
       m.metallicRoughnessTextureId,
+      m.aoTextureId,
+      m.lightmapTextureId,
     ])
       if (textureId && !content.textures.some((t) => t.id === textureId)) {
         const t = snapshot?.textures.find((t) => t.id === textureId);
@@ -2115,12 +2117,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!s.content.textures.some((asset) => asset.id === id)) return;
     if (s.settings.rendering?.environment?.textureId === id)
       throw new Error("贴图仍被环境光照引用，请先解除引用");
+    if (s.settings.rendering?.probes?.some(p => p.textureId === id))
+      throw new Error("贴图仍被局部反射探针引用，请先解除引用");
     if (
       Object.values(s.content.materials).some((m) =>
         [
           m.albedoTextureId,
           m.normalTextureId,
           m.metallicRoughnessTextureId,
+          m.aoTextureId,
+          m.lightmapTextureId,
         ].includes(id),
       )
     )

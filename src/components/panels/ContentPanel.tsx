@@ -112,13 +112,15 @@ export function MaterialEditor({ id }: { id: string }) {
           "albedoTextureId",
           "normalTextureId",
           "metallicRoughnessTextureId",
+          "aoTextureId",
+          "lightmapTextureId",
         ] as const
       ).map((slot, i) => (
         <TextField
           key={slot}
           select
           size="small"
-          label={["颜色贴图", "法线贴图", "金属粗糙度贴图"][i]}
+          label={["颜色贴图", "法线贴图", "金属粗糙度贴图", "环境遮蔽贴图", "烘焙光照贴图"][i]}
           value={m[slot] || ""}
           onChange={(e) => void update({ [slot]: e.target.value || undefined })}
         >
@@ -130,6 +132,13 @@ export function MaterialEditor({ id }: { id: string }) {
           ))}
         </TextField>
       ))}
+      <Stack direction="row" spacing={1}>
+        <TextField label="AO 贴图强度" type="number" size="small" value={m.aoStrength ?? 1} inputProps={{ min: 0, max: 20, step: 0.1 }} onChange={e => void update({ aoStrength: Number(e.target.value) })} />
+        <TextField label="烘焙光照强度" type="number" size="small" value={m.lightmapIntensity ?? 1} inputProps={{ min: 0, max: 20, step: 0.1 }} onChange={e => void update({ lightmapIntensity: Number(e.target.value) })} />
+      </Stack>
+      <TextField label="烘焙光照 UV" select size="small" value={m.lightmapUV ?? 1} onChange={e => void update({ lightmapUV: Number(e.target.value) as 0 | 1 })}>
+        <MenuItem value={0}>UV1（通道 0）</MenuItem><MenuItem value={1}>UV2（通道 1）</MenuItem>
+      </TextField>
       <PanelHeading
         title="贴图通道"
         help="金属粗糙度贴图的 G 通道存储粗糙度，B 通道存储金属度。"

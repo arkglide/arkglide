@@ -24,6 +24,11 @@ export interface MaterialAsset {
   albedoTextureId?: string;
   normalTextureId?: string;
   metallicRoughnessTextureId?: string;
+  aoTextureId?: string;
+  aoStrength?: number;
+  lightmapTextureId?: string;
+  lightmapIntensity?: number;
+  lightmapUV?: 0 | 1;
   uvScale: { u: number; v: number };
 }
 export interface TextureAsset {

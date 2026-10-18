@@ -14,6 +14,7 @@
       slots = new Map(),
       originals = new WeakMap(),
       wrappers = new Map();
+    const warnedUVs = new WeakMap();
     let content = {},
       buffers = new Map();
     function release(slot) {
@@ -139,6 +140,16 @@
         mat.useRoughnessFromMetallicTextureAlpha = false;
         mat.useRoughnessFromMetallicTextureGreen = true;
         mat.useMetallnessFromMetallicTextureBlue = true;
+        mat.ambientTexture = texture(id, "ao", d, d.aoTextureId);
+        mat.ambientTextureStrength = d.aoStrength ?? 1;
+        mat.useAmbientInGrayScale = true;
+        mat.lightmapTexture = texture(id, "lightmap", d, d.lightmapTextureId);
+        if (mat.lightmapTexture) {
+          mat.lightmapTexture.coordinatesIndex = d.lightmapUV ?? 1;
+          mat.lightmapTexture.level = d.lightmapIntensity ?? 1;
+          mat.lightmapTexture.uScale = mat.lightmapTexture.vScale = 1;
+        }
+        mat.useLightmapAsShadowmap = false;
       }
       return Promise.all([...slots.values()].map((s) => s.promise));
     }
@@ -168,6 +179,10 @@
             : node.materialId;
           return id === null ? mat : materials.get(id) || mat;
         });
+        for (const mat of resolved) if (mat?.lightmapTexture && mat.lightmapTexture.coordinatesIndex === 1 && !mesh.isVerticesDataPresent(B.VertexBuffer.UV2Kind) && warnedUVs.get(mesh) !== mat.lightmapTexture) {
+          warnedUVs.set(mesh, mat.lightmapTexture);
+          options.onError?.(node, Error("烘焙光照需要模型 UV2；请导入带 UV2 的模型或选择 UV1"));
+        }
         const old = wrappers.get(mesh);
         if (resolved.every((mat, i) => mat === source[i])) {
           mesh.material = original;
