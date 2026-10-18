@@ -123,7 +123,7 @@ export function MaterialEditor({ id }: { id: string }) {
           onChange={(e) => void update({ [slot]: e.target.value || undefined })}
         >
           <MenuItem value="">无贴图</MenuItem>
-          {content.textures.map((t) => (
+          {content.textures.filter(t => t.mime.startsWith("image/") && t.mime !== "image/vnd.radiance").map((t) => (
             <MenuItem key={t.id} value={t.id}>
               {t.name}
             </MenuItem>
@@ -367,7 +367,7 @@ function TextureRow({ asset }: { asset: TextureAsset }) {
     <Box
       sx={{ border: "1px solid #444", borderRadius: 1, p: 1, minWidth: 200 }}
     >
-      {url ? (
+      {url && ["application/x-babylon-env", "image/vnd.radiance"].includes(asset.mime) ? <Typography variant="caption">环境光照贴图</Typography> : url ? (
         <img
           src={url}
           alt={asset.name}
@@ -394,7 +394,7 @@ function TextureRow({ asset }: { asset: TextureAsset }) {
           <input
             aria-label={"替换贴图 " + asset.name}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/webp,.env,.hdr"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -579,7 +579,7 @@ export default function ContentPanel() {
             </Button>
             <PanelHeading
               title="贴图资源"
-              help="支持 PNG、JPEG 和 WebP，单张最大 64 MiB。贴图文件会保存在项目中。"
+              help="支持 PNG、JPEG、WebP，以及场景设置中导入的 .env / .hdr 环境贴图，单张最大 64 MiB。贴图文件会保存在项目中。"
             />
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
               {content.textures.map((t) => (

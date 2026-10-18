@@ -355,6 +355,8 @@
         o.log?.("场景块 " + nodes.length + " 个实体");
       }
       const hudKeys = [];
+      if (boot.settings.rendering?.environment?.textureId)
+        hudKeys.push("texture:" + boot.settings.rendering.environment.textureId);
       for (const h of content.gameplay?.hud || [])
         if (h.textureId) hudKeys.push("texture:" + h.textureId);
       await group(project.scene.nodes, {}, [

@@ -3,8 +3,11 @@ import type * as Babylon from "@babylonjs/core";
 import type { ProjectContent } from "../types/content";
 import type { SceneNode } from "../store/useEditorStore";
 import "./scene-runtime.js";
+import "./rendering-config.js";
+import "./rendering-runtime.js";
 
 export interface SceneAdapter {
+  rendering: any;
   nodes: Map<string, TransformNode>;
   sync(
     nodes: SceneNode[],

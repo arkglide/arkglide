@@ -44,6 +44,8 @@
     <script src="./arkglide-lifecycle.js"></script>
     <script src="./arkglide-timing.js"></script>
     <script src="./arkglide-render-compute.js"></script>
+    <script src="./arkglide-rendering-config.js"></script>
+    <script src="./arkglide-rendering.js"></script>
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-prefabs.js"></script>
     <script src="./lib/jolt-physics.js"></script>
@@ -501,6 +503,7 @@
       // settings: { gravity, backgroundColor, ambientIntensity, ambientColor, fpsCap }
       function applySettings(settings) {
         if (!settings) return; // 无设置则用 initBabylon 默认值
+        sceneAdapter?.rendering?.configure(settings.rendering);
 
         // 重力
         if (settings.gravity) {

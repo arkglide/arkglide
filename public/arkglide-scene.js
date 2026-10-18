@@ -224,6 +224,7 @@
     return { sync, apply, prepareDestroy, clear, materials };
   }
   function createSceneAdapter(B, scene, options = {}) {
+    const rendering = root.ArkGlideRendering?.create(B, scene, options);
     const nodes = new Map(),
       records = new Map(),
       resources = new Map(),
@@ -325,6 +326,7 @@
     }
     function update(node) {
       const object = nodes.get(node.id);
+      object.metadata = { ...object.metadata, arkglideRendering: { castShadows: node.castShadows !== false, receiveShadows: node.receiveShadows !== false } };
       const p = node.transform || { x: 0, y: 0, z: 0 },
         r = node.rotation || { x: 0, y: 0, z: 0 },
         s = node.scale || { x: 1, y: 1, z: 1 };
@@ -488,7 +490,7 @@
           records.delete(id);
         }
       });
-      const loads = [materialLibrary.sync(content, textureBuffers)];
+      const loads = [materialLibrary.sync(content, textureBuffers), rendering?.sync(content, textureBuffers)];
       next.forEach((node) => {
         const buffer =
           buffers instanceof Map ? buffers.get(node.id) : buffers[node.id];
@@ -521,10 +523,12 @@
         });
       });
       linkParents();
-      return Promise.all(loads);
+      rendering?.invalidate();
+      return Promise.all(loads).then(results => { rendering?.invalidate(); return results; });
     }
     let batchGeneration=0;
     function clear() {
+      rendering?.clear();
       batchGeneration++;
       definitions = [];
       pending.clear();
@@ -545,17 +549,19 @@
     function dispose() {
       disposed = true;
       clear();
+      rendering?.dispose();
     }
     return {
+      rendering,
       nodes,
       resources,
       sync,
-      refreshMaterials(content,textureBuffers){return materialLibrary.sync(content,textureBuffers);},
+      refreshMaterials(content,textureBuffers){return Promise.all([materialLibrary.sync(content,textureBuffers), rendering?.sync(content,textureBuffers)]);},
       async syncBatched(next,buffers,content,textureBuffers,batchNodes=128) {
         clear();
         const generation=batchGeneration;
         const all=next; definitions=all;
-        await materialLibrary.sync(content,textureBuffers);
+        await Promise.all([materialLibrary.sync(content,textureBuffers), rendering?.sync(content,textureBuffers)]);
         for(let offset=0;offset<all.length;offset+=batchNodes){
           if(disposed||generation!==batchGeneration)throw Error('场景分块创建已取消');
           const slice=all.slice(offset,offset+batchNodes);

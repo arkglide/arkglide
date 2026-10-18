@@ -62,6 +62,8 @@ export interface Transform {
 }
 
 export interface SceneNode {
+  castShadows?: boolean;
+  receiveShadows?: boolean;
   id: string;
   name: string;
   type: NodeType; // 'mesh' | 'light' | 'camera' | 'empty' | 'model'
@@ -370,6 +372,8 @@ export interface EditorState {
         | "animation"
         | "audioSource"
         | "activeCamera"
+        | "castShadows"
+        | "receiveShadows"
       >
     >,
     recordHistory?: boolean,
@@ -2109,6 +2113,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const s = get();
     assertEditing(s);
     if (!s.content.textures.some((asset) => asset.id === id)) return;
+    if (s.settings.rendering?.environment?.textureId === id)
+      throw new Error("贴图仍被环境光照引用，请先解除引用");
     if (
       Object.values(s.content.materials).some((m) =>
         [

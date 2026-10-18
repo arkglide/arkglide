@@ -148,6 +148,8 @@ export default function Inspector() {
         | "modelUrl"
         | "lightType"
         | "activeCamera"
+        | "castShadows"
+        | "receiveShadows"
         | "primitive"
       >
     >,
@@ -368,6 +370,8 @@ export default function Inspector() {
             sx={{ width: "100%", justifyContent: "space-between", mr: 0 }}
           />
 
+          <FormControlLabel label="投射阴影" control={<Switch checked={currentNode.castShadows !== false} onChange={e => update({ castShadows: e.target.checked })} />} />
+          <FormControlLabel label="接收阴影" control={<Switch checked={currentNode.receiveShadows !== false} onChange={e => update({ receiveShadows: e.target.checked })} />} />
           <Typography variant="caption">
             {currentNode.materialId
               ? "备用节点颜色（当前由材质覆盖）"
@@ -401,6 +405,7 @@ export default function Inspector() {
             <MenuItem value="directional">Directional</MenuItem>
             <MenuItem value="point">Point</MenuItem>
           </TextField>
+          <FormControlLabel label="投射阴影" control={<Switch checked={currentNode.castShadows !== false} onChange={e => update({ castShadows: e.target.checked })} />} />
 
           <Typography variant="caption">Intensity</Typography>
           <Slider

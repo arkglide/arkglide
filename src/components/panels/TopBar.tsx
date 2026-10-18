@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { RenderingSettingsPanel } from './RenderingSettingsPanel';
 import {
   Alert,
   AppBar,
@@ -584,6 +585,7 @@ export default function TopBar() {
             onChange={(e) => setTimeDraft((s) => ({ ...s, fps: e.target.value }))}
             placeholder="60"
           />
+          <RenderingSettingsPanel value={localSettings.rendering} onChange={rendering => setLocalSettings(s => ({ ...s, rendering }))} />
         </DialogContent>
         <DialogActions>
           <Button size="small" onClick={() => setSettingsDialogOpen(false)}>

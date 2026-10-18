@@ -1,4 +1,6 @@
 export const RUNTIME_FILES = [
+  "arkglide-rendering-config.js",
+  "arkglide-rendering.js",
   "runtime.html",
   "standalone-player.js",
   "standalone.html",

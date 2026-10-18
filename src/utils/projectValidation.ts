@@ -13,6 +13,7 @@ export const PROJECT_VERSION = "0.6";
 import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 import "../engine/render-compute.js";
 import "../engine/animation-compute.js";
+import "../engine/rendering-config.js";
 
 export function assertScriptPath(name: string): void {
   if (
@@ -87,6 +88,7 @@ export function validateProject(data: any): {
     )
       throw new Error("无效父节点引用");
     validateComponents(n);
+    (globalThis as any).ArkGlideRenderingConfig.validateNode(n);
     if (
       n.scripts &&
       (!Array.isArray(n.scripts) ||
@@ -164,6 +166,8 @@ export function validateProject(data: any): {
 
   if (settings.build !== undefined)
     settings.build = exportSettings(settings.build);
+  if (settings.rendering !== undefined)
+    settings.rendering = (globalThis as any).ArkGlideRenderingConfig.settings(settings.rendering);
   if (settings.renderCompute !== undefined)
     settings.renderCompute = (globalThis as any).ArkGlideRenderCompute.settings(
       settings.renderCompute,
@@ -197,6 +201,8 @@ export function validateProject(data: any): {
   )
     throw new Error("无效时间设置");
   const content = validateContent(data.content, nodes, scripts, settings);
+  if (settings.rendering !== undefined)
+    (globalThis as any).ArkGlideRenderingConfig.validateResources(settings.rendering, content);
   validateAdvancedReferences(content, nodes);
   return { nodes, scripts, activeFileId, settings, content };
 }
@@ -279,7 +285,7 @@ function validateContent(
       !id(t.id) ||
       textureIds.has(t.id) ||
       typeof t.name !== "string" ||
-      !["image/png", "image/jpeg", "image/webp"].includes(t.mime) ||
+      !["image/png", "image/jpeg", "image/webp", "application/x-babylon-env", "image/vnd.radiance"].includes(t.mime) ||
       !Number.isInteger(t.byteLength) ||
       t.byteLength <= 0 ||
       t.byteLength > 64 * 1024 * 1024
@@ -312,6 +318,8 @@ function validateContent(
     ])
       if (ref !== undefined && !textureIds.has(ref))
         throw new Error("材质引用的贴图不存在");
+      else if (ref !== undefined && !["image/png", "image/jpeg", "image/webp"].includes(content.textures.find(t => t.id === ref)!.mime))
+        throw new Error("材质贴图必须是 PNG、JPEG 或 WebP");
   }
   const checkNodes = (items: SceneNode[]) => {
     for (const n of items) {
@@ -544,7 +552,7 @@ function validateNodeSubtree(
   return validateProject({
     scene: { nodes: plain },
     scripts,
-    settings,
+    settings: { ...settings, rendering: undefined },
   }).nodes.map((n, index) => ({
     ...n,
     ...(nodes[index].physics

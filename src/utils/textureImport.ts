@@ -29,10 +29,28 @@ export async function importTextureFile(
           : new TextDecoder().decode(b.slice(0, 4)) === "RIFF" &&
               new TextDecoder().decode(b.slice(8, 12)) === "WEBP"
             ? "image/webp"
-            : null;
-    if (!mime) throw new Error("请选择 PNG、JPEG 或 WebP 贴图");
-    const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
-    bitmap.close();
+            : [0x86, 0x16, 0x87, 0x96, 0xf6, 0xd6, 0x96, 0x36].every((v, i) => b[i] === v)
+              ? "application/x-babylon-env"
+              : /^#\?(?:RADIANCE|RGBE)\r?\n/.test(new TextDecoder().decode(b.slice(0, 32)))
+                ? "image/vnd.radiance" : null;
+    if (!mime) throw new Error("请选择 PNG、JPEG、WebP、.env 或 .hdr 贴图");
+    if (mime === "application/x-babylon-env") {
+      const end = b.indexOf(0, 8);
+      if (end < 0) throw new Error("环境贴图头损坏");
+      let header;
+      try { header = JSON.parse(new TextDecoder().decode(b.slice(8, end))); }
+      catch { throw new Error("环境贴图头损坏"); }
+      if (!Number.isInteger(header.width) || header.width < 1 || header.width > 8192 || !header.specular?.mipmaps?.length)
+        throw new Error("环境贴图缺少预过滤数据");
+    } else if (mime === "image/vnd.radiance") {
+      const header = new TextDecoder().decode(b.slice(0, 16384));
+      const size = /-Y\s+(\d+)\s+\+X\s+(\d+)/.exec(header);
+      if (!header.includes("FORMAT=32-bit_rle_rgbe") || !size || +size[1] < 1 || +size[2] < 1 || +size[1] > 8192 || +size[2] > 16384)
+        throw new Error("不支持或损坏的 Radiance HDR 贴图");
+    } else {
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
+      bitmap.close();
+    }
     const state = useEditorStore.getState();
     if (key && replacements.get(key) !== token)
       throw new Error("贴图替换已取消：已有更新的替换请求");

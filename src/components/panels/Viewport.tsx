@@ -244,8 +244,9 @@ export default function Viewport() {
   }, []);
 
   useEffect(() => {
-    void adapterRef.current?.sync(nodes, modelBuffers, content, textureBuffers);
-  }, [nodes, modelBuffers, content, textureBuffers]);
+    adapterRef.current?.rendering?.configure(settings.rendering);
+    void adapterRef.current?.sync(nodes, modelBuffers, content, textureBuffers).catch(error => useEditorStore.getState().addConsoleLog("error", String(error)));
+  }, [nodes, modelBuffers, content, textureBuffers, settings.rendering]);
 
   useEffect(() => {
     const scene = sceneRef.current;
