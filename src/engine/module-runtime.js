@@ -35,6 +35,7 @@
     "motion",
     "optics",
     "assets",
+    "rendering",
   ];
   function failure(file, message, node) {
     const error = new Error(message);

@@ -51,6 +51,64 @@ test("soft shadows, environment IBL and exposure change actual WebGL pixels", as
   expect(result.cleared.environmentTextures).toBe(0);
 });
 
+test("WASM multi-view scheduling obeys a total pixel budget and live quality changes release unused views", async ({ page }) => {
+  await page.goto("/runtime.html");
+  await page.waitForFunction(() => !!(window as any).coreModule);
+  const result = await page.evaluate(async () => {
+    const w = window as any, B = w.BABYLON;
+    const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 128; document.body.append(canvas);
+    const engine = new B.Engine(canvas, false, { preserveDrawingBuffer: true });
+    const scene = new B.Scene(engine), camera = new B.FreeCamera("view", new B.Vector3(0, 0, 6), scene); camera.setTarget(B.Vector3.Zero());
+    const manager = w.ArkGlideRendering.create(B, scene);
+    manager.configure({ gpuProfiling: true, views: { depth: 2, maxViews: 3, maxPixels: 40000, samples: 1, minArea: 0 } });
+    await manager.sync();
+    const compute = w.ArkGlideRenderCompute.create(B, w.coreModule, { viewsMinPortals: 0 });
+    const portals = w.ArkGlidePortals.create(B, { scene, renderCompute: compute, physics: {}, getObject: () => null, find: () => null });
+    const owner = { record: { active: true }, track: () => () => {} }, api = portals.forOwner(owner);
+    const material = new B.PBRMaterial("lamp", scene); material.emissiveColor.set(2, 0.3, 0.1); material.metallic = 0;
+    for (let i = 0; i < 6; i++) {
+      const position = { x: (i % 3 - 1) * 2.2, y: i < 3 ? -1.2 : 1.2, z: 0 };
+      const a = api.create({ id: "source:" + i, shape: "rectangle", width: i === 1 ? 2 : 1.4, height: 1.4, position });
+      const b = api.create({ id: "exit:" + i, shape: "rectangle", width: 1.4, height: 1.4, position: { x: 20 + i * 5, y: 0, z: 0 }, rotation: { x: 0, y: 1, z: 0, w: 0 } });
+      a.link(b);
+      const mesh = B.MeshBuilder.CreateBox("lamp:" + i, {}, scene); mesh.position.set(20 + i * 5, 0, -2); mesh.material = material;
+    }
+    const draw = async () => {
+      for (let i = 0; i < 6; i++) { engine.beginFrame(); portals.updateVisuals(); portals.render(); scene.render(); engine.endFrame(); await new Promise(r => setTimeout(r, 20)); }
+    };
+    try {
+      await draw();
+      const budgeted = portals.stats(), computation = compute.stats(), metrics = manager.stats();
+      const settings = manager.forOwner(owner); settings.setQuality("low"); await draw();
+      const low = { ...portals.stats(), ...manager.stats(), width: engine.getRenderWidth() };
+      settings.setQuality("high"); await draw();
+      const high = manager.stats();
+      camera.position.set(0, 0, 6); camera.setTarget(new B.Vector3(0, 0, 20)); await draw();
+      const hidden = portals.stats();
+      const fallbackMaterialsReady = scene.meshes.filter((m: any) => m.name.endsWith(":view")).every((m: any) => m.material.isReady(m));
+      portals.dispose(); manager.clear();
+      const cleared = manager.stats();
+      return { budgeted, computation, metrics, low, high, hidden, fallbackMaterialsReady, cleared };
+    } finally { portals.dispose(); manager.dispose(); compute.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); }
+  });
+  await test.info().attach("view-budget.json", { body: JSON.stringify(result, null, 2), contentType: "application/json" });
+  expect(result.budgeted.portalRenderedViews).toBeGreaterThan(0);
+  expect(result.budgeted.portalRenderedViews).toBeLessThanOrEqual(3);
+  expect(result.budgeted.portalRenderedPixels).toBeLessThanOrEqual(40000);
+  expect(result.computation.viewBudgetNativeBatches).toBeGreaterThan(0);
+  expect(result.metrics.renderDrawCalls).toBeGreaterThan(0);
+  expect(result.metrics.gpuTimeMs === null || result.metrics.gpuTimeMs >= 0).toBe(true);
+  expect(result.low.renderQuality).toBe("low");
+  expect(result.low.width).toBe(192);
+  expect(result.low.portalRenderedViews).toBeLessThanOrEqual(4);
+  expect(result.high.renderQuality).toBe("high");
+  expect(result.high.aoEnabled).toBe(true);
+  expect(result.hidden.portalRenderedViews).toBe(0);
+  expect(result.hidden.portalViews).toBe(0);
+  expect(result.fallbackMaterialsReady).toBe(true);
+  expect(result.cleared.picturePipelines).toBe(0);
+});
+
 test("emissive textures bloom and grade once, including through a real portal view", async ({ page }) => {
   await page.goto("/runtime.html");
   await page.waitForFunction(() => !!(window as any).ArkGlideRendering);

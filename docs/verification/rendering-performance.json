@@ -1,0 +1,105 @@
+{
+  "date": "2026-10-19T11:38:57.127Z",
+  "platform": "linux x64",
+  "compiler": {
+    "name": "Emscripten",
+    "version": "3.1.69",
+    "optimization": "-O3",
+    "build": "EMXX=<installed em++> npm run build:wasm",
+    "note": "The provided compiler override was used; the build script default SDK remains unchanged."
+  },
+  "artifacts": {
+    "cpp/render/batch.cpp": {
+      "sha256": "c07b0a878e66a4cdd572efc89e175e8a0ccff3d944842561d94c2f5ff695e802"
+    },
+    "src/engine/render-view-budget.js": {
+      "sha256": "de8dad2d413a9f41abefe616aafc087a69ba719431c1b157b89d3fe005020a39"
+    },
+    "src/wasm/arkglide_math.js": {
+      "sha256": "41efdee4b8b8d4c0f0df571183c9728be811970ae5f2dcd1c7f50f3a4991a4b4"
+    },
+    "examples/rendering-lab.arkglide": {
+      "sha256": "53eeeeaf392d77e52464839641118370e7998ad9603b85ade445650a12f7388d"
+    }
+  },
+  "benchmark": {
+    "command": "node scripts/benchmark-view-budget.mjs",
+    "runtime": "v24.19.0",
+    "iterations": 100,
+    "samples": 5,
+    "warmupIterations": 1000,
+    "cases": [
+      {
+        "candidates": 2,
+        "selected": 1,
+        "javascriptMs": 0.00289402999999993,
+        "wasmWithCopiesMs": 0.0027656400000000757
+      },
+      {
+        "candidates": 8,
+        "selected": 6,
+        "javascriptMs": 0.02178337000000056,
+        "wasmWithCopiesMs": 0.005117350000000442
+      },
+      {
+        "candidates": 16,
+        "selected": 5,
+        "javascriptMs": 0.010288779999998497,
+        "wasmWithCopiesMs": 0.005481399999998757
+      },
+      {
+        "candidates": 32,
+        "selected": 6,
+        "javascriptMs": 0.021518479999999725,
+        "wasmWithCopiesMs": 0.010550270000001092
+      },
+      {
+        "candidates": 128,
+        "selected": 5,
+        "javascriptMs": 0.09064231999999947,
+        "wasmWithCopiesMs": 0.04209243000000015
+      },
+      {
+        "candidates": 512,
+        "selected": 5,
+        "javascriptMs": 0.3234690999999998,
+        "wasmWithCopiesMs": 0.16052560000000085
+      },
+      {
+        "candidates": 2048,
+        "selected": 5,
+        "javascriptMs": 1.4284078099999988,
+        "wasmWithCopiesMs": 0.68223207
+      }
+    ],
+    "limits": "CPU view projection, homogeneous clipping, area sorting and pixel allocation, including validation and buffer copies; excludes scene extraction, draw submission and GPU time. Not target-device FPS."
+  },
+  "verification": {
+    "unit": {
+      "command": "node --test --test-concurrency=1 tests/*.test.mjs",
+      "passed": 575
+    },
+    "editorBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:browser -- --reporter=list",
+      "passed": 39,
+      "includes": "Four actual WebGL rendering/pixel tests, WASM view budgets, 3,000-deep hierarchy and 20-session resource cleanup."
+    },
+    "standaloneBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium node --test --test-concurrency=1 tests/composition/browser.mjs tests/foundations/browser.mjs tests/package/browser.mjs tests/portal/browser.mjs tests/rendering/browser.mjs",
+      "passed": 11,
+      "includes": "Near-plane portal coverage, gameplay, package loading, lighting lab and rendering resource cleanup."
+    },
+    "staticPlayerBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:static -- --reporter=list",
+      "passed": 7
+    },
+    "productionBuild": {
+      "command": "NODE_OPTIONS=--max-old-space-size=4096 npm run build",
+      "passed": true,
+      "includes": "TypeScript and production editor/runtime assets.",
+      "note": "4 GiB is the build process heap limit; no runtime memory limit was changed."
+    },
+    "browserScope": "Headless Chromium with ANGLE SwiftShader. Correctness and lifecycle verification only, without a target-device GPU/FPS claim.",
+    "execution": "Browser suites ran serially with runtime source fixed to prevent CLI runtime synchronization from triggering development-server hot reloads."
+  }
+}

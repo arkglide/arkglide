@@ -16,6 +16,7 @@ copyFileSync(
 
 for (const [source, target] of [
   ["rendering-config", "rendering-config"],
+  ["render-view-budget", "render-view-budget"],
   ["rendering-runtime", "rendering"],
   ["timing-runtime", "timing"],
   ["render-compute", "render-compute"],

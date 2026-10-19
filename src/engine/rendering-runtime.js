@@ -3,9 +3,11 @@
   "use strict";
   function create(B, scene, options = {}) {
     const C = root.ArkGlideRenderingConfig, engine = scene.getEngine(), shadows = new Map();
+    const baseHardwareScale = engine.getHardwareScalingLevel(), instrumentation = new B.SceneInstrumentation(scene);
+    let gpu = null, gpuStartCount = 0, frameOpen = false, frameStarted = 0, offscreenDraws = 0, drawCalls = 0, mainTriangles = 0, cpuSubmitMs = 0;
     let config = C.settings(), content = {}, buffers = new Map(), active = false, dead = false, dirty = true;
     let environment = null, skybox = null, skyboxTexture = null, signature = "", syncGeneration = 0;
-    const cubes = new Map(), probeTextures = new Map(), variants = new Map(), assignments = new Map();
+    const cubes = new Map(), probeTextures = new Map(), variants = new Map(), assignments = new Map(), variantSources = new WeakMap();
     let probeMeshes = [], probesReady = false, ao = null, pipeline = null, byteColor = null, postCamera = null, postSignature = "";
     const observers = [];
     function watch(observable, fn) { const token = observable.add(fn); observers.push(() => observable.remove(token)); }
@@ -33,6 +35,7 @@
           skyboxTexture = texture;
         }
       }
+      if (skybox?.material?.reflectionTexture) skybox.material.reflectionTexture.rotationY = config.environment.rotation;
     }
     function releaseCube(id, slot) {
       cubes.delete(id);
@@ -74,6 +77,7 @@
     }
     function clearVariants() {
       for (const [mesh, record] of assignments) if (!mesh.isDisposed() && mesh.material === record.assigned) mesh.material = record.base;
+      for (const mesh of scene.meshes) if (variantSources.has(mesh.material)) mesh.material = variantSources.get(mesh.material);
       assignments.clear();
       for (const map of variants.values()) for (const material of map.values()) material.dispose(false, false);
       variants.clear();
@@ -97,6 +101,7 @@
       for (const p of config.probes) {
         const texture = cubes.get(p.textureId).texture.clone();
         texture.name = "arkglide:probe:" + p.id;
+        texture.rotationY = 0;
         texture.boundingBoxPosition = new B.Vector3(p.position.x, p.position.y, p.position.z);
         texture.boundingBoxSize = new B.Vector3(p.size.x, p.size.y, p.size.z);
         texture.level = p.intensity;
@@ -105,6 +110,7 @@
       probesReady = true; dirty = true;
     }
     function variant(base, probeId) {
+      base = variantSources.get(base) || base;
       if (!base || (!base.subMaterials && !base.metadata?.arkglideManagedMaterial)) return base;
       let map = variants.get(base);
       if (!map) { map = new Map(); variants.set(base, map); }
@@ -121,6 +127,7 @@
         material.reflectionTexture = probeTextures.get(probeId);
       }
       material.metadata = { ...base.metadata, arkglideProbeVariant: true };
+      variantSources.set(material, base);
       map.set(probeId, material);
       return material;
     }
@@ -132,7 +139,7 @@
         const point = mesh.getBoundingInfo().boundingBox.centerWorld;
         const index = C.selectProbe(point, config.probes);
         const record = assignments.get(mesh);
-        const base = record && mesh.material === record.assigned ? record.base : mesh.material;
+        const base = record && mesh.material === record.assigned ? record.base : variantSources.get(mesh.material) || mesh.material;
         const material = index < 0 ? base : variant(base, config.probes[index].id);
         if (mesh.material !== material) mesh.material = material;
         if (material !== base) assignments.set(mesh, { base, assigned: material }); else assignments.delete(mesh);
@@ -145,8 +152,8 @@
       scene.imageProcessingConfiguration.applyByPostProcess = false;
     }
     function updatePost() {
-      const needsPost = config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
-      const camera = scene.activeCamera, key = JSON.stringify([config.ao, config.bloom, needsPost]);
+      const needsPost = config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
+      const camera = scene.activeCamera, key = JSON.stringify([config.ao, config.bloom, needsPost, config.antialiasing, config.samples]);
       if (postCamera === camera && postSignature === key) return;
       clearPost(); postCamera = camera; postSignature = key;
       if (config.ao.enabled && camera && engine.webGLVersion >= 2 && engine.getCaps().drawBuffersExtension) {
@@ -157,6 +164,8 @@
         const caps = engine.getCaps(), hdr = !!(caps.textureHalfFloatRender || caps.textureFloatRender);
         pipeline = new B.DefaultRenderingPipeline("arkglide:picture", true, scene, [camera], false);
         pipeline.imageProcessingEnabled = hdr;
+        pipeline.samples = config.antialiasing === "msaa" ? Math.min(config.samples, caps.maxMSAASamples || 1) : 1;
+        pipeline.fxaaEnabled = config.antialiasing === "fxaa" || (config.antialiasing === "msaa" && pipeline.samples === 1);
         pipeline.bloomEnabled = config.bloom.enabled;
         pipeline.bloomThreshold = config.bloom.threshold; pipeline.bloomWeight = config.bloom.weight;
         pipeline.bloomKernel = config.bloom.kernel; pipeline.bloomScale = config.bloom.scale;
@@ -186,14 +195,12 @@
       const s = config.shadows, caps = engine.getCaps();
       const key = JSON.stringify(s);
       if (signature !== key) { clearShadows(); signature = key; }
-      const lights = s.enabled ? scene.lights.filter(light => {
-        const f = flags(light);
-        return f && f.castShadows !== false && light.isEnabled() && light.getClassName() !== "HemisphericLight";
-      }).slice(0, s.maxLights) : [];
+      const lights = shadowLights();
       for (const [light, slot] of shadows) if (!lights.includes(light)) { slot.generator.dispose(); shadows.delete(light); }
+      if (!s.enabled && !config.probes.length) { probeMeshes = []; return; }
       const meshes = scene.meshes.filter(mesh => !mesh.isDisposed() && !mesh.metadata?.arkglideRenderInternal && mesh.getTotalVertices() > 0 && flags(mesh));
       probeMeshes = meshes;
-      for (const mesh of meshes) mesh.receiveShadows = flags(mesh).receiveShadows !== false;
+      if (s.enabled) for (const mesh of meshes) mesh.receiveShadows = flags(mesh).receiveShadows !== false;
       const casters = meshes.filter(mesh => flags(mesh).castShadows !== false);
       for (const light of lights) {
         let slot = shadows.get(light);
@@ -217,32 +224,69 @@
     watch(scene.onMeshRemovedObservable, invalidate);
     watch(scene.onNewLightAddedObservable, invalidate);
     watch(scene.onLightRemovedObservable, invalidate);
+    function shadowLights() {
+      return config.shadows.enabled ? scene.lights.filter(light => {
+        const f = flags(light);
+        return f && f.castShadows !== false && light.isEnabled() && typeof light.needCube === "function" && light.getClassName() !== "HemisphericLight";
+      }).slice(0, config.shadows.maxLights) : [];
+    }
     function prepareFrame() {
       if (!active || dead) return;
+      if (!frameOpen) beginFrame();
+      if (!dirty && config.shadows.enabled) {
+        const lights = shadowLights();
+        if (lights.length !== shadows.size || lights.some(light => !shadows.has(light))) dirty = true;
+      }
       if (dirty) updateShadows();
       updateProbes(); updatePost();
     }
+    function beginFrame() { frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
+    function finishFrame() {
+      if (!active || !frameOpen) return;
+      drawCalls = instrumentation.drawCallsCounter.current + offscreenDraws;
+      mainTriangles = Math.floor(scene.getActiveIndices() / 3);
+      cpuSubmitMs = performance.now() - frameStarted; frameOpen = false;
+    }
+    function configure(input) {
+      if (dead) throw Error("Rendering disposed");
+      config = C.settings(input); dirty = true; applyColor();
+      if (engine.getHardwareScalingLevel() !== baseHardwareScale / config.resolutionScale) engine.setHardwareScalingLevel(baseHardwareScale / config.resolutionScale);
+      if (config.gpuProfiling && engine.getCaps().timerQuery && !gpu) { gpu = new B.EngineInstrumentation(engine); gpuStartCount = gpu.gpuFrameTimeCounter.count; gpu.captureGPUFrameTime = true; }
+      if (!config.gpuProfiling && gpu) { gpu.captureGPUFrameTime = false; gpu.dispose(); gpu = null; }
+    }
     watch(scene.onBeforeRenderObservable, prepareFrame);
+    watch(scene.onAfterRenderObservable, finishFrame);
     function clear() {
       active = false; dirty = true; signature = "";
       syncGeneration++; clearProbes(); clearPost(); clearShadows();
       for (const [id, slot] of cubes) releaseCube(id, slot);
+      if (gpu) { gpu.captureGPUFrameTime = false; gpu.dispose(); gpu = null; }
+      engine.setHardwareScalingLevel(baseHardwareScale);
+      frameOpen = false; drawCalls = mainTriangles = cpuSubmitMs = offscreenDraws = 0;
       content = {}; buffers = new Map();
     }
     const api = {
-      configure(input) { if (dead) throw Error("Rendering disposed"); config = C.settings(input); dirty = true; applyColor(); },
+      configure,
       sync(nextContent = {}, nextBuffers = new Map()) {
         if (dead) return Promise.resolve();
+        configure(config);
         content = nextContent; buffers = nextBuffers; active = true; dirty = true;
         return syncCubes();
       },
       invalidate,
       prepareFrame,
+      beginFrame,
+      recordOffscreenDraws(count) { offscreenDraws += Math.max(0, count); },
+      viewSettings: () => ({ ...config.views }),
       linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender) }),
+      stats: () => ({ shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
+      forOwner(owner) {
+        const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
+        return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, getStats() { check(); return api.stats(); } });
+      },
       clear,
-      dispose() { if (dead) return; clear(); dead = true; for (const remove of observers) remove(); if (scene._arkglideRendering === api) delete scene._arkglideRendering; },
+      dispose() { if (dead) return; clear(); dead = true; instrumentation.dispose(); for (const remove of observers) remove(); if (scene._arkglideRendering === api) delete scene._arkglideRendering; },
     };
     scene._arkglideRendering = api;
     return api;

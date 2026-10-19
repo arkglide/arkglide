@@ -275,6 +275,7 @@
       );
       mesh.parent = nodes.get(id);
       decorate(mesh, id);
+      mesh.metadata.arkglideRenderInternal = true;
       const mat = new B.StandardMaterial(id + ":marker-material", scene);
       mat.emissiveColor = B.Color3.FromHexString(
         node.type === "light"

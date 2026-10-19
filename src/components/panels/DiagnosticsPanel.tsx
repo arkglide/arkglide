@@ -21,6 +21,11 @@ export default function DiagnosticsPanel() {
           `${stats.nativeMatrixUpdates || 0} / ${((stats.coreWasmHeapBytes || 0) / 1048576).toFixed(1)} MiB`,
         ],
         ["FPS", stats.fps.toFixed(1)],
+        ["画质 / 渲染比例", `${stats.renderQuality || "custom"} / ${stats.renderResolutionScale ?? 1}`],
+        ["绘制调用 / 主视图三角形", `${stats.renderDrawCalls || 0} / ${stats.renderMainTriangles || 0}`],
+        ["GPU 帧时间", stats.gpuTimeMs == null ? (stats.gpuTimerSupported ? "未采样（在画面设置中开启）" : "设备未提供计时扩展") : `${stats.gpuTimeMs.toFixed(2)} ms`],
+        ["离屏视图 / 像素 / 预算", `${stats.portalRenderedViews || 0} / ${stats.portalRenderedPixels || 0} / ${stats.portalPixelBudget || 0}`],
+        ["视图预算 WASM / JS 批次", `${stats.viewBudgetNativeBatches || 0} / ${stats.viewBudgetJSBatches || 0}`],
         ["渲染计算后端", stats.renderComputeBackend || "—"],
         [
           "变换提交批次 / 实体",

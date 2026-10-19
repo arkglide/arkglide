@@ -802,6 +802,10 @@ interface PortalsAPI {
     recursiveScale?: number;
     samples?: 1 | 2 | 4 | 8;
     maxViews?: number;
+    maxPixels?: number;
+    minArea?: number;
+    minResolution?: number;
+    particles?: boolean;
   }): void;
 }
 interface GrabHandle {
@@ -1055,6 +1059,28 @@ interface OpticsAPI {
 declare const signals: SignalsAPI;
 declare const motion: MotionAPI;
 declare const optics: OpticsAPI;
+type RenderQuality = "low" | "medium" | "high" | "custom";
+interface RenderingAPI {
+  /** Changes quality budgets for this session; keeps environment assets and color choices. */
+  setQuality(quality: RenderQuality): void;
+  getSettings(): {
+    quality: RenderQuality;
+    resolutionScale: number;
+    antialiasing: "none" | "fxaa" | "msaa";
+    samples: number;
+    gpuProfiling: boolean;
+    shadows: { enabled: boolean; mapSize: number; filter: "pcf" | "pcss" | "poisson"; bias: number; normalBias: number; darkness: number; maxDistance: number; maxLights: number };
+    environment: { textureId: string | null; intensity: number; rotation: number; skybox: boolean };
+    color: { toneMapping: "none" | "standard" | "aces"; exposure: number; contrast: number; saturation: number; hue: number; tint: number };
+    ao: { enabled: boolean; ratio: number; radius: number; strength: number; samples: number };
+    bloom: { enabled: boolean; threshold: number; weight: number; kernel: number; scale: number };
+    views: { depth: number; scale: number; recursiveScale: number; samples: number; maxViews: number; maxPixels: number; minArea: number; minResolution: number; particles: boolean };
+    probes: { id: string; name: string; textureId: string; position: Vec3; size: Vec3; priority: number; intensity: number }[];
+  };
+  getStats(): { renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean };
+}
+declare const rendering: RenderingAPI;
+interface ScriptContext { rendering: RenderingAPI; }
 interface ScriptContext { signals: SignalsAPI; motion: MotionAPI; optics: OpticsAPI; }
 interface PrefabSpawnOptions { visible?: boolean; /** Load assets first, activate component/script bindings via handle.startScripts(). */ deferScripts?: boolean; }
 interface PrefabHandle { startScripts(): void; }

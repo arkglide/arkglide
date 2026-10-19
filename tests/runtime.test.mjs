@@ -81,7 +81,7 @@ function setup() {
     ),
     context,
   );
-  for (const name of ["timing", "render-compute", "spatial", "state", "visuals", "surfaces", "fields", "triggers", "signals", "motion", "optics", "levels", "checkpoints", "portal-projection", "cameras", "portals", "interaction", "physics-tools", "physics", "input-ui", "audio", "animation"])
+  for (const name of ["timing", "render-view-budget", "render-compute", "rendering-config", "rendering", "spatial", "state", "visuals", "surfaces", "fields", "triggers", "signals", "motion", "optics", "levels", "checkpoints", "portal-projection", "cameras", "portals", "interaction", "physics-tools", "physics", "input-ui", "audio", "animation"])
     vm.runInContext(
       fs.readFileSync(
         new URL("../public/arkglide-" + name + ".js", import.meta.url),

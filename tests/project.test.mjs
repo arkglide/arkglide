@@ -1621,13 +1621,14 @@ test('late script edits do not resurrect deleted files or consume redo history',
 
 test('render compute budgets round-trip and invalid native settings are rejected before replacing the project',()=>{
  const project=recovery.captureEditorProject(store.getState());
- project.settings.renderCompute={enabled:true,normalsMinVertices:64,transformsMinEntities:16,worldBounds:false,boundsMinChangedFraction:.5,cullMinMeshes:8,maxBatchMeshes:4096,epsilon:1e-6};
+ project.settings.renderCompute={enabled:true,normalsMinVertices:64,transformsMinEntities:16,worldBounds:false,boundsMinChangedFraction:.5,cullMinMeshes:8,viewsMinPortals:8,maxBatchMeshes:4096,epsilon:1e-6};
  const result=normalize(project);
  assert.deepEqual({...result.settings.renderCompute},project.settings.renderCompute);
  const legacy=normalize({...project,settings:{...project.settings,renderCompute:{normalsMinVertices:64}}});
  assert.equal(legacy.settings.renderCompute.worldBounds,true);
  assert.equal(legacy.settings.renderCompute.transformsMinEntities,32);
  assert.equal(legacy.settings.renderCompute.boundsMinChangedFraction,.25);
+ assert.equal(legacy.settings.renderCompute.viewsMinPortals,8);
  for(const bad of [{enabled:'yes'},{worldBounds:'yes'},{transformsMinEntities:-1},{maxBatchMeshes:0},{epsilon:-1},{cullMinMeshes:NaN},{extra:1}])assert.throws(()=>normalize({...project,settings:{...project.settings,renderCompute:bad}}),/render compute/i);
 });
 

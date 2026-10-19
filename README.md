@@ -2,7 +2,7 @@
 
 浏览器中的 3D 游戏编辑器：React、Dockview、Monaco、Babylon.js 与 C++/WASM。
 
-软阴影、HDR 环境光照、烘焙光照、AO 与局部反射探针见 [画面与光照](docs/rendering.md)。
+软阴影、HDR 环境光照、烘焙光照、AO、局部反射探针、自发光/Bloom、调色、画质档位与 WASM 多视图预算见 [画面与光照](docs/rendering.md)。导入 `examples/rendering-lab.arkglide` 可查看组合示例。
 
 ```sh
 npm ci

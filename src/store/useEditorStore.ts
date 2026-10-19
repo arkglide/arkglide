@@ -102,6 +102,20 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  renderQuality?: string;
+  renderResolutionScale?: number;
+  renderDrawCalls?: number;
+  renderMainTriangles?: number;
+  renderSubmitMs?: number;
+  gpuTimerSupported?: boolean;
+  gpuTimeMs?: number | null;
+  shadowLights?: number;
+  picturePipelines?: number;
+  portalRenderedViews?: number;
+  portalRenderedPixels?: number;
+  portalPixelBudget?: number;
+  viewBudgetNativeBatches?: number;
+  viewBudgetJSBatches?: number;
   renderComputeBackend?: string;
   renderCullBatches?: number;
   renderCullCandidates?: number;
@@ -1303,7 +1317,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     ))) return;
     partial = structuredClone(partial);
     if (
-      ["physics", "character", "joints", "animation", "audioSource"].some((k) =>
+      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows"].some((k) =>
         Object.hasOwn(partial, k),
       )
     ) {
@@ -1939,6 +1953,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
     if (unchanged) return;
     partial = structuredClone(partial);
+    if (partial.rendering !== undefined) {
+      const state = get();
+      partial.rendering = validateProject({ ...state, settings: { ...state.settings, ...partial }, scene: { nodes: state.nodes } }).settings.rendering;
+    }
     pushHistory(get, set);
     set((state) => ({
       settings: { ...state.settings, ...partial },

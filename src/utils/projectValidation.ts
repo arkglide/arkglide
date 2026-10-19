@@ -293,6 +293,10 @@ function validateContent(
       throw new Error("无效贴图资源");
     textureIds.add(t.id);
   }
+  for (const element of content.gameplay?.hud || []) {
+    if (element.textureId && !["image/png", "image/jpeg", "image/webp"].includes(content.textures.find(t => t.id === element.textureId)?.mime || ""))
+      throw new Error("UI 图片贴图必须是 PNG、JPEG 或 WebP");
+  }
   for (const [key, m] of Object.entries(content.materials)) {
     if (
       !m ||

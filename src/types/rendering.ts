@@ -1,4 +1,10 @@
 export interface RenderingSettings {
+  quality?: "custom" | "low" | "medium" | "high";
+  resolutionScale?: number;
+  antialiasing?: "none" | "fxaa" | "msaa";
+  samples?: number;
+  gpuProfiling?: boolean;
+  views?: { depth?: number; scale?: number; recursiveScale?: number; samples?: number; maxViews?: number; maxPixels?: number; minArea?: number; minResolution?: number; particles?: boolean };
   ao?: { enabled?: boolean; ratio?: number; radius?: number; strength?: number; samples?: number };
   probes?: ReflectionProbeSettings[];
   shadows?: {

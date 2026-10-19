@@ -940,7 +940,7 @@ export function UIEditorPanel({
                     value={h.textureId || ""}
                     onChange={(e) => patch({ textureId: e.target.value })}
                   >
-                    {textures.map((t) => (
+                    {textures.filter(t => ["image/png", "image/jpeg", "image/webp"].includes(t.mime)).map((t) => (
                       <MenuItem key={t.id} value={t.id}>
                         {t.name}
                       </MenuItem>

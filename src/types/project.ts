@@ -25,6 +25,7 @@ export interface ProjectSettings {
     worldBounds?: boolean;
     boundsMinChangedFraction?: number;
     cullMinMeshes?: number;
+    viewsMinPortals?: number;
     maxBatchMeshes?: number;
     epsilon?: number;
   };

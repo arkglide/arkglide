@@ -85,6 +85,8 @@ test("shared scene adapter owns shadow maps, honors flags, updates models and re
   const adapter = globalThis.ArkGlideScene.createSceneAdapter(B, scene);
   const node = (id, type, extra = {}) => ({ id, name: id, type, transform: { x: 0, y: 0, z: 0 }, ...extra });
   try {
+    await adapter.sync([node("legacy", "mesh")]); scene.render();
+    assert.equal(adapter.nodes.get("legacy").receiveShadows, false);
     adapter.rendering.configure({ shadows: { enabled: true }, color: { toneMapping: "aces", exposure: 1.8 } });
     await adapter.sync([node("ground", "mesh", { receiveShadows: false }), node("box", "mesh", { castShadows: false }), node("sun", "light")]);
     scene.render();
@@ -108,6 +110,31 @@ test("probe selection has deterministic overlap priorities and inclusive box bou
   assert.throws(() => C.settings({ probes: [probe("same", 0, 2), probe("same", 1, 2)] }), /探针/);
   assert.throws(() => C.settings({ probes: [{ ...probe("bad", 0, 2), size: { x: 0, y: 1, z: 1 } }] }), /probe size/);
 });
+test("quality presets preserve scene look choices, validate atomically and stop expired scripts from changing quality", async () => {
+  const input = { color: { toneMapping: "aces", exposure: 1.7 }, environment: { intensity: 0.8 }, views: { maxPixels: 40000 } };
+  const high = C.preset(input, "high"), low = C.preset(high, "low");
+  assert.equal(high.color.exposure, 1.7); assert.equal(low.environment.intensity, 0.8);
+  assert.ok(high.views.maxPixels > low.views.maxPixels);
+  const engine = new B.NullEngine(), scene = new B.Scene(engine);
+  let scale = 1;
+  engine.setHardwareScalingLevel = value => { scale = value; };
+  engine.getHardwareScalingLevel = () => scale;
+  const manager = globalThis.ArkGlideRendering.create(B, scene);
+  const owner = { record: { active: true } }, api = manager.forOwner(owner);
+  try {
+    manager.configure(high); await manager.sync();
+    api.setQuality("low"); assert.equal(api.getStats().renderQuality, "low");
+    assert.ok(Math.abs(engine.getHardwareScalingLevel() - 1 / 0.75) < 1e-8);
+    const copy = api.getSettings(); copy.shadows.mapSize = 4096;
+    assert.equal(api.getSettings().shadows.mapSize, 512);
+    owner.record.active = false; assert.throws(() => api.setQuality("high"), /expired/);
+    manager.clear(); assert.equal(engine.getHardwareScalingLevel(), 1);
+  } finally { manager.dispose(); scene.dispose(); engine.dispose(); }
+  const s = () => store.getState(); s().newProject();
+  const before = s().settings;
+  assert.throws(() => s().updateSettings({ rendering: { views: { maxPixels: NaN } } }), /预算|参数/);
+  assert.ok(s().settings === before);
+});
 test("local probes isolate shared managed materials, follow moving meshes and dispose variants without disposing source textures", async () => {
   const engine = new B.NullEngine(), scene = new B.Scene(engine);
   let disposedClones = 0;
@@ -115,20 +142,21 @@ test("local probes isolate shared managed materials, follow moving meshes and di
     constructor(_url, _scene, _ext, _mip, _files, load) { queueMicrotask(load); }
     isReady() { return false; }
     dispose() {}
-    clone() { return { dispose() { disposedClones++; } }; }
+    clone() { return { rotationY: this.rotationY, dispose() { disposedClones++; } }; }
   }
   const manager = globalThis.ArkGlideRendering.create({ ...B, CubeTexture: Cube }, scene);
   const source = new B.PBRMaterial("shared", scene); source.metadata = { arkglideManagedMaterial: true };
   const a = B.MeshBuilder.CreateBox("a", {}, scene), b = B.MeshBuilder.CreateBox("b", {}, scene);
   for (const m of [a, b]) { m.material = source; m.metadata = { arkglideRendering: {} }; }
   b.position.x = 8;
-  manager.configure({ probes: [{ id: "room", name: "room", textureId: "env", position: { x: 0, y: 0, z: 0 }, size: { x: 4, y: 4, z: 4 } }] });
+  manager.configure({ environment: { textureId: "env", rotation: 1.25 }, probes: [{ id: "room", name: "room", textureId: "env", position: { x: 0, y: 0, z: 0 }, size: { x: 4, y: 4, z: 4 } }] });
   try {
     await manager.sync({ textures: [{ id: "env", mime: "application/x-babylon-env" }] }, { env: new ArrayBuffer(1) });
     scene.onBeforeRenderObservable.notifyObservers(scene);
     assert.ok(a.material !== source, "a should use a probe variant");
     assert.ok(b.material === source, "b should retain its original material");
     assert.deepEqual(a.material.reflectionTexture.boundingBoxSize.asArray(), [4, 4, 4]);
+    assert.equal(a.material.reflectionTexture.rotationY, 0);
     a.position.x = 10; scene.onBeforeRenderObservable.notifyObservers(scene);
     assert.ok(a.material === source, "a should restore its original material outside the probe");
     b.position.x = 0; scene.onBeforeRenderObservable.notifyObservers(scene);

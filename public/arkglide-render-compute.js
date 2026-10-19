@@ -8,6 +8,7 @@
     worldBounds: true,
     boundsMinChangedFraction: 0.25,
     cullMinMeshes: 32,
+    viewsMinPortals: 8,
     maxBatchMeshes: 65536,
     epsilon: 1e-7,
   };
@@ -37,6 +38,7 @@
         "normalsMinVertices",
         "transformsMinEntities",
         "cullMinMeshes",
+        "viewsMinPortals",
         "maxBatchMeshes",
       ].every((k) => Number.isSafeInteger(result[k]) && result[k] >= 0) ||
       result.maxBatchMeshes < 1 ||
@@ -61,6 +63,7 @@
       indices,
       output;
     let frame = 0;
+    const viewBudget = root.ArkGlideViewBudget?.create(native, config.viewsMinPortals);
     const counters = {
       renderCullBatches: 0,
       renderCullCandidates: 0,
@@ -211,6 +214,7 @@
       }
     }
     return {
+      planViews: viewBudget ? (input, camera, budget) => { live(); return viewBudget.plan(input, camera, budget); } : undefined,
       normalData,
       select,
       beginFrame() {
@@ -220,10 +224,12 @@
       stats: () => ({
         renderComputeBackend: native && !dead ? "cpp-wasm" : "javascript",
         ...counters,
+        ...viewBudget?.stats(),
       }),
       dispose() {
         if (dead) return;
         dead = true;
+        viewBudget?.dispose();
         native?.delete();
         boxes = planes = positions = indices = output = null;
       },

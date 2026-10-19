@@ -43,6 +43,7 @@
     <script src="./arkglide-api.js"></script>
     <script src="./arkglide-lifecycle.js"></script>
     <script src="./arkglide-timing.js"></script>
+    <script src="./arkglide-render-view-budget.js"></script>
     <script src="./arkglide-render-compute.js"></script>
     <script src="./arkglide-rendering-config.js"></script>
     <script src="./arkglide-rendering.js"></script>
@@ -134,7 +135,7 @@
         typeof createArkGlideMath === "function"
           ? createArkGlideMath().then(function (module) {
               math = ArkGlideMath.createMathAPI(module);
-              if(!module.RuntimeWorld?.prototype.applySync||!module.RuntimeWorld?.prototype.gatherBounds||!module.RuntimeClock||!module.RenderBatch||!module.AnimationBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
+              if(!module.RuntimeWorld?.prototype.applySync||!module.RuntimeWorld?.prototype.gatherBounds||!module.RuntimeClock||!module.RenderBatch?.prototype.planViews||!module.AnimationBatch)throw Error('WASM runtime core is missing; rebuild the runtime library');
               coreModule=module;logicalWorld=new module.RuntimeWorld();
             })
           : Promise.resolve();
@@ -432,6 +433,7 @@
           session.stats(),
           entityAPI.stats(),
           renderCompute?.stats() || {renderComputeBackend:"javascript",renderCullBatches:0,renderCullCandidates:0,renderCulledMeshes:0,renderNormalBatches:0,renderNormalVertices:0},
+          sceneAdapter?.rendering?.stats() || {},
           packageRuntime?.stats() || {packageResources:0,packageGroups:0,packageIndexes:0,packageModules:0},
           physicsRuntime?.stats(),
           cameraRuntime?.stats() || {runtimeCameras:0,cameraRigs:0},
@@ -706,6 +708,7 @@
                   "motion",
                   "optics",
                   "assets",
+                  "rendering",
                   code +
                     "\n//# sourceURL=arkglide-script:///" +
                     encodeURIComponent(file),
@@ -744,6 +747,7 @@
                 motionRuntime.forOwner(owner),
                 opticsRuntime.forOwner(owner),
                 assetsForOwner(owner),
+                sceneAdapter.rendering.forOwner(owner),
               ];
               var context = Object.fromEntries(
                 ArkGlideModules.parameters.map(function (name, index) {

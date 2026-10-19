@@ -16,13 +16,28 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     color: { ...defaults.color, ...value?.color },
     ao: { ...defaults.ao, ...value?.ao },
     bloom: { ...defaults.bloom, ...value?.bloom },
+    views: { ...defaults.views, ...value?.views },
   };
-  const change = (section: keyof typeof c, patch: object) => onChange({ ...value, [section]: { ...c[section], ...patch } });
+  const change = (section: keyof typeof c, patch: object) => onChange({ ...value, quality: "custom", [section]: { ...c[section], ...patch } });
+  const chooseQuality = (name: string) => {
+    try {
+      onChange((globalThis as any).ArkGlideRenderingConfig.preset(value, name));
+      setError("");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+    }
+  };
   const number = (section: keyof typeof c, field: string, label: string, min: number, max: number, step = 0.1) => (
     <TextField key={section + field} label={label} size="small" type="number" value={c[section][field]} inputProps={{ min, max, step }} onChange={e => change(section, { [field]: e.target.value.trim() ? Number(e.target.value) : NaN })} />
   );
   return <Stack spacing={1.5} sx={{ mt: 3 }} data-testid="rendering-settings">
     <Typography variant="subtitle2">画面与光照</Typography>
+    <TextField label="画质档位" select size="small" value={value?.quality || "custom"} onChange={e => chooseQuality(e.target.value)}>{[["low", "低"], ["medium", "中"], ["high", "高"], ["custom", "自定义"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
+    <Stack direction="row" spacing={1}>
+      <TextField label="渲染分辨率比例" type="number" size="small" value={value?.resolutionScale ?? 1} inputProps={{ min: 0.5, max: 1.5, step: 0.05 }} onChange={e => onChange({ ...value, quality: "custom", resolutionScale: Number(e.target.value) })} />
+      <TextField label="抗锯齿" select size="small" value={value?.antialiasing || "none"} onChange={e => onChange({ ...value, quality: "custom", antialiasing: e.target.value as RenderingSettings["antialiasing"] })}>{[["none", "基础"], ["fxaa", "FXAA"], ["msaa", "MSAA"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
+    </Stack>
+    <FormControlLabel label="采集 GPU 帧时间" control={<Switch checked={value?.gpuProfiling || false} onChange={e => onChange({ ...value, gpuProfiling: e.target.checked })} />} />
     {error && <Alert severity="error">{error}</Alert>}
     <FormControlLabel label="实时软阴影" control={<Switch checked={c.shadows.enabled} onChange={e => change("shadows", { enabled: e.target.checked })} />} />
     <Stack direction="row" spacing={1}>
@@ -51,6 +66,11 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <FormControlLabel label="屏幕空间环境遮蔽（AO）" control={<Switch checked={c.ao.enabled} onChange={e => change("ao", { enabled: e.target.checked })} />} />
     <Stack direction="row" spacing={1}>{number("ao", "radius", "AO 半径", 0.01, 10)}{number("ao", "strength", "AO 强度", 0, 5)}</Stack>
     <TextField label="AO 采样" size="small" select value={c.ao.samples} onChange={e => change("ao", { samples: Number(e.target.value) })}>{[4, 8, 16, 32].map(n => <MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+    <Typography variant="subtitle2">多视图预算</Typography>
+    <Stack direction="row" spacing={1}>{number("views", "maxViews", "离屏视图上限", 1, 64, 1)}{number("views", "depth", "传送门递归层数", 1, 5, 1)}</Stack>
+    <TextField label="离屏总像素预算（MP）" type="number" size="small" value={c.views.maxPixels / 1048576} inputProps={{ min: 1 / 1024, max: 64, step: 0.5 }} onChange={e => change("views", { maxPixels: Math.round(Number(e.target.value) * 1048576) })} />
+    <Stack direction="row" spacing={1}>{number("views", "scale", "门内分辨率比例", 0.1, 2, 0.05)}{number("views", "recursiveScale", "递归分辨率比例", 0.1, 1, 0.05)}</Stack>
+    <FormControlLabel label="门内显示粒子" control={<Switch checked={c.views.particles} onChange={e => change("views", { particles: e.target.checked })} />} />
     <Typography variant="subtitle2">局部反射探针</Typography>
     {(value?.probes || []).map(p => <ProbeEditor key={p.id} value={p} textures={textures.filter(t => t.mime === "application/x-babylon-env")} onChange={next => onChange({ ...value, probes: value!.probes!.map(old => old.id === p.id ? next : old) })} onDelete={() => onChange({ ...value, probes: value!.probes!.filter(old => old.id !== p.id) })} />)}
     <Button size="small" disabled={!(textures.some(t => t.mime === "application/x-babylon-env")) || (value?.probes?.length || 0) >= 32} onClick={() => onChange({ ...value, probes: [...(value?.probes || []), { id: crypto.randomUUID(), name: "房间反射", textureId: textures.find(t => t.mime === "application/x-babylon-env")!.id, position: { x: 0, y: 0, z: 0 }, size: { x: 10, y: 5, z: 10 }, priority: 0, intensity: 1 }] })}>添加局部反射探针</Button>

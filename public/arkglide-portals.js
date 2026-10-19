@@ -15,7 +15,11 @@
       serial = 0,
       rendering = false,
       renderCount = 0;
-    let quality = { depth: 2, scale: 1, recursiveScale: 0.75, samples: 4, maxViews: 24 };
+    const defaultQuality = { depth: 2, scale: 1, recursiveScale: 0.75, samples: 4, maxViews: 24, maxPixels: 16777216, minArea: 0.0001, minResolution: 32, particles: false };
+    let quality = { ...defaultQuality }, qualityOverrides = {};
+    const planningBuffers = [];
+    let planningCursor = 0, reservedPixels = 0, renderedPixels = 0, renderedViews = 0;
+    function effectiveQuality() { return { ...defaultQuality, ...scene._arkglideRendering?.viewSettings(), ...qualityOverrides }; }
     let traversalLimits = { maxSubSteps: 128, maxStepTime: 1 / 240, maxTravelDistance: 0.15 };
     const V = (p) => {
         S.vec(p);
@@ -1524,11 +1528,13 @@
           scene.activeCamera === camera ? o.renderCompute.select(list, scene.frustumPlanes, length) : null;
         texture.ignoreCameraViewport = true;
         texture.gammaSpace = !linear;
-        texture.renderParticles = false;
+        texture.renderParticles = quality.particles;
         texture.samples = Math.min(quality.samples, Math.max(1, scene.getEngine().getCaps().maxMSAASamples || 1));
         v = { camera, texture, width, height, type, linear };
         views[index] = v;
       }
+      v.texture.renderParticles = quality.particles;
+      v.texture.samples = Math.min(quality.samples, Math.max(1, caps.maxMSAASamples || 1));
       return v;
     }
     function snapshot() {
@@ -1542,13 +1548,17 @@
       p.view = view;
       p.material.setFloat("hasView", view ? 1 : 0);
       if (view) p.material.setTexture("portalView", view);
+      else p.material.removeTexture("portalView");
     }
     function render() {
       if (disposed || rendering || !scene.activeCamera) return;
+      scene._arkglideRendering?.beginFrame();
       scene._arkglideRendering?.prepareFrame();
+      quality = effectiveQuality();
       for (const p of portals.values()) p.material.setFloat("linearOutput", scene._arkglideRendering?.linearOutput() ? 1 : 0);
       rendering = true;
       renderCount = 0;
+      planningCursor = 0; reservedPixels = renderedPixels = renderedViews = 0;
       const main = scene.activeCamera,
         engine = scene.getEngine(),
         // Read the main framebuffer size before recursive RTTs bind their own.
@@ -1557,19 +1567,36 @@
         maxSize = engine.getCaps().maxTextureSize || 4096,
         oldClip = scene.clipPlane,
         oldClip2 = scene.clipPlane2;
+      function planned(camera, depth, exit) {
+        const candidates = [...portals.values()].filter(p => active(p) && p !== exit);
+        if (!candidates.length || renderCount >= quality.maxViews || reservedPixels >= quality.maxPixels) return { candidates, allocations: [] };
+        let slot = planningBuffers[planningCursor++];
+        if (!slot) { slot = { input: new Float64Array(0), camera: new Float64Array(19) }; planningBuffers.push(slot); }
+        if (slot.input.length < candidates.length * 10) slot.input = new Float64Array(Math.max(candidates.length * 10, slot.input.length * 2));
+        const matrix = camera.getViewMatrix(true).multiply(camera.getProjectionMatrix(true));
+        slot.camera.set(matrix.m); const position = S.pose(B, camera).position;
+        slot.camera.set([position.x, position.y, position.z], 16);
+        const scale = Math.pow(quality.recursiveScale, quality.depth - depth);
+        for (let i = 0; i < candidates.length; i++) {
+          const p = candidates[i], at = i * 10;
+          slot.input.set([p.position.x, p.position.y, p.position.z, p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w, p.width, p.height, scale], at);
+        }
+        const input = slot.input.subarray(0, candidates.length * 10);
+        const budget = { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)), maxSize, minArea: quality.minArea, maxViews: quality.maxViews - renderCount, maxPixels: quality.maxPixels - reservedPixels, minResolution: quality.minResolution };
+        const allocations = o.renderCompute?.planViews ? o.renderCompute.planViews(input, slot.camera, budget)
+          : root.ArkGlideViewBudget ? root.ArkGlideViewBudget.plan(input, slot.camera, budget)
+          : candidates.map((p, index) => ({ index, width: Math.max(1, Math.round(width * Math.min(scale, maxSize / width, maxSize / height))), height: Math.max(1, Math.round(height * Math.min(scale, maxSize / width, maxSize / height))) })).slice(0, budget.maxViews);
+        return { candidates, allocations };
+      }
       function visit(camera, depth, exit) {
         const result = new Map();
         const pose = S.pose(B, camera);
-        for (const p of portals.values())
-          if (
-            active(p) &&
-            p !== exit &&
-            B.Vector3.Dot(pose.position.subtract(p.position), normal(p)) > 0
-          ) {
-            if (renderCount >= quality.maxViews) break;
-            const levelScale = Math.pow(quality.recursiveScale, quality.depth - depth),
-              sizeScale = Math.min(levelScale, maxSize / width, maxSize / height),
-              view = target(renderCount++, Math.max(1, Math.round(width * sizeScale)), Math.max(1, Math.round(height * sizeScale))),
+        const { candidates, allocations } = planned(camera, depth, exit), first = renderCount;
+        renderCount += allocations.length;
+        for (const allocation of allocations) reservedPixels += allocation.width * allocation.height;
+        for (let i = 0; i < allocations.length; i++) {
+            const allocation = allocations[i], p = candidates[allocation.index];
+            const view = target(first + i, allocation.width, allocation.height),
               m = mapping(p),
               rotation = B.Quaternion.Identity(),
               scale = new B.Vector3(),
@@ -1606,7 +1633,10 @@
               view.texture.renderList = scene.meshes.filter(
                 (mesh) => mesh.isEnabled() && !mesh.isDisposed(),
               );
+              const beforeDraws = engine._drawCalls?.current || 0;
               view.texture.render(false, false);
+              scene._arkglideRendering?.recordOffscreenDraws((engine._drawCalls?.current || 0) - beforeDraws);
+              renderedViews++; renderedPixels += allocation.width * allocation.height;
               result.set(p, view.texture);
             } finally {
               for (const x of saved) {
@@ -1620,6 +1650,8 @@
       try {
         const result = visit(main, quality.depth, null);
         for (const p of portals.values()) setView(p, result.get(p) || null);
+        for (let i = renderCount; i < views.length; i++) { views[i]?.texture.dispose(); views[i]?.camera.dispose(); }
+        views.length = renderCount;
       } finally {
         scene.clipPlane = oldClip;
         scene.clipPlane2 = oldClip2;
@@ -1726,7 +1758,7 @@
           },
           setQuality(config) {
             guard(owner);
-            const next = { ...quality, ...config };
+            const next = { ...effectiveQuality(), ...config };
             if (
               !Number.isInteger(next.depth) ||
               !Number.isInteger(next.maxViews)
@@ -1738,7 +1770,12 @@
             if (!Number.isInteger(next.samples) || ![1, 2, 4, 8].includes(next.samples))
               throw Error("Invalid portal sample count");
             S.number(next.maxViews, 1, 64, "Invalid view budget");
+            if (!Number.isInteger(next.maxPixels) || !Number.isInteger(next.minResolution) || typeof next.particles !== "boolean") throw Error("Invalid portal pixel budget");
+            S.number(next.maxPixels, 1024, 67108864, "Invalid portal pixel budget");
+            S.number(next.minResolution, 1, 512, "Invalid portal minimum resolution");
+            S.number(next.minArea, 0, 0.1, "Invalid portal minimum area");
             quality = next;
+            qualityOverrides = { ...qualityOverrides, ...config };
             for (const p of portals.values()) setView(p, null);
             for (const v of views) {
               v?.texture.dispose();
@@ -1757,7 +1794,9 @@
         portalTravelers: actors.size,
         portalClones: [...actors.values()].filter((r) => r.visual).length,
         portalViews: views.filter(Boolean).length,
-        portalRenderedViews: renderCount,
+        portalRenderedViews: renderedViews,
+        portalRenderedPixels: renderedPixels,
+        portalPixelBudget: effectiveQuality().maxPixels,
         portalTraversals: [...actors.values()].reduce(
           (n, r) => n + r.crossings,
           0,

@@ -2,6 +2,12 @@
 (function (root) {
   "use strict";
   const defaults = {
+    quality: "custom",
+    resolutionScale: 1,
+    antialiasing: "none",
+    samples: 4,
+    gpuProfiling: false,
+    views: { depth: 2, scale: 1, recursiveScale: 0.75, samples: 4, maxViews: 24, maxPixels: 16777216, minArea: 0.0001, minResolution: 32, particles: false },
     shadows: { enabled: false, mapSize: 1024, filter: "pcf", bias: 0.0005, normalBias: 0.02, darkness: 0, maxDistance: 100, maxLights: 2 },
     environment: { textureId: null, intensity: 1, rotation: 0, skybox: false },
     color: { toneMapping: "none", exposure: 1, contrast: 1, saturation: 0, hue: 30, tint: 0 },
@@ -26,6 +32,12 @@
   }
   function settings(input) {
     const c = merge(defaults, input);
+    if (!["custom", "low", "medium", "high"].includes(c.quality) || !["none", "fxaa", "msaa"].includes(c.antialiasing) || ![1, 2, 4, 8].includes(c.samples) || typeof c.gpuProfiling !== "boolean") throw Error("无效画质配置");
+    number(c.resolutionScale, 0.5, 1.5, "resolution scale");
+    if (![1, 2, 3, 4, 5].includes(c.views.depth) || ![1, 2, 4, 8].includes(c.views.samples) || !Number.isInteger(c.views.maxViews) || !Number.isInteger(c.views.maxPixels) || !Number.isInteger(c.views.minResolution) || typeof c.views.particles !== "boolean") throw Error("无效离屏视图预算");
+    number(c.views.maxViews, 1, 64, "view count"); number(c.views.maxPixels, 1024, 67108864, "view pixels");
+    number(c.views.minResolution, 1, 512, "view minimum resolution"); number(c.views.minArea, 0, 0.1, "view minimum area");
+    number(c.views.scale, 0.1, 2, "view scale"); number(c.views.recursiveScale, 0.1, 1, "view recursive scale");
     if (typeof c.shadows.enabled !== "boolean" || typeof c.environment.skybox !== "boolean" ||
         ![256, 512, 1024, 2048, 4096].includes(c.shadows.mapSize) ||
         !["pcf", "pcss", "poisson"].includes(c.shadows.filter) ||
@@ -83,6 +95,19 @@
     }
     return selected;
   }
+  function preset(input, name) {
+    if (!["low", "medium", "high", "custom"].includes(name)) throw Error("无效画质档位");
+    const c = settings(input); c.quality = name;
+    if (name === "custom") return c;
+    const low = name === "low", high = name === "high";
+    c.resolutionScale = low ? 0.75 : 1;
+    c.antialiasing = high ? "msaa" : "fxaa"; c.samples = high ? 4 : 1;
+    Object.assign(c.shadows, { enabled: true, mapSize: low ? 512 : high ? 2048 : 1024, filter: high ? "pcss" : "pcf", maxLights: low ? 1 : high ? 4 : 2 });
+    Object.assign(c.ao, { enabled: !low, ratio: high ? 1 : 0.5, samples: high ? 16 : 8 });
+    Object.assign(c.bloom, { enabled: !low, scale: high ? 0.5 : 0.25 });
+    Object.assign(c.views, { depth: low ? 1 : 2, scale: low ? 0.5 : high ? 1 : 0.75, samples: high ? 4 : 1, maxViews: low ? 4 : high ? 16 : 8, maxPixels: low ? 1048576 : high ? 8388608 : 3145728, particles: high });
+    return c;
+  }
   const materialTextureFields = ["albedoTextureId", "normalTextureId", "metallicRoughnessTextureId", "aoTextureId", "lightmapTextureId", "emissiveTextureId"];
-  root.ArkGlideRenderingConfig = { settings, validateResources, validateNode, selectProbe, materialTextureFields, environmentMimes, imageMimes };
+  root.ArkGlideRenderingConfig = { settings, preset, validateResources, validateNode, selectProbe, materialTextureFields, environmentMimes, imageMimes };
 })(globalThis);

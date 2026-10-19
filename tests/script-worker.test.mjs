@@ -350,6 +350,21 @@ test('view, portal and interaction APIs provide typed legacy-script completions'
 
 test('the portal lab ES-module factory has no semantic diagnostics with the published ScriptContext',async()=>{const code=fs.readFileSync(new URL('../examples/portal-lab-scripts/main.js',import.meta.url),'utf8'),{worker,file}=setup({'main.js':code});assert.deepEqual(await diagnostics(worker,file('main.js')),[]);});
 
+test('quality and multi-view budgets are typed in JS/TS factories and module contexts', async () => {
+  const body = `rendering.setQuality('high');
+    portals.setQuality({maxPixels:1048576,minArea:.001,minResolution:32,particles:true});
+    console.log(rendering.getSettings().views.maxPixels,rendering.getStats().gpuTimeMs);`;
+  const { worker, file } = setup({
+    'quality.js': `return {onStart(){${body}}};`,
+    'quality.ts': `return {onStart(){${body}}};`,
+    'module.js': `export default ({rendering,portals}) => ({onStart(){${body}}});`,
+  });
+  for (const name of ['quality.js', 'quality.ts', 'module.js'])
+    assert.deepEqual(await diagnostics(worker, file(name)), []);
+  const invalid = setup({ 'bad.js': "rendering.setQuality('ultra');portals.setQuality({maxPixels:'large'});return {};" });
+  assert.equal((await diagnostics(invalid.worker, invalid.file('bad.js'))).length, 2);
+});
+
 test('composition services complete in legacy scripts and the actual demo modules have no semantic diagnostics', async () => {
   for (const [api, member] of [['signals', 'gate'], ['motion', 'create'], ['optics', 'trace']]) {
     const code = `return {onStart(){${api}. }};`, { worker, file } = setup({ 'legacy.js': code });

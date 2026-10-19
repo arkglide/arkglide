@@ -127,8 +127,18 @@ test(
       assert.equal(await frame.evaluate(() => time.totalTime), timeBefore);
       await page.evaluate(() => ArkGlidePlayer.pause());
       await frame.waitForFunction(() => running);
+      // Chromium can expose pointerLockElement before dispatching the change event.
+      // Wait for that event, whose input handler clears held keys, before sending F.
+      await frame.evaluate(() => {
+        globalThis.__resumedLockReady = false;
+        document.addEventListener('pointerlockchange', function locked() {
+          if (document.pointerLockElement !== document.getElementById('renderCanvas')) return;
+          globalThis.__resumedLockReady = true;
+          document.removeEventListener('pointerlockchange', locked);
+        });
+      });
       await canvas.click({ position: { x: 300, y: 300 } });
-      await frame.waitForFunction(() => document.pointerLockElement === document.getElementById('renderCanvas'));
+      await frame.waitForFunction(() => __resumedLockReady && document.pointerLockElement === document.getElementById('renderCanvas'));
       await frame.waitForFunction(() => document.hasFocus());
       await frame.evaluate(() => { globalThis.__modeKeys = []; window.addEventListener('keydown', e => __modeKeys.push([e.code, e.target.tagName])); });
       async function switchMode(mode) {
