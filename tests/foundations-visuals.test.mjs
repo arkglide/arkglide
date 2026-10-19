@@ -1,5 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {setup}from './helpers/foundations.mjs';
 const triangle={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2]};
+test('particle GPU requests fall back on unsupported engines and validate before allocating',()=>{const s=setup();try{
+ const options={capacity:16,rate:10,lifetime:[.2,.5],size:[.1,.2],velocity:{min:{x:0,y:1,z:0},max:{x:1,y:2,z:1}},colors:['#ffffff','#ff0000'],backend:'gpu',blendMode:'standard',gravity:{x:0,y:-1,z:0},emitBox:{min:{x:-1,y:0,z:-1},max:{x:1,y:0,z:1}},angularSpeed:[-1,1]};
+ const handle=s.v.createParticles(options);assert.equal(handle.backend,'cpu');assert.equal(s.visuals.stats().cpuParticleSystems,1);handle.destroy();
+ const before=s.scene.particleSystems.length;assert.throws(()=>s.v.createParticles({...options,backend:'broken'}));assert.throws(()=>s.v.createParticles({...options,emitBox:{min:{x:2,y:0,z:0},max:{x:1,y:0,z:0}}}));assert.equal(s.scene.particleSystems.length,before);
+ }finally{s.done();}});
 test('owned material changes restore sharing chains and do not dispose another entity material',()=>{const s=setup();try{
  const a=s.body('a'),b=s.body('b',{x:3,y:0,z:0}),old=new s.B.StandardMaterial('old',s.scene);s.entities.getObject(a.id).material=old;s.entities.getObject(b.id).material=old;
  const first=s.v.createMaterial({color:'#336699',alpha:.5}),second=s.v.createMaterial({emissive:'#abcdef'});first.apply(a);second.apply(a);first.destroy();second.destroy();assert.equal(s.entities.getObject(a.id).material,old);a.destroy();assert.equal(s.entities.getObject(b.id).material,old);assert.ok(!old.isDisposed?.());

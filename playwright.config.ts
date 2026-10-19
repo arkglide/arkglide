@@ -6,6 +6,7 @@ export default defineConfig({
     { name: "core-ui", testMatch: "**/core-ui.spec.ts" },
     { name: "render-compute", testMatch: "**/render-compute.spec.ts" },
     { name: "rendering", testMatch: "**/rendering.spec.ts" },
+    { name: "advanced-rendering", testMatch: "**/advanced-rendering.spec.ts" },
     { name: "animation-compute", testMatch: "**/animation-compute.spec.ts" },
     { name: "editor", testMatch: "**/editor.spec.ts" },
     { name: "batch1", testMatch: "**/batch1.spec.ts" },

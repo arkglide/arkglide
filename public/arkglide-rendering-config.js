@@ -13,6 +13,9 @@
     color: { toneMapping: "none", exposure: 1, contrast: 1, saturation: 0, hue: 30, tint: 0 },
     bloom: { enabled: false, threshold: 1, weight: 0.3, kernel: 32, scale: 0.5 },
     ao: { enabled: false, ratio: 0.5, radius: 1, strength: 1, samples: 8 },
+    fog: { mode: "none", color: "#A8BDD0", density: 0.01, start: 10, end: 100 },
+    sky: { enabled: false, sunAzimuth: 0, sunElevation: 35, turbidity: 2, rayleigh: 2, mie: 0.005, luminance: 1 },
+    dof: { enabled: false, focusDistance: 10, focalLength: 50, fStop: 2.8, quality: 1 },
     probes: [],
   };
   const environmentMimes = ["application/x-babylon-env", "image/vnd.radiance"];
@@ -59,6 +62,13 @@
     number(c.bloom.kernel, 8, 128, "Bloom kernel"); number(c.bloom.scale, 0.25, 1, "Bloom scale");
     if (typeof c.ao.enabled !== "boolean" || ![4, 8, 16, 32].includes(c.ao.samples)) throw Error("无效 AO 配置");
     number(c.ao.ratio, 0.25, 1, "AO ratio"); number(c.ao.radius, 0.01, 10, "AO radius"); number(c.ao.strength, 0, 5, "AO strength");
+    if (!["none", "linear", "exp", "exp2"].includes(c.fog.mode) || !/^#[\da-f]{6}$/i.test(c.fog.color)) throw Error("无效大气雾配置");
+    number(c.fog.density, 0, 1, "fog density"); number(c.fog.start, 0, 100000, "fog start"); number(c.fog.end, 0.001, 1000000, "fog end");
+    if (c.fog.end <= c.fog.start) throw Error("雾结束距离必须大于开始距离");
+    if (typeof c.sky.enabled !== "boolean" || typeof c.dof.enabled !== "boolean" || ![0, 1, 2].includes(c.dof.quality)) throw Error("无效天空或景深配置");
+    number(c.sky.sunAzimuth, -360, 360, "sun azimuth"); number(c.sky.sunElevation, -90, 90, "sun elevation");
+    number(c.sky.turbidity, 1, 20, "sky turbidity"); number(c.sky.rayleigh, 0, 8, "sky Rayleigh"); number(c.sky.mie, 0, 0.1, "sky Mie"); number(c.sky.luminance, 0, 10, "sky luminance");
+    number(c.dof.focusDistance, 0.01, 100000, "focus distance"); number(c.dof.focalLength, 1, 300, "focal length"); number(c.dof.fStop, 0.1, 32, "f-stop");
     if (!Array.isArray(c.probes) || c.probes.length > 32) throw Error("反射探针数量超过上限");
     const ids = new Set();
     c.probes = c.probes.map(p => {
@@ -105,6 +115,7 @@
     Object.assign(c.shadows, { enabled: true, mapSize: low ? 512 : high ? 2048 : 1024, filter: high ? "pcss" : "pcf", maxLights: low ? 1 : high ? 4 : 2 });
     Object.assign(c.ao, { enabled: !low, ratio: high ? 1 : 0.5, samples: high ? 16 : 8 });
     Object.assign(c.bloom, { enabled: !low, scale: high ? 0.5 : 0.25 });
+    c.dof.quality = high ? 2 : low ? 0 : 1;
     Object.assign(c.views, { depth: low ? 1 : 2, scale: low ? 0.5 : high ? 1 : 0.75, samples: high ? 4 : 1, maxViews: low ? 4 : high ? 16 : 8, maxPixels: low ? 1048576 : high ? 8388608 : 3145728, particles: high });
     return c;
   }

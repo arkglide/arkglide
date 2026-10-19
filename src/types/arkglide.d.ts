@@ -911,9 +911,14 @@ interface VisualMeshHandle {
 interface BeamOptions extends VisualMeshOptions { segments: { origin: Vec3; end: Vec3 }[]; radius: number; sides?: number; color?: string; }
 interface BeamHandle { readonly entity: Entity; readonly active: boolean; update(patch: Partial<BeamOptions>): void; destroy(): void; }
 interface ParticleOptions {
+  backend?: 'cpu' | 'gpu' | 'auto';
+  blendMode?: 'standard' | 'additive' | 'multiply';
+  gravity?: Vec3;
+  emitBox?: { min: Vec3; max: Vec3 };
+  angularSpeed?: [number, number];
   capacity: number; rate: number; lifetime: [number, number]; size: [number, number]; velocity: { min: Vec3; max: Vec3 }; colors: [string, string]; texture?: TextureHandle; entity?: Entity; position?: Vec3;
 }
-interface ParticleHandle { readonly active: boolean; start(): void; stop(): void; destroy(): void; }
+interface ParticleHandle { readonly active: boolean; readonly backend: 'cpu' | 'gpu'; start(): void; stop(): void; destroy(): void; }
 interface VisualsAPI {
   createMaterial(options?: MaterialOptions): MaterialHandle;
   createTexture(options: { assetId: string; invertY?: boolean }): TextureHandle;
@@ -1069,6 +1074,9 @@ interface RenderingAPI {
     antialiasing: "none" | "fxaa" | "msaa";
     samples: number;
     gpuProfiling: boolean;
+    fog: { mode: "none" | "linear" | "exp" | "exp2"; color: string; density: number; start: number; end: number };
+    sky: { enabled: boolean; sunAzimuth: number; sunElevation: number; turbidity: number; rayleigh: number; mie: number; luminance: number };
+    dof: { enabled: boolean; focusDistance: number; focalLength: number; fStop: number; quality: 0 | 1 | 2 };
     shadows: { enabled: boolean; mapSize: number; filter: "pcf" | "pcss" | "poisson"; bias: number; normalBias: number; darkness: number; maxDistance: number; maxLights: number };
     environment: { textureId: string | null; intensity: number; rotation: number; skybox: boolean };
     color: { toneMapping: "none" | "standard" | "aces"; exposure: number; contrast: number; saturation: number; hue: number; tint: number };

@@ -3,12 +3,13 @@
   "use strict";
   function create(B, scene, options = {}) {
     const C = root.ArkGlideRenderingConfig, engine = scene.getEngine(), shadows = new Map();
+    const atmosphere = root.ArkGlideAtmosphere?.create(B, scene);
     const baseHardwareScale = engine.getHardwareScalingLevel(), instrumentation = new B.SceneInstrumentation(scene);
     let gpu = null, gpuStartCount = 0, frameOpen = false, frameStarted = 0, offscreenDraws = 0, drawCalls = 0, mainTriangles = 0, cpuSubmitMs = 0;
     let config = C.settings(), content = {}, buffers = new Map(), active = false, dead = false, dirty = true;
     let environment = null, skybox = null, skyboxTexture = null, signature = "", syncGeneration = 0;
     const cubes = new Map(), probeTextures = new Map(), variants = new Map(), assignments = new Map(), variantSources = new WeakMap();
-    let probeMeshes = [], probesReady = false, ao = null, pipeline = null, byteColor = null, postCamera = null, postSignature = "";
+    let probeMeshes = [], probesReady = false, ao = null, pipeline = null, byteColor = null, postCamera = null, postSignature = "", dofDepth = null;
     const observers = [];
     function watch(observable, fn) { const token = observable.add(fn); observers.push(() => observable.remove(token)); }
     function invalidate() { dirty = true; }
@@ -25,8 +26,8 @@
       scene.environmentTexture = texture;
       scene.environmentIntensity = config.environment.intensity;
       if (texture) texture.rotationY = config.environment.rotation;
-      if (!texture || !config.environment.skybox || skyboxTexture !== texture) disposeSkybox();
-      if (texture && config.environment.skybox && !skybox) {
+      if (!texture || !config.environment.skybox || config.sky.enabled || skyboxTexture !== texture) disposeSkybox();
+      if (texture && config.environment.skybox && !config.sky.enabled && !skybox) {
         skybox = scene.createDefaultSkybox(texture, true, 1000, 0, false);
         if (skybox) {
           skybox.isPickable = false;
@@ -148,12 +149,14 @@
     function clearPost() {
       byteColor?.dispose(postCamera); byteColor = null;
       pipeline?.dispose(); pipeline = null;
+      if (dofDepth && scene._depthRenderer?.[dofDepth.camera.uniqueId] === dofDepth.renderer) scene.disableDepthRenderer(dofDepth.camera);
+      dofDepth = null;
       ao?.dispose(true); ao = null; postCamera = null; postSignature = "";
       scene.imageProcessingConfiguration.applyByPostProcess = false;
     }
     function updatePost() {
-      const needsPost = config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
-      const camera = scene.activeCamera, key = JSON.stringify([config.ao, config.bloom, needsPost, config.antialiasing, config.samples]);
+      const needsPost = config.dof.enabled || config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
+      const camera = scene.activeCamera, key = JSON.stringify([config.ao, config.bloom, config.dof, needsPost, config.antialiasing, config.samples]);
       if (postCamera === camera && postSignature === key) return;
       clearPost(); postCamera = camera; postSignature = key;
       if (config.ao.enabled && camera && engine.webGLVersion >= 2 && engine.getCaps().drawBuffersExtension) {
@@ -169,7 +172,18 @@
         pipeline.bloomEnabled = config.bloom.enabled;
         pipeline.bloomThreshold = config.bloom.threshold; pipeline.bloomWeight = config.bloom.weight;
         pipeline.bloomKernel = config.bloom.kernel; pipeline.bloomScale = config.bloom.scale;
+        pipeline.depthOfFieldBlurLevel = config.dof.quality;
+        pipeline.depthOfFieldEnabled = config.dof.enabled;
+        pipeline.depthOfField.focusDistance = config.dof.focusDistance * 1000;
+        pipeline.depthOfField.focalLength = config.dof.focalLength;
+        pipeline.depthOfField.lensSize = config.dof.focalLength;
+        pipeline.depthOfField.fStop = config.dof.fStop;
+        const previousDepth = scene._depthRenderer?.[camera.uniqueId];
         pipeline.prepare();
+        if (config.dof.enabled && !previousDepth && scene._depthRenderer?.[camera.uniqueId]) {
+          dofDepth = { camera, renderer: scene._depthRenderer[camera.uniqueId] };
+          dofDepth.renderer.useOnlyInActiveCamera = true;
+        }
         if (!hdr) byteColor = new B.ImageProcessingPostProcess("arkglide:color", 1, camera, B.Texture.BILINEAR_SAMPLINGMODE, engine, false, B.Constants.TEXTURETYPE_UNSIGNED_BYTE, scene.imageProcessingConfiguration);
         scene.imageProcessingConfiguration.applyByPostProcess = true;
       }
@@ -238,7 +252,7 @@
         if (lights.length !== shadows.size || lights.some(light => !shadows.has(light))) dirty = true;
       }
       if (dirty) updateShadows();
-      updateProbes(); updatePost();
+      updateProbes(); updatePost(); atmosphere?.configure(config, !!pipeline);
     }
     function beginFrame() { frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
     function finishFrame() {
@@ -259,6 +273,7 @@
     function clear() {
       active = false; dirty = true; signature = "";
       syncGeneration++; clearProbes(); clearPost(); clearShadows();
+      atmosphere?.clear();
       for (const [id, slot] of cubes) releaseCube(id, slot);
       if (gpu) { gpu.captureGPUFrameTime = false; gpu.dispose(); gpu = null; }
       engine.setHardwareScalingLevel(baseHardwareScale);
@@ -280,7 +295,7 @@
       viewSettings: () => ({ ...config.views }),
       linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
+      stats: () => ({ ...atmosphere?.stats(), dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
       forOwner(owner) {
         const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
         return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, getStats() { check(); return api.stats(); } });

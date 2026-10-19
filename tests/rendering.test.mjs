@@ -8,9 +8,23 @@ import { unzipSync, strFromU8 } from "fflate";
 import { createStaticGame, RUNTIME_FILES } from "../src/export/static-game.mjs";
 import "../src/engine/package-runtime.js";
 import "../src/engine/rendering-config.js";
+import "../src/engine/atmosphere-runtime.js";
 import "../src/engine/rendering-runtime.js";
 import "../src/engine/scene-runtime.js";
 const C = globalThis.ArkGlideRenderingConfig;
+test("atmosphere settings reject invalid drafts, preserve old defaults and restore owned sky/fog", async () => {
+  assert.equal(C.settings().fog.mode, "none"); assert.equal(C.settings().sky.enabled, false); assert.equal(C.settings().dof.enabled, false);
+  for (const input of [{fog:{mode:"height"}},{fog:{start:50,end:40}},{sky:{sunElevation:91}},{dof:{fStop:0}},{dof:{quality:3}}]) assert.throws(()=>C.settings(input));
+  const engine=new B.NullEngine(),scene=new B.Scene(engine),manager=globalThis.ArkGlideRendering.create(B,scene);
+  try {
+    manager.configure({fog:{mode:"exp2",density:.1},sky:{enabled:true,sunElevation:12}}); await manager.sync(); manager.prepareFrame();
+    assert.equal(scene.fogMode,B.Scene.FOGMODE_EXP2); assert.equal(manager.stats().atmosphereSky,true);
+    assert.equal(scene.meshes.filter(m=>m.name==='arkglide:atmosphere').length,1);
+    manager.configure({sky:{enabled:true,sunElevation:70}});manager.prepareFrame();
+    assert.equal(scene.meshes.filter(m=>m.name==='arkglide:atmosphere').length,1);
+    manager.clear(); assert.equal(scene.fogMode,B.Scene.FOGMODE_NONE);assert.equal(manager.stats().atmosphereSky,false);
+  } finally {manager.dispose();scene.dispose();engine.dispose();}
+});
 let server, store, archive, validate;
 before(async () => {
   globalThis.indexedDB = indexedDB;

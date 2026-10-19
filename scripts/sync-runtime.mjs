@@ -16,6 +16,7 @@ copyFileSync(
 
 for (const [source, target] of [
   ["rendering-config", "rendering-config"],
+  ["atmosphere-runtime", "atmosphere"],
   ["render-view-budget", "render-view-budget"],
   ["rendering-runtime", "rendering"],
   ["timing-runtime", "timing"],

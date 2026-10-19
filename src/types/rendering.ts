@@ -4,6 +4,9 @@ export interface RenderingSettings {
   antialiasing?: "none" | "fxaa" | "msaa";
   samples?: number;
   gpuProfiling?: boolean;
+  fog?: { mode?: "none" | "linear" | "exp" | "exp2"; color?: string; density?: number; start?: number; end?: number };
+  sky?: { enabled?: boolean; sunAzimuth?: number; sunElevation?: number; turbidity?: number; rayleigh?: number; mie?: number; luminance?: number };
+  dof?: { enabled?: boolean; focusDistance?: number; focalLength?: number; fStop?: number; quality?: 0 | 1 | 2 };
   views?: { depth?: number; scale?: number; recursiveScale?: number; samples?: number; maxViews?: number; maxPixels?: number; minArea?: number; minResolution?: number; particles?: boolean };
   ao?: { enabled?: boolean; ratio?: number; radius?: number; strength?: number; samples?: number };
   probes?: ReflectionProbeSettings[];

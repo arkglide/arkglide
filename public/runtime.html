@@ -46,6 +46,7 @@
     <script src="./arkglide-render-view-budget.js"></script>
     <script src="./arkglide-render-compute.js"></script>
     <script src="./arkglide-rendering-config.js"></script>
+    <script src="./arkglide-atmosphere.js"></script>
     <script src="./arkglide-rendering.js"></script>
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-prefabs.js"></script>
@@ -604,6 +605,7 @@
           if (!scene.activeCamera || scene.activeCamera.isDisposed())
             scene.activeCamera = camera;
           var renderStart = performance.now();
+          visualsRuntime?.setScale(running ? time.timeScale : 0);
           try { portalRuntime?.updateVisuals(); renderCompute?.beginFrame(); portalRuntime?.render(); } catch (error) { reportScriptError({hook:"portals.render",error}); }
           scene.render();
           renderMs = performance.now() - renderStart;

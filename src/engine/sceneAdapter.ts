@@ -4,6 +4,7 @@ import type { ProjectContent } from "../types/content";
 import type { SceneNode } from "../store/useEditorStore";
 import "./scene-runtime.js";
 import "./rendering-config.js";
+import "./atmosphere-runtime.js";
 import "./rendering-runtime.js";
 
 export interface SceneAdapter {

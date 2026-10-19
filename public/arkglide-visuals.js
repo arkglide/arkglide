@@ -2,8 +2,8 @@
 (function (root) {
   'use strict';
   function create(B, o) {
-    const S = root.ArkGlideSpatial, resources = new Set(), materials = new WeakMap(), textures = new WeakMap();
-    let dead = false, serial = 0;
+    const S = root.ArkGlideSpatial, resources = new Set(), materials = new WeakMap(), textures = new WeakMap(), particleRecords = new Map();
+    let dead = false, serial = 0, particleScale = 1;
     let limits = { maxVertices: 100000, maxIndices: 600000, maxParticles: 10000, ...o.limits };
     const guard = owner => { if (dead || !owner.record.active || owner.record.destroying) throw Error('Visual resource owner expired'); };
     const object = e => { const m = e && !e.destroyed && o.find(e.id) === e && o.getObject(e.id); if (!m) throw Error('Visual entity absent'); return m; };
@@ -87,6 +87,7 @@
       const settle = error => { if (settled) return; settled = true; URL.revokeObjectURL(url); error ? reject(error) : resolve(handle); };
       const r = owned(owner, () => {
         for (const item of materialRecords) for (const field of ['diffuseTexture', 'emissiveTexture']) if (item.native[field] === native) item.native[field] = null;
+        for (const [system,record] of particleRecords) if (system.particleTexture === native) record.destroy();
         native?.dispose(); settle(new Error('Texture load canceled'));
       });
       const handle = Object.freeze({ ready, get active() { return r.live; }, destroy: r.destroy });
@@ -161,7 +162,14 @@
       if (['x','y','z'].some(k => options.velocity.min[k] > options.velocity.max[k])) throw Error('Invalid particle velocity range');
       const colors = options.colors.map(color); if (colors.length !== 2) throw Error('Particles need two colors');
       if (options.texture && !textures.has(options.texture)) throw Error('Invalid particle texture');
-      const system = new B.ParticleSystem('visual:particles:' + ++serial, options.capacity, o.scene);
+      if (!['cpu','gpu','auto'].includes(options.backend ?? 'cpu') || !['standard','additive','multiply'].includes(options.blendMode ?? 'additive')) throw Error('Invalid particle backend or blend mode');
+      if (options.gravity) S.vec(options.gravity);
+      if (options.emitBox) { S.vec(options.emitBox.min); S.vec(options.emitBox.max); if (['x','y','z'].some(k=>options.emitBox.min[k]>options.emitBox.max[k])) throw Error('Invalid particle emitter box'); }
+      if (options.angularSpeed && (!Array.isArray(options.angularSpeed) || options.angularSpeed.length!==2 || !options.angularSpeed.every(Number.isFinite) || options.angularSpeed[0]>options.angularSpeed[1])) throw Error('Invalid particle angular speed');
+      const gpu = options.backend !== undefined && options.backend !== 'cpu' && o.scene.getEngine().webGLVersion >= 2 && B.GPUParticleSystem?.IsSupported;
+      const backend = gpu ? 'gpu' : 'cpu';
+      const system = gpu ? new B.GPUParticleSystem('visual:particles:' + ++serial, {capacity:options.capacity,randomTextureSize:256}, o.scene)
+        : new B.ParticleSystem('visual:particles:' + ++serial, options.capacity, o.scene);
       let white;
       try {
         if (options.texture) { textures.get(options.texture).check(); system.particleTexture = textures.get(options.texture).native; }
@@ -170,15 +178,27 @@
         if (options.position) S.vec(options.position);
         system.emitRate = options.rate; [system.minLifeTime,system.maxLifeTime] = options.lifetime; [system.minSize,system.maxSize] = options.size;
         system.color1 = new B.Color4(colors[0].r,colors[0].g,colors[0].b,1); system.color2 = new B.Color4(colors[1].r,colors[1].g,colors[1].b,1);
-        system.startDirectionFunction = (_matrix, direction) => { for (const k of ['x','y','z']) direction[k] = options.velocity.min[k] + Math.random() * (options.velocity.max[k] - options.velocity.min[k]); };
-        system.startPositionFunction = (matrix, position) => { B.Vector3.TransformCoordinatesToRef(B.Vector3.Zero(), matrix, position); };
+        const vec = p => new B.Vector3(p.x,p.y,p.z);
+        const emitter = system.createBoxEmitter(vec(options.velocity.min),vec(options.velocity.max));
+        emitter.minEmitBox = options.emitBox ? vec(options.emitBox.min) : B.Vector3.Zero();
+        emitter.maxEmitBox = options.emitBox ? vec(options.emitBox.max) : B.Vector3.Zero();
+        system.gravity.copyFrom(options.gravity ? vec(options.gravity) : B.Vector3.Zero());
+        system.blendMode = {standard:B.ParticleSystem.BLENDMODE_STANDARD,additive:B.ParticleSystem.BLENDMODE_ADD,multiply:B.ParticleSystem.BLENDMODE_MULTIPLY}[options.blendMode ?? 'additive'];
+        if (options.angularSpeed) [system.minAngularSpeed,system.maxAngularSpeed]=options.angularSpeed;
+        // Existing scripts used world-space velocity callbacks. Explicit new backends
+        // use the native emitter space, including emitter rotation, on both paths.
+        if (!gpu && options.backend === undefined) {
+          system.startDirectionFunction = (_matrix,direction) => { for (const k of ['x','y','z']) direction[k]=options.velocity.min[k]+Math.random()*(options.velocity.max[k]-options.velocity.min[k]); };
+        }
       } catch (error) { system.dispose(false); white?.dispose(); throw error; }
-      const r = owned(owner, () => { system.dispose(false); white?.dispose(); });
-      const handle = Object.freeze({ get active() { return r.live; }, start() { r.check(); system.start(); }, stop() { r.check(); system.stop(); }, destroy: r.destroy });
+      const r = owned(owner, () => { particleRecords.delete(system); system.dispose(false); white?.dispose(); });
+      const speed = system.updateSpeed;
+      particleRecords.set(system, {destroy:r.destroy,speed}); system.updateSpeed = speed * particleScale;
+      const handle = Object.freeze({ backend, get active() { return r.live; }, start() { r.check(); system.start(); }, stop() { r.check(); system.stop(); }, destroy: r.destroy });
       if (options.entity) object(options.entity).onDisposeObservable?.addOnce(r.destroy);
       system.start(); return handle;
     }
-    return { forOwner(owner) { guard(owner); return Object.freeze({ createMaterial: c => material(owner,c), createTexture: c => texture(owner,c), createMesh: (d,c) => mesh(owner,d,c), createBeam: c => beam(owner,c), createDecal: (e,c) => decal(owner,e,c), createParticles: c => particles(owner,c), setLimits(patch) { guard(owner); const next = { ...limits,...patch }; if (Object.keys(patch).some(k => !Object.hasOwn(limits,k)) || !Object.values(next).every(n => Number.isInteger(n) && n > 0)) throw Error('Invalid visual budgets'); limits = next; } }); }, stats: () => ({ visualResources: resources.size }), dispose() { if (dead) return; for (const r of [...resources]) r.dispose(); dead = true; } };
+    return { forOwner(owner) { guard(owner); return Object.freeze({ createMaterial: c => material(owner,c), createTexture: c => texture(owner,c), createMesh: (d,c) => mesh(owner,d,c), createBeam: c => beam(owner,c), createDecal: (e,c) => decal(owner,e,c), createParticles: c => particles(owner,c), setLimits(patch) { guard(owner); const next = { ...limits,...patch }; if (Object.keys(patch).some(k => !Object.hasOwn(limits,k)) || !Object.values(next).every(n => Number.isInteger(n) && n > 0)) throw Error('Invalid visual budgets'); limits = next; } }); }, setScale(value) { if (!Number.isFinite(value) || value < 0) throw Error('Invalid particle time scale'); particleScale = value; for (const [system,record] of particleRecords) system.updateSpeed = record.speed * value; }, stats: () => ({ visualResources: resources.size, gpuParticleSystems: [...particleRecords.keys()].filter(p=>p.getClassName()==='GPUParticleSystem').length, cpuParticleSystems: [...particleRecords.keys()].filter(p=>p.getClassName()!=='GPUParticleSystem').length }), dispose() { if (dead) return; for (const r of [...resources]) r.dispose(); dead = true; } };
   }
   root.ArkGlideVisuals = { create };
 })(globalThis);

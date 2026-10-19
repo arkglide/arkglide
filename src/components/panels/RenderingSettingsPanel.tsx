@@ -17,6 +17,9 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     ao: { ...defaults.ao, ...value?.ao },
     bloom: { ...defaults.bloom, ...value?.bloom },
     views: { ...defaults.views, ...value?.views },
+    fog: { ...defaults.fog, ...value?.fog },
+    sky: { ...defaults.sky, ...value?.sky },
+    dof: { ...defaults.dof, ...value?.dof },
   };
   const change = (section: keyof typeof c, patch: object) => onChange({ ...value, quality: "custom", [section]: { ...c[section], ...patch } });
   const chooseQuality = (name: string) => {
@@ -71,6 +74,17 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <TextField label="离屏总像素预算（MP）" type="number" size="small" value={c.views.maxPixels / 1048576} inputProps={{ min: 1 / 1024, max: 64, step: 0.5 }} onChange={e => change("views", { maxPixels: Math.round(Number(e.target.value) * 1048576) })} />
     <Stack direction="row" spacing={1}>{number("views", "scale", "门内分辨率比例", 0.1, 2, 0.05)}{number("views", "recursiveScale", "递归分辨率比例", 0.1, 1, 0.05)}</Stack>
     <FormControlLabel label="门内显示粒子" control={<Switch checked={c.views.particles} onChange={e => change("views", { particles: e.target.checked })} />} />
+    <Typography variant="subtitle2">大气与景深</Typography>
+    <TextField label="大气雾" select size="small" value={c.fog.mode} onChange={e => change("fog", {mode:e.target.value})}>{[["none","关闭"],["linear","线性距离雾"],["exp","指数雾"],["exp2","指数平方雾"]].map(([v,n])=><MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
+    <TextField label="雾颜色" type="color" size="small" value={c.fog.color} onChange={e=>change("fog",{color:e.target.value})} />
+    <Stack direction="row" spacing={1}>{number("fog","density","雾密度",0,1,.001)}{number("fog","start","雾开始距离",0,100000,1)}{number("fog","end","雾结束距离",.001,1000000,1)}</Stack>
+    <FormControlLabel label="程序大气天空" control={<Switch checked={c.sky.enabled} onChange={e=>change("sky",{enabled:e.target.checked})} />} />
+    <Stack direction="row" spacing={1}>{number("sky","sunAzimuth","太阳方位（度）",-360,360,1)}{number("sky","sunElevation","太阳高度（度）",-90,90,1)}</Stack>
+    <Stack direction="row" spacing={1}>{number("sky","turbidity","天空浑浊度",1,20,.1)}{number("sky","rayleigh","Rayleigh 散射",0,8,.1)}{number("sky","mie","Mie 散射",0,.1,.001)}</Stack>
+    {number("sky","luminance","天空亮度",0,10,.1)}
+    <FormControlLabel label="景深（主视图）" control={<Switch checked={c.dof.enabled} onChange={e=>change("dof",{enabled:e.target.checked})} />} />
+    <Stack direction="row" spacing={1}>{number("dof","focusDistance","对焦距离（世界单位）",.01,100000,.1)}{number("dof","focalLength","焦距（mm）",1,300,1)}{number("dof","fStop","光圈 f-stop",.1,32,.1)}</Stack>
+    <TextField label="景深质量" select size="small" value={c.dof.quality} onChange={e=>change("dof",{quality:Number(e.target.value)})}>{["低","中","高"].map((n,i)=><MenuItem key={i} value={i}>{n}</MenuItem>)}</TextField>
     <Typography variant="subtitle2">局部反射探针</Typography>
     {(value?.probes || []).map(p => <ProbeEditor key={p.id} value={p} textures={textures.filter(t => t.mime === "application/x-babylon-env")} onChange={next => onChange({ ...value, probes: value!.probes!.map(old => old.id === p.id ? next : old) })} onDelete={() => onChange({ ...value, probes: value!.probes!.filter(old => old.id !== p.id) })} />)}
     <Button size="small" disabled={!(textures.some(t => t.mime === "application/x-babylon-env")) || (value?.probes?.length || 0) >= 32} onClick={() => onChange({ ...value, probes: [...(value?.probes || []), { id: crypto.randomUUID(), name: "房间反射", textureId: textures.find(t => t.mime === "application/x-babylon-env")!.id, position: { x: 0, y: 0, z: 0 }, size: { x: 10, y: 5, z: 10 }, priority: 0, intensity: 1 }] })}>添加局部反射探针</Button>
