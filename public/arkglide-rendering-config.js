@@ -102,6 +102,10 @@
       if (!(content.textures || []).some(t => t.id === p.textureId && t.mime === "application/x-babylon-env")) throw Error("局部反射探针需要预过滤 .env 环境贴图");
   }
   function validateNode(node) {
+    if(node.optimization!==undefined){
+      const o=node.optimization;if(!object(o)||!['mesh','model'].includes(node.type)||Object.keys(o).some(k=>!['shareGeometry','lod'].includes(k))||o.shareGeometry!==undefined&&typeof o.shareGeometry!=='boolean')throw Error('无效网格优化配置');
+      if(o.lod!==undefined){const l=o.lod;if(!object(l)||Object.keys(l).some(k=>!['enabled','levels'].includes(k))||typeof l.enabled!=='boolean'||l.levels!==undefined&&!Array.isArray(l.levels)||l.enabled&&!(l.levels?.length>0)||l.levels?.length>3)throw Error('无效 LOD 配置');let distance=0;for(const level of l.levels||[]){if(!object(level)||Object.keys(level).some(k=>!['distance','grid'].includes(k))||!Number.isInteger(level.grid))throw Error('无效 LOD 层级');number(level.distance,.1,1000000,'LOD distance');number(level.grid,2,128,'LOD grid');if(level.distance<=distance)throw Error('LOD 距离应递增');distance=level.distance;}}
+    }
     if(node.bakedLighting!==undefined){const b=node.bakedLighting;if(!object(b)||!['mesh','model'].includes(node.type)||Object.keys(b).some(k=>!['autoUV2','signature'].includes(k))||typeof b.autoUV2!=='boolean'||!/^\w{8}$/.test(b.signature)||node.type==='model'&&b.autoUV2)throw Error('无效烘焙元数据');}
     for (const key of ["castShadows", "receiveShadows"])
       if (node[key] !== undefined && typeof node[key] !== "boolean") throw Error("无效节点阴影开关");

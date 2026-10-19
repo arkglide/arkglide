@@ -152,6 +152,7 @@ export default function Inspector() {
         | "castShadows"
         | "receiveShadows"
         | "planarReflection"
+        | "optimization"
         | "primitive"
       >
     >,
@@ -329,6 +330,15 @@ export default function Inspector() {
       )}
 
       {(["mesh","model"].includes(currentNode.type)) && <Stack spacing={1} sx={{mt:1}}>
+          {currentNode.type==='mesh'&&<FormControlLabel label="共享重复基础几何" control={<Switch checked={currentNode.optimization?.shareGeometry!==false} onChange={e=>update({optimization:{...currentNode.optimization,shareGeometry:e.target.checked}})}/>}/>}
+          <FormControlLabel label="静态几何 LOD" control={<Switch checked={!!currentNode.optimization?.lod?.enabled} onChange={e=>update({optimization:{...currentNode.optimization,lod:{enabled:e.target.checked,levels:currentNode.optimization?.lod?.levels?.length?currentNode.optimization.lod.levels:[{distance:20,grid:16},{distance:50,grid:6}]}}})}/>}/>
+          {currentNode.optimization?.lod?.enabled&&<Stack spacing={1}>
+            <Typography variant="caption">距离使用世界单位；网格精度越小，远景越简化。骨骼、变形、多材质和光照图网格保留原几何。碰撞与拾取使用原网格。</Typography>
+            {currentNode.optimization.lod.levels?.map((level,i)=><Stack key={currentNode.id+'lod'+i} direction="row" spacing={1}>
+              <ScalarField label={`LOD ${i+1} 距离`} size="small" value={level.distance} inputProps={{min:.1,max:1000000,step:1}} onValueChange={distance=>{const levels=currentNode.optimization!.lod!.levels!;if(distance<.1||distance>1000000||i>0&&distance<=levels[i-1].distance||i<levels.length-1&&distance>=levels[i+1].distance)return;update({optimization:{...currentNode.optimization,lod:{enabled:true,levels:levels.map((l,j)=>j===i?{...l,distance}:l)}}});}}/>
+              <ScalarField label={`LOD ${i+1} 网格精度`} size="small" value={level.grid} inputProps={{min:2,max:128,step:1}} onValueChange={grid=>{if(!Number.isInteger(grid)||grid<2||grid>128)return;update({optimization:{...currentNode.optimization,lod:{enabled:true,levels:currentNode.optimization!.lod!.levels!.map((l,j)=>j===i?{...l,grid}:l)}}});}}/>
+            </Stack>)}
+          </Stack>}
           <FormControlLabel label="平面反射（需在画面设置中开启）" control={<Switch checked={currentNode.planarReflection?.enabled || false} onChange={e=>update({planarReflection:{...currentNode.planarReflection,enabled:e.target.checked}})} />} />
           {currentNode.planarReflection?.enabled && <Stack spacing={1}>
             <TextField label="反射面本地法向" select size="small" value={currentNode.planarReflection.axis || 'y'} onChange={e=>update({planarReflection:{...currentNode.planarReflection!,axis:e.target.value as 'x'|'y'|'z'}})}>{['x','y','z'].map(axis=><MenuItem key={axis} value={axis}>{axis.toUpperCase()}</MenuItem>)}</TextField>

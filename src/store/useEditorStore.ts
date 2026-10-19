@@ -62,6 +62,7 @@ export interface Transform {
 }
 
 export interface SceneNode {
+  optimization?: import('../types/rendering').MeshOptimizationSettings;
   bakedLighting?: { autoUV2: boolean; signature: string };
   planarReflection?: import('../types/rendering').PlanarReflectionSettings;
   castShadows?: boolean;
@@ -104,6 +105,7 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number;
   cascadedShadowLights?: number;
   atmosphereSky?: boolean;
   dofEnabled?: boolean;
@@ -403,6 +405,7 @@ export interface EditorState {
         | "receiveShadows"
         | "planarReflection"
         | "bakedLighting"
+        | "optimization"
       >
     >,
     recordHistory?: boolean,
@@ -1339,7 +1342,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     ))) return;
     partial = structuredClone(partial);
     if (
-      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows", "planarReflection", "bakedLighting"].some((k) =>
+      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows", "planarReflection", "bakedLighting", "optimization"].some((k) =>
         Object.hasOwn(partial, k),
       )
     ) {

@@ -40,6 +40,7 @@ import {
 import RecoveryPanel from './RecoveryPanel';
 import StaticExportDialog from './StaticExportDialog';
 import LightingBakeDialog from './LightingBakeDialog';
+import ResourceBudgetDialog from './ResourceBudgetDialog';
 import { validateProject } from '../../utils/projectValidation';
 import { useEditorStore } from '../../store/useEditorStore';
 import type { ProjectSettings } from '../../types/project';
@@ -70,6 +71,7 @@ export default function TopBar() {
 
   const [staticExportOpen, setStaticExportOpen] = useState(false);
   const [bakeOpen,setBakeOpen]=useState(false);
+  const [budgetOpen,setBudgetOpen]=useState(false);
 
   // 菜单 anchor
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -312,6 +314,7 @@ export default function TopBar() {
           </MenuItem>
           <MenuItem component="a" href="/math-benchmark.html" target="_blank" rel="noopener" onClick={closeMenu}>数学性能基准</MenuItem>
           <MenuItem disabled={playState!=='stopped'} onClick={()=>{closeMenu();setBakeOpen(true);}}>静态光照烘焙…</MenuItem>
+          <MenuItem disabled={playState!=='stopped'} onClick={()=>{closeMenu();setBudgetOpen(true);}}>资源预算检查…</MenuItem>
         </Menu>
         <Divider orientation="vertical" flexItem sx={{ mx: 1, my: 0.5 }} />
         <Tooltip title="播放">
@@ -361,6 +364,7 @@ export default function TopBar() {
 
       <StaticExportDialog open={staticExportOpen} onClose={() => setStaticExportOpen(false)} />
       <LightingBakeDialog open={bakeOpen} onClose={()=>setBakeOpen(false)} />
+      <ResourceBudgetDialog open={budgetOpen} onClose={()=>setBudgetOpen(false)} />
 
       {/* 保存命名 Dialog（首次保存） */}
       <Dialog

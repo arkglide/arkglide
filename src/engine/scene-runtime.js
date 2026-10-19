@@ -268,7 +268,8 @@
     return { sync, apply, prepareDestroy, clear, materials };
   }
   function createSceneAdapter(B, scene, options = {}) {
-    const rendering = root.ArkGlideRendering?.create(B, scene, options);
+    const optimization = root.ArkGlideSceneOptimization?.create(B, scene, options), geometryPool = new Map();
+    const rendering = root.ArkGlideRendering?.create(B, scene, {...options,onPrepareGeometry:()=>optimization?.prepare(),getOptimizationStats:()=>optimization?.stats()});
     const nodes = new Map(),
       records = new Map(),
       resources = new Map(),
@@ -325,11 +326,9 @@
           capsule: "CreateCapsule",
           torus: "CreateTorus",
         };
-        object = B.MeshBuilder[builders[primitiveOf(node)] || "CreateBox"](
-          node.id,
-          {},
-          scene,
-        );
+        const primitive=primitiveOf(node),shared=node.optimization?.shareGeometry!==false,cached=geometryPool.get(primitive);
+        if(shared&&cached&&!cached.isDisposed()){object=new B.Mesh(node.id,scene);cached.applyToMesh(object);}
+        else {object=B.MeshBuilder[builders[primitive]||'CreateBox'](node.id,{},scene);if(shared)geometryPool.set(primitive,object.geometry);}
       } else object = new B.TransformNode(node.id, scene);
       nodes.set(node.id, object);
       object.onDisposeObservable?.add(() => {
@@ -426,6 +425,7 @@
     function modelExtension(node) {
       return /\.gltf$/i.test(node.modelUrl || "") ? ".gltf" : ".glb";
     }
+    function kindOf(node){return node.type+':'+(node.type==='mesh'?primitiveOf(node)+':'+(node.optimization?.shareGeometry!==false):node.lightType||'');}
     async function loadModel(node, buffer) {
       const token = {},
         object = nodes.get(node.id);
@@ -541,10 +541,7 @@
         const buffer =
           buffers instanceof Map ? buffers.get(node.id) : buffers[node.id];
         const old = records.get(node.id);
-        const kind =
-          node.type +
-          ":" +
-          (node.type === "mesh" ? primitiveOf(node) : node.lightType || "");
+        const kind = kindOf(node);
         if (old && old.kind !== kind) {
           disposeContent(node.id);
           options.onRemove?.(node.id);
@@ -570,10 +567,11 @@
       });
       linkParents();
       rendering?.invalidate();
-      return Promise.all(loads).then(results => { rendering?.invalidate(); return results; });
+      return Promise.all(loads).then(async results => { await optimization?.sync(nodes,definitions);rendering?.invalidate(); return results; });
     }
     let batchGeneration=0;
     function clear() {
+      optimization?.clear();
       rendering?.clear();
       batchGeneration++;
       definitions = [];
@@ -587,6 +585,7 @@
         object.dispose(false, true);
       });
       nodes.clear();
+      geometryPool.clear();
       records.clear();
       for(const mat of legacyMaterials.values())mat.dispose(false,false);
       legacyMaterials.clear();
@@ -596,9 +595,11 @@
       disposed = true;
       clear();
       rendering?.dispose();
+      optimization?.dispose();
     }
     return {
       rendering,
+      optimization,
       nodes,
       resources,
       sync,
@@ -617,13 +618,14 @@
             const buffer=buffers instanceof Map?buffers.get(node.id):buffers[node.id];
             make(node);update(node);
             if(node.type==='model'&&buffer)loading.push(loadModel(node,buffer));
-            records.set(node.id,{kind:node.type+':'+(node.type==='mesh'?primitiveOf(node):node.lightType||''),buffer,url:node.modelUrl,definition:node});
+            records.set(node.id,{kind:kindOf(node),buffer,url:node.modelUrl,definition:node});
           }
           await Promise.all(loading);
           await new Promise(resolve=>setTimeout(resolve,0));
         }
         if(disposed||generation!==batchGeneration)throw Error('场景分块创建已取消');
         linkParents();
+        await optimization?.sync(nodes,definitions);
       },
       add(next, buffers, content, textureBuffers) {
         if (disposed) return Promise.reject(new Error("场景已销毁，实体添加已取消"));

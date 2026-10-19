@@ -22,6 +22,8 @@ export default function DiagnosticsPanel() {
         ],
         ["FPS", stats.fps.toFixed(1)],
         ["级联阴影灯", stats.cascadedShadowLights || 0],
+        ["LOD 网格 / 层级 / 跳过", `${stats.lodMeshes||0} / ${stats.lodLevels||0} / ${stats.lodSkippedMeshes||0}`],
+        ["LOD 构建 WASM / JS", `${stats.lodNativeBuilds||0} / ${stats.lodJSBuilds||0}`],
         ["画质 / 渲染比例", `${stats.renderQuality || "custom"} / ${stats.renderResolutionScale ?? 1}`],
         ["大气天空 / 景深 / SSR", `${stats.atmosphereSky ? "开" : "关"} / ${stats.dofEnabled ? "开" : "关"} / ${stats.ssrEnabled ? "开" : "关"}`],
         ["平面反射 / 离屏像素", `${stats.planarReflections || 0} / ${stats.planarRenderedPixels || 0}`],

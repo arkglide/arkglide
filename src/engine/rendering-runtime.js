@@ -289,6 +289,7 @@
       mirrors?.prepare(config,probeMeshes,frameNumber);
       offscreenDraws+=Math.max(0,(engine._drawCalls?.current||0)-beforeDraws);
       updateProbes();
+      options.onPrepareGeometry?.();
     }
     function beginFrame() { if(shadowCamera!==scene.activeCamera){clearShadows();shadowCamera=scene.activeCamera;dirty=true;}frameNumber++; frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
     function finishFrame() {
@@ -332,7 +333,7 @@
       viewSettings: () => ({ ...config.views }),
       linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ cascadedShadowLights: [...shadows.values()].filter(s=>s.cascaded).length, ...atmosphere?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
+      stats: () => ({ ...options.getOptimizationStats?.(), cascadedShadowLights: [...shadows.values()].filter(s=>s.cascaded).length, ...atmosphere?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
       forOwner(owner) {
         const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
         return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, getStats() { check(); return api.stats(); } });

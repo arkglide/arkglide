@@ -52,6 +52,8 @@
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-lighting-uv.js"></script>
     <script src="./arkglide-baked-lighting.js"></script>
+    <script src="./arkglide-geometry-cluster.js"></script>
+    <script src="./arkglide-scene-optimization.js"></script>
     <script src="./arkglide-prefabs.js"></script>
     <script src="./lib/jolt-physics.js"></script>
     <script src="./arkglide-spatial.js"></script>
@@ -624,6 +626,7 @@
           engine.resize();
         });
         sceneAdapter = ArkGlideScene.createSceneAdapter(BABYLON, scene, {
+          loadModule:()=>Promise.resolve(coreModule),
           renderCompute,
           onCreate: function (object, node) {
             entityAPI.register(object, node.id, node.name);

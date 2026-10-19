@@ -5,6 +5,9 @@ import type { SceneNode } from "../store/useEditorStore";
 import "./scene-runtime.js";
 import "./lighting-uv.js";
 import "./baked-lighting.js";
+import "./geometry-cluster.js";
+import "./scene-optimization.js";
+import {loadMathModule} from './wasm/math-loader';
 import "./rendering-config.js";
 import "./atmosphere-runtime.js";
 import "./render-view-budget.js";
@@ -37,6 +40,6 @@ export function createSceneAdapter(
   return (globalThis as any).ArkGlideScene.createSceneAdapter(
     B,
     scene,
-    options,
+    {...options,loadModule:loadMathModule},
   );
 }

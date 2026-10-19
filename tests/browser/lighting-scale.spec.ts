@@ -65,3 +65,32 @@ test('cancel terminates the actual bake worker without writing partial assets',a
  const state=await page.evaluate(async()=>{const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');return {textures:s.getState().content.textures.length,baked:s.getState().nodes.some(n=>n.bakedLighting)};});
  expect(state.textures).toBe(0);expect(state.baked).toBe(false);
 });
+
+test('static LOD renders fewer triangles per camera and keeps source geometry for picking',async({page})=>{
+ await page.goto('/runtime.html');await page.waitForFunction(()=>!!(window as any).coreModule?.GeometryBatch&&!!(window as any).ArkGlideSceneOptimization);
+ const r=await page.evaluate(async()=>{
+  const w=window as any,B=w.BABYLON,canvas=document.createElement('canvas');canvas.width=128;canvas.height=96;document.body.append(canvas);
+  const engine=new B.Engine(canvas,false,{preserveDrawingBuffer:true}),scene=new B.Scene(engine),camera=new B.FreeCamera('camera',new B.Vector3(0,1,-5),scene);camera.setTarget(B.Vector3.Zero());new B.HemisphericLight('light',B.Vector3.Up(),scene);
+  const adapter=w.ArkGlideScene.createSceneAdapter(B,scene,{loadModule:()=>Promise.resolve(w.coreModule)}),nodes=[{id:'sphere',name:'sphere',type:'mesh',primitive:'sphere',color:'#20C040',transform:{x:0,y:0,z:0},scale:{x:2,y:2,z:2},optimization:{lod:{enabled:true,levels:[{distance:10,grid:8},{distance:30,grid:4}]}}}];
+  const draw=async()=>{await scene.whenReadyAsync();for(let i=0;i<4;i++){scene.render();await new Promise(r=>setTimeout(r,15));}return scene.getActiveIndices()/3;};
+  try{
+   await adapter.sync(nodes);const high=await draw(),source=adapter.nodes.get('sphere'),sourceTriangles=source.getTotalIndices()/3;
+   camera.position.set(0,1,-40);camera.setTarget(B.Vector3.Zero());const low=await draw(),far=source.getLOD(camera),stats=adapter.optimization.stats(),indices=far.getTotalIndices()/3;
+   const sourceStillPickable=source.isPickable&&source.getTotalIndices()/3===sourceTriangles;
+   adapter.clear();return {high,low,indices,sourceTriangles,sourceStillPickable,stats,remaining:scene.meshes.length,geometries:scene.geometries.length};
+  }finally{adapter.dispose();scene.dispose();engine.dispose();canvas.remove();}
+ });
+ expect(r.low).toBeLessThan(r.high/2);expect(r.indices).toBeLessThan(r.sourceTriangles/2);expect(r.sourceStillPickable).toBe(true);expect(r.stats.lodNativeBuilds).toBe(2);expect(r.remaining).toBe(0);expect(r.geometries).toBe(0);
+});
+
+test('resource budget scans real texture dimensions, sharing and duplicate bytes and downloads JSON',async({page})=>{
+ await page.goto('/');await page.waitForSelector('#viewport');
+ await page.evaluate(async()=>{
+  const {useEditorStore:s}=await import('/src/store/useEditorStore.ts');s.getState().newProject();s.getState().addNode('mesh','Budget duplicate');
+  const canvas=new OffscreenCanvas(16,16),ctx=canvas.getContext('2d')!;ctx.fillStyle='#ffaa33';ctx.fillRect(0,0,16,16);const bytes=await (await canvas.convertToBlob({type:'image/png'})).arrayBuffer();
+  for(const id of ['budget-a','budget-b'])s.getState().importTexture({id,name:id+'.png',mime:'image/png',byteLength:bytes.byteLength},bytes);
+ });
+ await page.getByRole('button',{name:'菜单',exact:true}).click();await page.getByRole('menuitem',{name:'资源预算检查…',exact:true}).click();const dialog=page.getByRole('dialog',{name:'资源预算检查',exact:true});await dialog.getByRole('button',{name:'扫描资源',exact:true}).click();await expect(dialog.getByText(/源网格/)).toBeVisible();
+ const download=page.waitForEvent('download');await dialog.getByRole('button',{name:'下载 JSON',exact:true}).click();const file=await download,result=await (await file.createReadStream())!.toArray();const report=JSON.parse(Buffer.concat(result).toString());
+ expect(report.geometry.sharedGeometryMeshes).toBeGreaterThan(0);expect(report.assets.duplicateFiles.length).toBe(1);expect(report.assets.textures.every((t:any)=>t.width===16&&t.height===16)).toBe(true);expect(report.assets.estimatedTextureBytes).toBeGreaterThan(2000);
+});

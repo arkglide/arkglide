@@ -19,6 +19,8 @@ for (const [source, target] of [
   ["atmosphere-runtime", "atmosphere"],
   ["lighting-uv", "lighting-uv"],
   ["baked-lighting", "baked-lighting"],
+  ["geometry-cluster", "geometry-cluster"],
+  ["scene-optimization", "scene-optimization"],
   ["reflection-runtime", "reflections"],
   ["render-view-budget", "render-view-budget"],
   ["rendering-runtime", "rendering"],

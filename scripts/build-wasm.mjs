@@ -28,6 +28,7 @@ const sources = [
   "cpp/runtime/core.cpp",
   "cpp/render/batch.cpp",
   "cpp/render/light-bake.cpp",
+  "cpp/render/geometry.cpp",
   "cpp/animation/batch.cpp",
 ];
 
