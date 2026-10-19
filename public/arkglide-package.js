@@ -264,6 +264,13 @@
             "aoTextureId",
             "lightmapTextureId",
             "emissiveTextureId",
+            "clearCoatTextureId",
+            "clearCoatNormalTextureId",
+            "sheenTextureId",
+            "anisotropyTextureId",
+            "thicknessTextureId",
+            "transmissionTextureId",
+            "detailTextureId",
           ]) {
             const id = content.materials[d.id]?.[field];
             if (id) await acquire("texture:" + id);

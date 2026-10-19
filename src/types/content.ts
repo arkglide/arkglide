@@ -31,6 +31,23 @@ export interface MaterialAsset {
   lightmapUV?: 0 | 1;
   emissiveTextureId?: string;
   emissiveIntensity?: number;
+  normalScale?: number;
+  alphaMode?: "auto" | "opaque" | "mask" | "blend";
+  alphaCutoff?: number;
+  uvOffset?: { u: number; v: number };
+  uvRotation?: number;
+  clearCoat?: { enabled?: boolean; intensity?: number; roughness?: number; normalScale?: number };
+  clearCoatTextureId?: string;
+  clearCoatNormalTextureId?: string;
+  sheen?: { enabled?: boolean; color?: string; intensity?: number; roughness?: number };
+  sheenTextureId?: string;
+  anisotropy?: { enabled?: boolean; intensity?: number; rotation?: number };
+  anisotropyTextureId?: string;
+  transmission?: { enabled?: boolean; intensity?: number; ior?: number; thickness?: number; tintColor?: string; tintDistance?: number };
+  thicknessTextureId?: string;
+  transmissionTextureId?: string;
+  detail?: { enabled?: boolean; scale?: number; diffuse?: number; normal?: number; roughness?: number };
+  detailTextureId?: string;
   uvScale: { u: number; v: number };
 }
 export interface TextureAsset {

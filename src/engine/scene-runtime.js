@@ -91,11 +91,13 @@
           throw error;
         }
         item.texture.name = "arkglide:texture:" + key;
-        item.texture.gammaSpace = role === "albedo" || role === "emissive";
+        item.texture.gammaSpace = role === "albedo" || role === "emissive" || role === "sheen";
         old = item;
       }
       old.texture.uScale = definition.uvScale.u;
       old.texture.vScale = definition.uvScale.v;
+      old.texture.uOffset = definition.uvOffset?.u ?? 0; old.texture.vOffset = definition.uvOffset?.v ?? 0;
+      old.texture.wAng = definition.uvRotation ?? 0;
       return old.texture;
     }
     function sync(next = {}, nextBuffers = new Map()) {
@@ -150,8 +152,31 @@
           mat.lightmapTexture.coordinatesIndex = d.lightmapUV ?? 1;
           mat.lightmapTexture.level = d.lightmapIntensity ?? 1;
           mat.lightmapTexture.uScale = mat.lightmapTexture.vScale = 1;
+          mat.lightmapTexture.uOffset = mat.lightmapTexture.vOffset = mat.lightmapTexture.wAng = 0;
         }
         mat.useLightmapAsShadowmap = false;
+        const a=root.ArkGlideRenderingConfig?.material(d);
+        if(a){
+          mat.transparencyMode=a.alphaMode==='auto'?(d.alpha<1?B.PBRMaterial.PBRMATERIAL_ALPHABLEND:B.PBRMaterial.PBRMATERIAL_OPAQUE):{opaque:B.PBRMaterial.PBRMATERIAL_OPAQUE,mask:B.PBRMaterial.PBRMATERIAL_ALPHATEST,blend:B.PBRMaterial.PBRMATERIAL_ALPHABLEND}[a.alphaMode];
+          mat.alphaCutOff=a.alphaCutoff;mat.useAlphaFromAlbedoTexture=['mask','blend'].includes(a.alphaMode);
+          if(mat.albedoTexture)mat.albedoTexture.hasAlpha=mat.useAlphaFromAlbedoTexture;
+          if(mat.bumpTexture){mat.bumpTexture.level=a.normalScale;if(a.normalScale===0)mat.bumpTexture=null;}
+          const coat=mat.clearCoat;coat.isEnabled=a.clearCoat.enabled;coat.intensity=a.clearCoat.intensity;coat.roughness=a.clearCoat.roughness;
+          coat.texture=texture(id,'coat',d,d.clearCoatTextureId);coat.useRoughnessFromMainTexture=true;
+          coat.bumpTexture=texture(id,'coatNormal',d,d.clearCoatNormalTextureId);
+          if(coat.bumpTexture){coat.bumpTexture.level=a.clearCoat.normalScale;if(a.clearCoat.normalScale===0)coat.bumpTexture=null;}
+          const sheen=mat.sheen;sheen.isEnabled=a.sheen.enabled;sheen.intensity=a.sheen.intensity;sheen.roughness=a.sheen.roughness;
+          sheen.color=B.Color3.FromHexString(a.sheen.color);sheen.texture=texture(id,'sheen',d,d.sheenTextureId);sheen.useRoughnessFromMainTexture=true;
+          mat.anisotropy.isEnabled=a.anisotropy.enabled;mat.anisotropy.intensity=a.anisotropy.intensity;mat.anisotropy.angle=a.anisotropy.rotation;
+          mat.anisotropy.texture=texture(id,'anisotropy',d,d.anisotropyTextureId);
+          const sub=mat.subSurface;sub.isRefractionEnabled=a.transmission.enabled;sub.refractionIntensity=a.transmission.intensity;sub.indexOfRefraction=a.transmission.ior;
+          sub.linkRefractionWithTransparency=false;sub.useGltfStyleTextures=true;
+          sub.thicknessTexture=texture(id,'thickness',d,d.thicknessTextureId);sub.minimumThickness=sub.thicknessTexture?0:a.transmission.thickness;sub.maximumThickness=a.transmission.thickness;
+          sub.refractionIntensityTexture=texture(id,'transmission',d,d.transmissionTextureId);sub.tintColor=B.Color3.FromHexString(a.transmission.tintColor);sub.tintColorAtDistance=a.transmission.tintDistance;
+          const detail=mat.detailMap;detail.isEnabled=a.detail.enabled;detail.diffuseBlendLevel=a.detail.diffuse;detail.bumpLevel=a.detail.normal;detail.roughnessBlendLevel=a.detail.roughness;
+          detail.texture=texture(id,'detail',d,d.detailTextureId);
+          if(detail.texture){detail.texture.uScale=d.uvScale.u*a.detail.scale;detail.texture.vScale=d.uvScale.v*a.detail.scale;}
+        }
       }
       return Promise.all([...slots.values()].map((s) => s.promise));
     }

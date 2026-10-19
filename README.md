@@ -4,6 +4,8 @@
 
 软阴影、HDR 环境光照、烘焙光照、AO、局部反射探针、自发光/Bloom、调色、画质档位与 WASM 多视图预算见 [画面与光照](docs/rendering.md)。导入 `examples/rendering-lab.arkglide` 可查看组合示例。
 
+雾、程序天空、景深、GPU 粒子、SSR/平面反射、清漆/织物/各向异性和透射见 [高级画面功能](docs/advanced-rendering.md)，组合示例为 `examples/advanced-rendering-lab.arkglide`。
+
 ```sh
 npm ci
 npm run dev

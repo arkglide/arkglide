@@ -606,7 +606,9 @@
           if (!scene.activeCamera || scene.activeCamera.isDisposed())
             scene.activeCamera = camera;
           var renderStart = performance.now();
-          visualsRuntime?.setScale(running ? time.timeScale : 0);
+          // Scene animation ratio already includes scaled delta time. Override only
+          // zero/pause, which Babylon's particle animation otherwise treats as 1.
+          visualsRuntime?.setScale(running && time.timeScale > 0 ? 1 : 0);
           try { portalRuntime?.updateVisuals(); renderCompute?.beginFrame(); portalRuntime?.render(); } catch (error) { reportScriptError({hook:"portals.render",error}); }
           scene.render();
           renderMs = performance.now() - renderStart;

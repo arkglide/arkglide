@@ -315,6 +315,7 @@ function validateContent(
       )
     )
       throw new Error("无效材质参数");
+    (globalThis as any).ArkGlideRenderingConfig.material(m);
     for (const ref of [
       m.albedoTextureId,
       m.normalTextureId,
@@ -322,6 +323,13 @@ function validateContent(
       m.aoTextureId,
       m.lightmapTextureId,
       m.emissiveTextureId,
+      m.clearCoatTextureId,
+      m.clearCoatNormalTextureId,
+      m.sheenTextureId,
+      m.anisotropyTextureId,
+      m.thicknessTextureId,
+      m.transmissionTextureId,
+      m.detailTextureId,
     ])
       if (ref !== undefined && !textureIds.has(ref))
         throw new Error("材质引用的贴图不存在");

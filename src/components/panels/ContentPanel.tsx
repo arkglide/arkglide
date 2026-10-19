@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import { useEditorStore, type SceneNode } from "../../store/useEditorStore";
 import type { MaterialAsset, TextureAsset } from "../../types/content";
+import { AdvancedMaterialEditor } from './AdvancedMaterialEditor';
 import { instanceOverrides } from "../../engine/prefabs";
 import { importTextureFile } from "../../utils/textureImport";
 import { PanelHeading } from "./PanelHeading";
@@ -141,6 +142,7 @@ export function MaterialEditor({ id }: { id: string }) {
         <MenuItem value={0}>UV1（通道 0）</MenuItem><MenuItem value={1}>UV2（通道 1）</MenuItem>
       </TextField>
       <TextField label="自发光强度" type="number" size="small" value={m.emissiveIntensity ?? 1} inputProps={{ min: 0, max: 100, step: 0.1 }} onChange={e => void update({ emissiveIntensity: Number(e.target.value) })} />
+      <AdvancedMaterialEditor material={m} textures={content.textures} onChange={update} />
       <PanelHeading
         title="贴图通道"
         help="金属粗糙度贴图的 G 通道存储粗糙度，B 通道存储金属度。"

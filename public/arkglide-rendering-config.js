@@ -107,6 +107,29 @@
       number(p.offset??0,-100000,100000,"mirror offset");number(p.blur??0,0,64,"mirror blur");number(p.intensity??1,0,20,"mirror intensity");
     }
   }
+  const materialDefaults = {
+    normalScale: 1, alphaMode: "auto", alphaCutoff: 0.5, uvOffset: {u:0,v:0}, uvRotation: 0,
+    clearCoat: {enabled:false,intensity:1,roughness:0.1,normalScale:1},
+    sheen: {enabled:false,color:"#FFFFFF",intensity:1,roughness:0.5},
+    anisotropy: {enabled:false,intensity:0.5,rotation:0},
+    transmission: {enabled:false,intensity:1,ior:1.5,thickness:0.1,tintColor:"#FFFFFF",tintDistance:1},
+    detail: {enabled:false,scale:8,diffuse:1,normal:1,roughness:1},
+  };
+  function material(input={}) {
+    if(!object(input))throw Error("无效扩展材质");
+    const c=merge(materialDefaults,Object.fromEntries(Object.keys(materialDefaults).filter(k=>input[k]!==undefined).map(k=>[k,input[k]])),"material");
+    if(!["auto","opaque","mask","blend"].includes(c.alphaMode))throw Error("无效材质透明模式");
+    number(c.normalScale,0,10,"normal scale");number(c.alphaCutoff,0,1,"alpha cutoff");number(c.uvRotation,-Math.PI*2,Math.PI*2,"UV rotation");
+    for(const axis of ['u','v'])number(c.uvOffset[axis],-10000,10000,"UV offset");
+    for(const key of ['clearCoat','sheen','anisotropy','transmission','detail'])if(typeof c[key].enabled!=="boolean")throw Error("无效扩展材质开关");
+    for(const key of ['clearCoat','sheen','anisotropy','transmission'])number(c[key].intensity,0,1,key+" intensity");
+    for(const key of ['clearCoat','sheen'])number(c[key].roughness,0,1,key+" roughness");
+    number(c.clearCoat.normalScale,0,10,"coat normal scale");number(c.anisotropy.rotation,-Math.PI*2,Math.PI*2,"anisotropy rotation");
+    if(!/^#[\da-f]{6}$/i.test(c.sheen.color)||!/^#[\da-f]{6}$/i.test(c.transmission.tintColor))throw Error("无效扩展材质颜色");
+    number(c.transmission.ior,1,3,"IOR");number(c.transmission.thickness,0,1000,"material thickness");number(c.transmission.tintDistance,.001,100000,"absorption distance");
+    number(c.detail.scale,.01,1000,"detail scale");for(const key of ['diffuse','normal','roughness'])number(c.detail[key],0,5,"detail "+key);
+    return c;
+  }
   function selectProbe(point, probes) {
     let selected = -1, priority = -Infinity, volume = Infinity;
     for (let i = 0; i < probes.length; i++) {
@@ -134,6 +157,6 @@
     Object.assign(c.views, { depth: low ? 1 : 2, scale: low ? 0.5 : high ? 1 : 0.75, samples: high ? 4 : 1, maxViews: low ? 4 : high ? 16 : 8, maxPixels: low ? 1048576 : high ? 8388608 : 3145728, particles: high });
     return c;
   }
-  const materialTextureFields = ["albedoTextureId", "normalTextureId", "metallicRoughnessTextureId", "aoTextureId", "lightmapTextureId", "emissiveTextureId"];
-  root.ArkGlideRenderingConfig = { settings, preset, validateResources, validateNode, selectProbe, materialTextureFields, environmentMimes, imageMimes };
+  const materialTextureFields = ["albedoTextureId", "normalTextureId", "metallicRoughnessTextureId", "aoTextureId", "lightmapTextureId", "emissiveTextureId", "clearCoatTextureId", "clearCoatNormalTextureId", "sheenTextureId", "anisotropyTextureId", "thicknessTextureId", "transmissionTextureId", "detailTextureId"];
+  root.ArkGlideRenderingConfig = { settings, preset, validateResources, validateNode, selectProbe, material, materialTextureFields, environmentMimes, imageMimes };
 })(globalThis);

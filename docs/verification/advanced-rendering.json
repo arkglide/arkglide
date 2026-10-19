@@ -1,0 +1,181 @@
+{
+  "date": "2026-10-19T16:00:05.310Z",
+  "node": "v24.19.0",
+  "platform": "linux x64",
+  "scope": "Atmosphere and layered PBR pixel correctness, SSR hit/miss behavior, planar budgets, real GPU particles and lifecycle integration. Chromium ANGLE SwiftShader; no target-device GPU/FPS performance claim.",
+  "artifacts": {
+    "src/engine/atmosphere-runtime.js": {
+      "sha256": "b8e8a286afaee306947afb179ab35311c4de4bc6ba4964446e1b35e3549e95cc"
+    },
+    "src/engine/reflection-runtime.js": {
+      "sha256": "d8ed00fe37186d893972e7b5b17cba0e0f98cc5effda6cccaefd6ae52eab8aa7"
+    },
+    "src/engine/rendering-runtime.js": {
+      "sha256": "26146fa3eced9f29089b1671a3eea7fa3cdb5a3c1b547478874bdb41b34abbf3"
+    },
+    "src/engine/scene-runtime.js": {
+      "sha256": "454f1418157ca267dbbdaf4e775cc242f5df4ae87b45577e65d1c6d03a11764d"
+    },
+    "src/engine/visual-runtime.js": {
+      "sha256": "e1c57f382974d17ea852a2e6aff8077b4297b5e5b23a6d7903ebfa4cda8e619d"
+    },
+    "src/wasm/arkglide_math.js": {
+      "sha256": "41efdee4b8b8d4c0f0df571183c9728be811970ae5f2dcd1c7f50f3a4991a4b4"
+    },
+    "examples/advanced-rendering-lab.arkglide": {
+      "sha256": "0c0da12304d8b85af04a9de3d7198cfef72fe438a9e471e67639512b4b974088"
+    }
+  },
+  "verification": {
+    "unit": {
+      "command": "node --test --test-concurrency=1 tests/*.test.mjs",
+      "passed": 580
+    },
+    "editorBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:browser -- --reporter=list",
+      "passed": 44
+    },
+    "advancedControlsRerun": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npx playwright test --project=advanced-rendering --reporter=list",
+      "passed": 5
+    },
+    "standaloneBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium node --test --test-concurrency=1 tests/composition/browser.mjs tests/foundations/browser.mjs tests/package/browser.mjs tests/portal/browser.mjs tests/rendering/browser.mjs tests/rendering/advanced-browser.mjs",
+      "passed": 12
+    },
+    "staticPlayerBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:static -- --reporter=list",
+      "passed": 7
+    },
+    "productionBuild": {
+      "command": "NODE_OPTIONS=--max-old-space-size=4096 npm run build",
+      "passed": true,
+      "includes": "TypeScript and production editor/runtime assets. Build heap limit only; runtime memory configuration unchanged."
+    }
+  },
+  "coverage": [
+    "Actual fog/sky/day-night/DOF pixel differences",
+    "Native GPU particle emission, pause and owner cleanup; unsupported-engine CPU fallback",
+    "SSR geometry, preserving original material color on misses, and shared AO geometry buffers",
+    "Transformed planar reflections, one capture per main frame, pixel limits and native WASM scheduling",
+    "External depth/geometry buffers preserved when effects stop",
+    "Clearcoat, sheen, anisotropy, environment transmission, packed detail maps and alpha-mask pixels",
+    "Editor controls, typed JS/TS/module APIs, archive/clipboard/resource dependencies",
+    "Independent opaque-origin export, live medium/high preset switches and complete stop cleanup",
+    "Existing 3,000-deep scene tree and 20-session regression suite"
+  ],
+  "compute": {
+    "gpu": "Scattering sky, DOF, SSR and supported particle simulation execute on the GPU.",
+    "cpu": "Planar view projection, clipping and pixel allocation reuse the existing render-compute JS/WASM batch with its configured threshold.",
+    "wasmRebuilt": false,
+    "note": "No C++ changes or new WASM binary were needed. The existing module and JS/native parity tests were reused.",
+    "budgetBenchmark": "rendering-performance.json"
+  },
+  "standaloneDiagnostics": {
+    "initial": {
+      "atmosphereSky": true,
+      "fogMode": 2,
+      "planarReflections": 1,
+      "planarRenderedViews": 1,
+      "planarRenderedPixels": 110592,
+      "ssrEnabled": false,
+      "ssrSupported": true,
+      "dofEnabled": true,
+      "shadowLights": 1,
+      "environmentTextures": 1,
+      "shadowFilters": [
+        "pcf"
+      ],
+      "reflectionProbes": 0,
+      "probeMaterialVariants": 1,
+      "aoEnabled": true,
+      "aoSupported": true,
+      "bloomEnabled": true,
+      "picturePipelines": 1,
+      "hdrOutput": true,
+      "renderQuality": "medium",
+      "renderResolutionScale": 1,
+      "renderDrawCalls": 92,
+      "renderMainTriangles": 56076,
+      "renderSubmitMs": 4708.199999999255,
+      "gpuTimerSupported": true,
+      "gpuTimeMs": null,
+      "visualResources": 1,
+      "gpuParticleSystems": 1,
+      "cpuParticleSystems": 0,
+      "errors": 0,
+      "coat": true,
+      "sheen": true,
+      "anisotropy": true,
+      "transmission": true
+    },
+    "high": {
+      "atmosphereSky": true,
+      "fogMode": 2,
+      "planarReflections": 1,
+      "planarRenderedViews": 1,
+      "planarRenderedPixels": 196608,
+      "ssrEnabled": true,
+      "ssrSupported": true,
+      "dofEnabled": true,
+      "shadowLights": 1,
+      "environmentTextures": 1,
+      "shadowFilters": [
+        "pcss"
+      ],
+      "reflectionProbes": 0,
+      "probeMaterialVariants": 1,
+      "aoEnabled": true,
+      "aoSupported": true,
+      "bloomEnabled": true,
+      "picturePipelines": 1,
+      "hdrOutput": true,
+      "renderQuality": "high",
+      "renderResolutionScale": 1,
+      "renderDrawCalls": 106,
+      "renderMainTriangles": 56204,
+      "renderSubmitMs": 1346.3999999985099,
+      "gpuTimerSupported": true,
+      "gpuTimeMs": null,
+      "portals": 2,
+      "portalSurfaces": 0,
+      "portalTravelers": 0,
+      "portalClones": 0,
+      "portalViews": 1,
+      "portalRenderedViews": 1,
+      "portalRenderedPixels": 196608,
+      "portalPixelBudget": 8388608,
+      "portalTraversals": 0
+    },
+    "stopped": {
+      "atmosphereSky": false,
+      "fogMode": 0,
+      "planarReflections": 0,
+      "planarRenderedViews": 0,
+      "planarRenderedPixels": 0,
+      "ssrEnabled": false,
+      "ssrSupported": true,
+      "dofEnabled": false,
+      "shadowLights": 0,
+      "environmentTextures": 0,
+      "shadowFilters": [],
+      "reflectionProbes": 0,
+      "probeMaterialVariants": 0,
+      "aoEnabled": false,
+      "aoSupported": true,
+      "bloomEnabled": false,
+      "picturePipelines": 0,
+      "hdrOutput": false,
+      "renderQuality": "high",
+      "renderResolutionScale": 1,
+      "renderDrawCalls": 0,
+      "renderMainTriangles": 0,
+      "renderSubmitMs": 0,
+      "gpuTimerSupported": true,
+      "gpuTimeMs": null,
+      "particles": 0,
+      "depthTargets": 0
+    }
+  },
+  "execution": "Source was fixed during each browser suite; CLI exports and editor browser tests ran serially to avoid hot reload interference. The full 44-test editor suite passed before the final signed numeric-input adjustment; the five advanced-rendering browser tests then passed again with actual negative typing and stricter reflected-red-geometry checks. There are 63 unique browser cases, plus that five-case rerun."
+}

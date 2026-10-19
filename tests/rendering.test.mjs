@@ -230,3 +230,34 @@ test("baked texture dependencies participate in validation, clipboard restoratio
     assert.equal(result.textureData.emissive.byteLength, 3);
   } finally { client.dispose(); }
 });
+test("advanced PBR plugins share textures through reflection variants and keep every resource dependency", async () => {
+ const s=()=>store.getState();s().newProject();
+ const fields=['clearCoatTextureId','clearCoatNormalTextureId','sheenTextureId','anisotropyTextureId','thicknessTextureId','transmissionTextureId','detailTextureId'];
+ for(const id of fields)s().importTexture({id,name:id+'.png',mime:'image/png',byteLength:1},new Uint8Array([255]).buffer);
+ const id=s().createMaterial('Advanced');s().updateMaterial(id,{
+  ...Object.fromEntries(fields.map(field=>[field,field])),normalScale:2,alphaMode:'mask',alphaCutoff:.4,uvOffset:{u:.2,v:.3},uvRotation:.5,
+  clearCoat:{enabled:true,intensity:.9,roughness:.1},sheen:{enabled:true,color:'#55AA88'},anisotropy:{enabled:true,intensity:.8,rotation:.6},
+  transmission:{enabled:true,ior:1.6,thickness:.4,tintColor:'#88FFAA'},detail:{enabled:true,scale:12},
+ });s().setNodeMaterial('cube',id);s().updateTransform('cube',{planarReflection:{enabled:true,axis:'y',offset:.5}});
+ const before=s().content.materials[id];assert.throws(()=>s().updateMaterial(id,{transmission:{ior:0}}));assert.equal(s().content.materials[id],before);
+ for(const field of fields)assert.throws(()=>s().deleteTexture(field),/引用/);
+ const engine=new B.NullEngine({renderWidth:160,renderHeight:128}),scene=new B.Scene(engine),camera=new B.FreeCamera('camera',new B.Vector3(0,4,-6),scene);camera.setTarget(B.Vector3.Zero());
+ const created=[],disposed=new Set();class Texture extends B.RawTexture {constructor(_url,scene,_a,_b,_c,load){super(new Uint8Array([255,128,255,128]),1,1,B.Constants.TEXTUREFORMAT_RGBA,scene,false,false);created.push(this);queueMicrotask(load);}dispose(){disposed.add(this);super.dispose();}}
+ class Mirror extends B.MirrorTexture {render(){}}
+ const adapter=globalThis.ArkGlideScene.createSceneAdapter({...B,Texture,MirrorTexture:Mirror},scene);
+ try{
+  adapter.rendering.configure({reflections:{planar:{enabled:true,maxMirrors:1}}});await adapter.sync(s().nodes,new Map(),s().content,s().textureBuffers);scene.render();
+  const base=adapter.materials.get(id),variant=adapter.nodes.get('cube').material;
+  assert.equal(base.clearCoat.isEnabled,true);assert.equal(base.subSurface.indexOfRefraction,1.6);assert.equal(base.sheen.texture.gammaSpace,true);assert.equal(base.clearCoat.texture.gammaSpace,false);assert.equal(base.detailMap.texture.gammaSpace,false);
+  assert.equal(base.clearCoat.texture.uOffset,.2);assert.equal(base.detailMap.texture.uScale,12);assert.equal(base.transparencyMode,B.PBRMaterial.PBRMATERIAL_ALPHATEST);
+  assert.notEqual(base,variant);assert.equal(variant.clearCoat.isEnabled,true);assert.equal(variant.sheen.isEnabled,true);assert.equal(variant.anisotropy.intensity,.8);assert.equal(variant.clearCoat.texture,base.clearCoat.texture);assert.equal(variant.subSurface.thicknessTexture,base.subSurface.thicknessTexture);assert.equal(created.length,fields.length);
+  adapter.clear();assert.equal(disposed.size,fields.length);
+ }finally{adapter.dispose();scene.dispose();engine.dispose();}
+ s().selectNode('cube');s().copyToClipboard();s().removeNode('cube');s().deleteMaterial(id);for(const field of fields)s().deleteTexture(field);s().pasteFromClipboard();
+ for(const field of fields)assert.equal(s().textureBuffers.get(field).byteLength,1);
+ const files=unzipSync(archive.createProjectArchive());for(const field of fields)assert.equal(files['textures/'+field+'.bin'].length,1);
+ const runtime=Object.fromEntries(await Promise.all(RUNTIME_FILES.map(async p=>[p,new Uint8Array(await readFile(new URL('../public/'+p,import.meta.url)))])));
+ const game=createStaticGame({...s(),scene:{nodes:s().nodes}},{models:s().modelBuffers,textures:s().textureBuffers,audio:s().audioBuffers},runtime);
+ const client=globalThis.ArkGlidePackage.create({read:async d=>game.files[d.path].slice(),importModule:async()=>({default(){}})});
+ try{const result=await client.initialize(game.manifest.boot);for(const field of fields)assert.equal(result.textureData[field].byteLength,1);}finally{client.dispose();}
+});

@@ -4,6 +4,7 @@ import { useEditorStore } from "../../store/useEditorStore";
 import { importTextureFile } from "../../utils/textureImport";
 import type { RenderingSettings, ReflectionProbeSettings } from "../../types/rendering";
 import "../../engine/rendering-config.js";
+import {ScalarField} from '../ScalarField';
 
 export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingSettings; onChange: (value: RenderingSettings) => void }) {
   const textures = useEditorStore(s => s.content.textures);
@@ -35,7 +36,7 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     }
   };
   const number = (section: keyof typeof c, field: string, label: string, min: number, max: number, step = 0.1) => (
-    <TextField key={section + field} label={label} size="small" type="number" value={c[section][field]} inputProps={{ min, max, step }} onChange={e => change(section, { [field]: e.target.value.trim() ? Number(e.target.value) : NaN })} />
+    <ScalarField key={section + field} label={label} size="small" value={c[section][field]} inputProps={{ min, max, step }} onValueChange={value => change(section, { [field]: value })} />
   );
   return <Stack spacing={1.5} sx={{ mt: 3 }} data-testid="rendering-settings">
     <Typography variant="subtitle2">画面与光照</Typography>

@@ -48,7 +48,8 @@
           }
         ` }, { attributes: ["position"], uniforms: ["worldViewProjection", "sunDirection", "scattering", "luminance", "linearOutput"] });
         material.backFaceCulling = false; material.disableDepthWrite = true; material.fogEnabled = false;
-        sky = B.MeshBuilder.CreateBox("arkglide:atmosphere", { size: 2 }, scene);
+        // Also encloses reflected cameras; the vertex shader pins depth to far.
+        sky = B.MeshBuilder.CreateBox("arkglide:atmosphere", { size: 10000 }, scene);
         sky.infiniteDistance = true; sky.isPickable = false; sky.alwaysSelectAsActiveMesh = true;
         sky.metadata = { arkglideRenderInternal: true }; sky.material = material;
         sky.renderingGroupId = 0;

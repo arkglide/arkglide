@@ -132,6 +132,8 @@
       } else {
         // Instanciate shares source textures instead of allocating copies per probe.
         material = B.SerializationHelper.Instanciate(() => new base.constructor(base.name + ":probe:" + probeId, scene), base);
+        // Babylon's plugin copyTo clones textures; instantiation shares them.
+        for(const key of ['clearCoat','sheen','anisotropy','subSurface','detailMap','iridescence'])if(base[key]&&material[key])B.SerializationHelper.Instanciate(()=>material[key],base[key]);
         material.reflectionTexture = texture;
       }
       material.metadata = { ...base.metadata, arkglideProbeVariant: true };
@@ -183,7 +185,9 @@
         ssr.maxSteps=r.maxSteps;ssr.step=r.step;ssr.maxDistance=r.maxDistance;ssr.thickness=r.thickness;ssr.strength=r.strength;
         ssr.roughnessFactor=r.roughnessFactor;ssr.blurDispersionStrength=r.blur;ssr.ssrDownsample=r.downsample;ssr.blurDownsample=r.downsample;
         ssr.inputTextureColorIsInGammaSpace=false;ssr.generateOutputInGammaSpace=false;
-        ssr.environmentTexture=scene.environmentTexture;
+        // Preserve the surface's existing local probe / planar / IBL result on
+        // misses. A global cube fallback would replace each material's probe.
+        ssr.environmentTexture=null;ssr.useFresnel=true;
       }
       if(!previousGeometry && scene.geometryBufferRenderer)ownedGeometry=scene.geometryBufferRenderer;
       if (needsPost && camera) {
@@ -276,7 +280,6 @@
       }
       if (dirty) updateShadows();
       updatePost(); atmosphere?.configure(config, !!pipeline);
-      if(ssr && ssr.environmentTexture!==scene.environmentTexture)ssr.environmentTexture=scene.environmentTexture;
       const beforeDraws=engine._drawCalls?.current||0;
       mirrors?.prepare(config,probeMeshes,frameNumber);
       offscreenDraws+=Math.max(0,(engine._drawCalls?.current||0)-beforeDraws);
