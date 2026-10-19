@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ArkGlide 场景性能基准</title>
+<style>body{margin:24px;background:#15181e;color:#e4e8ed;font:15px/1.6 system-ui,sans-serif}main{max-width:1100px;margin:auto}h1{font-size:24px}button,select{padding:8px 14px;margin:4px;background:#283344;color:inherit;border:1px solid #526581;border-radius:6px}button:disabled{opacity:.5}canvas{display:block;width:100%;aspect-ratio:16/9;background:#10151c;margin-top:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}#status{min-height:2em}small{color:#b6becb}</style></head><body><main>
+<h1>场景性能基准</h1><p>在相同场景和相机轨迹中对照原始几何与静态 LOD。先预热，再记录帧耗时、CPU/GPU、绘制调用和三角形。采样时保持此页面在前台。</p>
+<label>分辨率 <select id="resolution"><option value="1920,1080">1920 × 1080</option><option value="1280,720">1280 × 720</option><option value="960,540">960 × 540</option></select></label>
+<button id="start">开始对照测试</button><button id="cancel" disabled>停止</button><button id="download" disabled>下载 JSON</button><p id="status" role="status">尚未开始。</p>
+<small>软件渲染结果只用于验证流程。此基准覆盖静态几何与基础 PBR 光照；完整游戏的阴影、特效、物理与脚本需要另行测量。</small>
+<canvas id="canvas"></canvas><pre id="result"></pre>
+<script src="./lib/babylon.js"></script><script src="./lib/arkglide_math.js"></script>
+<script src="./arkglide-rendering-config.js"></script><script src="./arkglide-rendering.js"></script><script src="./arkglide-geometry-cluster.js"></script><script src="./arkglide-scene-optimization.js"></script><script src="./arkglide-scene.js"></script><script src="./arkglide-scene-benchmark-metrics.js"></script>
+<script type="module" src="./scene-benchmark.js"></script></main></body></html>

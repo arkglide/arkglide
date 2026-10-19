@@ -15,7 +15,7 @@ export default function LightingBakeDialog({open,onClose}:{open:boolean;onClose:
  const close=()=>{job.current?.cancel();onClose();};
  const bake=async()=>{
   setError('');setMessage('');setProgress(0);
-  try{job.current=startLightingBake({resolution,aoSamples,aoDistance,bias},setProgress);const result=await job.current.promise;setMessage(`已生成 ${result.maps} 张光照图，完成 ${result.rays.toLocaleString()} 条 WASM/BVH 射线。可以撤销恢复。`);}
+  try{job.current=startLightingBake({resolution,aoSamples,aoDistance,bias},setProgress);const result=await job.current.promise;setMessage(`已生成 ${result.maps} 张光照图，完成 ${result.rays.toLocaleString()} 条光照射线。可以撤销恢复。`);}
   catch(e){setError(String(e));}finally{job.current=null;setProgress(null);}
  };
  return <Dialog open={open} onClose={close} fullWidth maxWidth="sm">

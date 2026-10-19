@@ -626,7 +626,7 @@
           engine.resize();
         });
         sceneAdapter = ArkGlideScene.createSceneAdapter(BABYLON, scene, {
-          loadModule:()=>Promise.resolve(coreModule),
+          loadModule:()=>mathReady.then(()=>coreModule),
           renderCompute,
           onCreate: function (object, node) {
             entityAPI.register(object, node.id, node.name);

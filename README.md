@@ -6,6 +6,8 @@
 
 雾、程序天空、景深、GPU 粒子、SSR/平面反射、清漆/织物/各向异性和透射见 [高级画面功能](docs/advanced-rendering.md)，组合示例为 `examples/advanced-rendering-lab.arkglide`。
 
+[静态光照烘焙与级联阴影](docs/lighting-workflow.md)、[几何共享/LOD 与资源预算](docs/scene-scale.md)、[场景性能基准](docs/scene-performance.md) 已接入菜单与属性面板。组合示例为 `examples/lighting-scale-lab.arkglide`；真实显卡预算通过基准入口在目标设备采集。
+
 ```sh
 npm ci
 npm run dev

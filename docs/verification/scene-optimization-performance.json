@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-19T16:46:16.490Z",
+  "node": "v24.19.0",
+  "samples": 15,
+  "scope": "Static LOD CPU clustering kernels, including input/output bridge copies. Excludes model decoding, Babylon object creation, GPU uploads and game FPS.",
+  "cases": [
+    {
+      "vertices": 703,
+      "sourceTriangles": 1296,
+      "lodTriangles": 565,
+      "maxDifference": 0,
+      "javascriptMs": {
+        "samples": 15,
+        "median": 1.1851729999998497,
+        "p95": 1.9260799999999563,
+        "min": 1.0891579999999976,
+        "max": 1.9260799999999563
+      },
+      "wasmWithCopiesMs": {
+        "samples": 15,
+        "median": 0.19575800000006893,
+        "p95": 0.32468999999991865,
+        "min": 0.12396399999988716,
+        "max": 0.32468999999991865
+      }
+    },
+    {
+      "vertices": 2415,
+      "sourceTriangles": 4624,
+      "lodTriangles": 753,
+      "maxDifference": 0,
+      "javascriptMs": {
+        "samples": 15,
+        "median": 3.0582019999999375,
+        "p95": 4.800574999999981,
+        "min": 1.677731999999878,
+        "max": 4.800574999999981
+      },
+      "wasmWithCopiesMs": {
+        "samples": 15,
+        "median": 0.2500809999999092,
+        "p95": 0.3729329999998754,
+        "min": 0.23089900000013586,
+        "max": 0.3729329999998754
+      }
+    },
+    {
+      "vertices": 8911,
+      "sourceTriangles": 17424,
+      "lodTriangles": 797,
+      "maxDifference": 0,
+      "javascriptMs": {
+        "samples": 15,
+        "median": 5.744918000000098,
+        "p95": 11.350668999999925,
+        "min": 5.270256999999901,
+        "max": 11.350668999999925
+      },
+      "wasmWithCopiesMs": {
+        "samples": 15,
+        "median": 0.6727479999999559,
+        "p95": 1.0398979999999938,
+        "min": 0.6374450000000706,
+        "max": 1.0398979999999938
+      }
+    }
+  ]
+}

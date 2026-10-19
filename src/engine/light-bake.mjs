@@ -62,6 +62,7 @@ export function sceneLightingSignature(state){
   // Include parent transforms, occluders, lights, material bindings and source
   // revisions; omit bake metadata itself so adding a result does not stale it.
   const nodes=state.nodes.map(({bakedLighting,...n})=>n);
-  let hash=2166136261;const text=JSON.stringify([nodes,state.settings.ambientColor,state.settings.ambientIntensity]);
+  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(k=>value[k]!==undefined).map(k=>[k,canonical(value[k])])):value;
+  let hash=2166136261;const text=JSON.stringify(canonical([nodes,state.settings.ambientColor,state.settings.ambientIntensity]));
   for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');
 }

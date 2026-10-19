@@ -31,11 +31,12 @@ test('cascaded directional shadows render pixels, follow the main camera and rel
    manager.configure({});await manager.sync();const plain=await draw();
    manager.configure({shadows:{enabled:true,maxDistance:50,cascades:{enabled:true,count:3}}});const shadowed=await draw();
    const generator=light.getShadowGenerator(camera),native=generator instanceof B.CascadedShadowGenerator,count=generator.numCascades;
+   const beforeBreak=generator._cascades[0].breakDistance;camera.minZ=2;camera.maxZ=60;await draw();const lensRefreshed=Math.abs(generator._cascades[0].breakDistance-beforeBreak)>.001;
    const second=new B.FreeCamera('second',new B.Vector3(5,3,-7),scene);second.setTarget(B.Vector3.Zero());scene.activeCamera=second;await draw();const switched=light.getShadowGenerator(second)!==generator;
-   manager.clear();return {native,count,switched,diff:plain.reduce((sum,v,i)=>sum+(i%4===3?0:Math.abs(v-shadowed[i])),0),remaining:scene.textures.filter((t:any)=>t.name.includes('shadowMap')).length};
+   manager.clear();return {native,count,switched,lensRefreshed,diff:plain.reduce((sum,v,i)=>sum+(i%4===3?0:Math.abs(v-shadowed[i])),0),remaining:scene.textures.filter((t:any)=>t.name.includes('shadowMap')).length};
   }finally{manager.dispose();scene.dispose();engine.dispose();canvas.remove();}
  });
- expect(r.native).toBe(true);expect(r.count).toBe(3);expect(r.switched).toBe(true);expect(r.diff).toBeGreaterThan(1000);expect(r.remaining).toBe(0);
+ expect(r.native).toBe(true);expect(r.count).toBe(3);expect(r.switched).toBe(true);expect(r.lensRefreshed).toBe(true);expect(r.diff).toBeGreaterThan(1000);expect(r.remaining).toBe(0);
 });
 
 test('baked irradiance renders textured PBR albedo instead of adding white light',async({page})=>{
@@ -45,14 +46,15 @@ test('baked irradiance renders textured PBR albedo instead of adding white light
   const w=window as any,B=w.BABYLON,canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;document.body.append(canvas);
   const engine=new B.Engine(canvas,false,{preserveDrawingBuffer:true}),scene=new B.Scene(engine),camera=new B.FreeCamera('camera',new B.Vector3(0,3,-.01),scene);camera.setTarget(B.Vector3.Zero());scene.clearColor.set(0,0,0,1);
   const rgb=new Float32Array(32*32*3).fill(1),png=encodeLightmap(rgb,32).png,content={materials:{baked:{id:'baked',name:'baked',baseColor:'#20C040',emissiveColor:'#000000',metallic:0,roughness:1,alpha:1,doubleSided:false,uvScale:{u:1,v:1},lightmapTextureId:'lm',lightmapUV:1,bakedDirectLighting:true}},textures:[{id:'lm',name:'light.png',mime:'image/png',byteLength:png.byteLength}]};
-  const adapter=w.ArkGlideScene.createSceneAdapter(B,scene),nodes=[{id:'floor',name:'floor',type:'mesh',primitive:'plane',materialId:'baked',bakedLighting:{autoUV2:true,signature:'00000000'},transform:{x:0,y:0,z:0},scale:{x:4,y:1,z:4}}];
+  const adapter=w.ArkGlideScene.createSceneAdapter(B,scene),nodes=[{id:'floor',name:'floor',type:'mesh',primitive:'plane',materialId:'baked',planarReflection:{enabled:true,axis:'y'},bakedLighting:{autoUV2:true,signature:'00000000'},transform:{x:0,y:0,z:0},scale:{x:4,y:1,z:4}}];
   try{
    await adapter.sync(nodes,{},content,{lm:png.buffer});await scene.whenReadyAsync();for(let i=0;i<5;i++){scene.render();await new Promise(r=>setTimeout(r,15));}
    const image=await engine.readPixels(0,0,96,96),at=(48*96+48)*4,green=Array.from(image.slice(at,at+3));
-   const material=adapter.nodes.get('floor').material;adapter.clear();return {green,direct:material.directIntensity,textures:scene.textures.filter((t:any)=>t.name.startsWith('arkglide:texture:')).length};
+   const base=adapter.nodes.get('floor').material;adapter.rendering.configure({reflections:{planar:{enabled:true,maxMirrors:1,maxPixels:4096}}});for(let i=0;i<5;i++){scene.render();await new Promise(r=>setTimeout(r,15));}const reflected=await engine.readPixels(0,0,96,96),variantGreen=Array.from(reflected.slice(at,at+3)),material=adapter.nodes.get('floor').material,variant=material!==base;
+   adapter.clear();return {green,variantGreen,variant,direct:material.directIntensity,textures:scene.textures.filter((t:any)=>t.name.startsWith('arkglide:texture:')).length};
   }finally{adapter.dispose();scene.dispose();engine.dispose();canvas.remove();}
  });
- expect(r.green[1]).toBeGreaterThan(r.green[0]*1.5);expect(r.green[1]).toBeGreaterThan(r.green[2]*1.3);expect(r.green[1]).toBeGreaterThan(100);expect(r.direct).toBe(0);expect(r.textures).toBe(0);
+ expect(r.green[1]).toBeGreaterThan(r.green[0]*1.5);expect(r.green[1]).toBeGreaterThan(r.green[2]*1.3);expect(r.green[1]).toBeGreaterThan(100);expect(r.variant).toBe(true);expect(r.variantGreen[1]).toBeGreaterThan(r.variantGreen[0]*1.5);expect(r.variantGreen[1]).toBeGreaterThan(100);expect(r.direct).toBe(0);expect(r.textures).toBe(0);
 });
 
 test('cancel terminates the actual bake worker without writing partial assets',async({page})=>{
@@ -77,10 +79,11 @@ test('static LOD renders fewer triangles per camera and keeps source geometry fo
    await adapter.sync(nodes);const high=await draw(),source=adapter.nodes.get('sphere'),sourceTriangles=source.getTotalIndices()/3;
    camera.position.set(0,1,-40);camera.setTarget(B.Vector3.Zero());const low=await draw(),far=source.getLOD(camera),stats=adapter.optimization.stats(),indices=far.getTotalIndices()/3;
    const sourceStillPickable=source.isPickable&&source.getTotalIndices()/3===sourceTriangles;
-   adapter.clear();return {high,low,indices,sourceTriangles,sourceStillPickable,stats,remaining:scene.meshes.length,geometries:scene.geometries.length};
+   source.dispose(false,false);scene.render();const removedLOD=adapter.optimization.stats().lodMeshes;
+   adapter.clear();return {high,low,indices,sourceTriangles,sourceStillPickable,stats,removedLOD,remaining:scene.meshes.length,geometries:scene.geometries.length};
   }finally{adapter.dispose();scene.dispose();engine.dispose();canvas.remove();}
  });
- expect(r.low).toBeLessThan(r.high/2);expect(r.indices).toBeLessThan(r.sourceTriangles/2);expect(r.sourceStillPickable).toBe(true);expect(r.stats.lodNativeBuilds).toBe(2);expect(r.remaining).toBe(0);expect(r.geometries).toBe(0);
+ expect(r.low).toBeLessThan(r.high/2);expect(r.indices).toBeLessThan(r.sourceTriangles/2);expect(r.sourceStillPickable).toBe(true);expect(r.stats.lodNativeBuilds).toBe(2);expect(r.removedLOD).toBe(0);expect(r.remaining).toBe(0);expect(r.geometries).toBe(0);
 });
 
 test('resource budget scans real texture dimensions, sharing and duplicate bytes and downloads JSON',async({page})=>{
@@ -93,4 +96,12 @@ test('resource budget scans real texture dimensions, sharing and duplicate bytes
  await page.getByRole('button',{name:'菜单',exact:true}).click();await page.getByRole('menuitem',{name:'资源预算检查…',exact:true}).click();const dialog=page.getByRole('dialog',{name:'资源预算检查',exact:true});await dialog.getByRole('button',{name:'扫描资源',exact:true}).click();await expect(dialog.getByText(/源网格/)).toBeVisible();
  const download=page.waitForEvent('download');await dialog.getByRole('button',{name:'下载 JSON',exact:true}).click();const file=await download,result=await (await file.createReadStream())!.toArray();const report=JSON.parse(Buffer.concat(result).toString());
  expect(report.geometry.sharedGeometryMeshes).toBeGreaterThan(0);expect(report.assets.duplicateFiles.length).toBe(1);expect(report.assets.textures.every((t:any)=>t.width===16&&t.height===16)).toBe(true);expect(report.assets.estimatedTextureBytes).toBeGreaterThan(2000);
+});
+
+test('scene benchmark records software-labelled frame quantiles and cancels a subsequent run cleanly',async({page})=>{
+ await page.goto('/scene-benchmark.html?meshes=36&width=256&height=192&warmup=5&samples=10');await page.bringToFront();
+ await page.getByRole('button',{name:'开始对照测试',exact:true}).click();await page.waitForFunction(()=>(window as any).__arkglideBenchmark?.state==='complete',undefined,{timeout:90000});
+ const report=await page.evaluate(()=>(window as any).__arkglideBenchmark.report);expect(report.renderMode).toBe('software');expect(report.hardwareBudgetVerified).toBe(false);expect(report.results).toHaveLength(2);expect(report.results[0].frameMs.samples).toBe(10);expect(report.results[1].optimization.lodNativeBuilds).toBe(2);expect(report.results[1].triangles.median).toBeLessThan(report.results[0].triangles.median);expect(report.resolution).toEqual({width:256,height:192});
+ await page.evaluate(()=>{void (window as any).ArkGlideSceneBenchmark.run({meshes:36,width:256,height:192,warmup:600,samples:1800}).catch(()=>{});});await page.getByRole('button',{name:'停止',exact:true}).click();await expect(page.getByRole('button',{name:'开始对照测试',exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>(window as any).BABYLON.EngineStore.Instances.length)).toBe(0);
 });

@@ -16,11 +16,11 @@ export default function ResourceBudgetDialog({open,onClose}:{open:boolean;onClos
    <Typography variant="caption">{report.project} · {new Date(report.date).toLocaleString()}</Typography>
    <Typography>源网格 {report.geometry.meshes}，独立几何 {report.geometry.uniqueGeometries}，共享网格 {report.geometry.sharedGeometryMeshes}</Typography>
    <Typography>源三角形 {report.geometry.sourceTriangles.toLocaleString()}，顶点/索引约 {mib(report.geometry.vertexAndIndexBytes)}</Typography>
-   <Typography>模型文件 {mib(report.assets.modelBytes)}，贴图文件 {mib(report.assets.textureFileBytes)}，RGBA8 贴图含 Mip 估算 {mib(report.assets.estimatedTextureBytes)}</Typography>
+   <Typography>模型文件 {mib(report.assets.modelBytes)}，贴图文件 {mib(report.assets.textureFileBytes)}，独立图片 RGBA8 含 Mip 估算 {mib(report.assets.estimatedTextureBytes)}</Typography>
    <Typography>相同字节的文件组 {report.assets.duplicateFiles.length}，缺失模型 {report.assets.missingModels.length}</Typography>
    {report.assets.estimatedTextureBytes>256*1048576&&<Alert severity="warning">静态贴图估算超过 256 MiB，可优先检查大尺寸贴图和复用关系；目标预算仍需按设备确定。</Alert>}
    {report.assets.textures.map(t=><Typography variant="caption" key={t.id}>{t.name}：{t.width?`${t.width} × ${t.height}，约 ${mib(t.estimatedBytes||0)}`:t.error||'该格式未估算显存'}</Typography>)}
-   <Typography variant="caption">估算不包含阴影、反射、后处理、MSAA 和驱动开销。几何共享减少缓冲，不代表绘制调用合批。</Typography>
+   <Typography variant="caption">估算不包含模型内嵌纹理、多用途副本、阴影、反射、后处理、MSAA 和驱动开销。几何共享减少缓冲，不代表绘制调用合批。</Typography>
   </>}
  </Stack></DialogContent><DialogActions><Button onClick={close}>{progress!==null?'取消':'关闭'}</Button><Button disabled={!report||progress!==null} onClick={()=>downloadBudget(report)}>下载 JSON</Button><Button variant="contained" disabled={progress!==null||useEditorStore.getState().playState!=='stopped'} onClick={()=>void scan()}>扫描资源</Button></DialogActions></Dialog>;
 }

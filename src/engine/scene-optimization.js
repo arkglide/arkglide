@@ -23,7 +23,14 @@
    for(let i=0;i<count;i++){data.positions.set(result.vertices.subarray(i*8,i*8+3),i*3);data.normals.set(result.vertices.subarray(i*8+3,i*8+6),i*3);data.uvs.set(result.vertices.subarray(i*8+6,i*8+8),i*2);}
    const g=new B.Geometry('arkglide:lod-geometry:'+mesh.uniqueId+':'+grid,scene,data,false);bucket.set(grid,g);return g;
   }
-  function prepare(){for(const [mesh,record]of records)for(const level of record.levels){level.material=mesh.material;level.receiveShadows=mesh.receiveShadows;level.visibility=mesh.visibility;}}
+  function prepare(){
+   let removed=false;
+   for(const [mesh,record]of records){
+    if(mesh.isDisposed()){release(mesh,record);removed=true;continue;}
+    for(const level of record.levels){level.material=mesh.material;level.receiveShadows=mesh.receiveShadows;level.visibility=mesh.visibility;}
+   }
+   if(removed){counters.lodMeshes=[...records.values()].filter(r=>r.levels.length>0).length;counters.lodLevels=[...records.values()].reduce((n,r)=>n+r.levels.length,0);}
+  }
   async function sync(nodes,definitions){
    const token=++generation,wanted=new Set(),tasks=[];counters.lodSkippedMeshes=0;
    for(const node of definitions){

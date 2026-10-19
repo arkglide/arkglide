@@ -313,6 +313,7 @@ export default function TopBar() {
             </Box>
           </MenuItem>
           <MenuItem component="a" href="/math-benchmark.html" target="_blank" rel="noopener" onClick={closeMenu}>数学性能基准</MenuItem>
+          <MenuItem component="a" href="/scene-benchmark.html" target="_blank" rel="noopener" onClick={closeMenu}>场景性能基准</MenuItem>
           <MenuItem disabled={playState!=='stopped'} onClick={()=>{closeMenu();setBakeOpen(true);}}>静态光照烘焙…</MenuItem>
           <MenuItem disabled={playState!=='stopped'} onClick={()=>{closeMenu();setBudgetOpen(true);}}>资源预算检查…</MenuItem>
         </Menu>

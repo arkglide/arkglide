@@ -21,6 +21,7 @@ for (const [source, target] of [
   ["baked-lighting", "baked-lighting"],
   ["geometry-cluster", "geometry-cluster"],
   ["scene-optimization", "scene-optimization"],
+  ["scene-benchmark-metrics", "scene-benchmark-metrics"],
   ["reflection-runtime", "reflections"],
   ["render-view-budget", "render-view-budget"],
   ["rendering-runtime", "rendering"],

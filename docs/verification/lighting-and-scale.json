@@ -1,0 +1,223 @@
+{
+  "date": "2026-10-19T17:28:02.949Z",
+  "node": "v24.19.0",
+  "platform": "linux x64",
+  "verification": {
+    "unit": {
+      "command": "node --test --test-concurrency=1 tests/*.test.mjs",
+      "passed": 595
+    },
+    "editorBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:browser -- --reporter=list",
+      "passed": 51
+    },
+    "postLensRerun": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npx playwright test --project=lighting-scale --reporter=list",
+      "passed": 7
+    },
+    "standaloneBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium node --test --test-concurrency=1 tests/composition/browser.mjs tests/foundations/browser.mjs tests/package/browser.mjs tests/portal/browser.mjs tests/rendering/browser.mjs tests/rendering/advanced-browser.mjs tests/rendering/lighting-scale-browser.mjs",
+      "passed": 13
+    },
+    "staticPlayerBrowser": {
+      "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:static -- --reporter=list",
+      "passed": 7
+    },
+    "productionBuild": {
+      "command": "NODE_OPTIONS=--max-old-space-size=4096 npm run build",
+      "passed": true,
+      "includes": "TypeScript and production editor/runtime assets. Extra heap is for the build process only."
+    }
+  },
+  "uniqueBrowserCases": 71,
+  "artifacts": {
+    "cpp/render/light-bake.cpp": {
+      "sha256": "43e9517ff6966cc694405ca3d38c44da7650595d15b9e13c8d8dd76db381df1d"
+    },
+    "cpp/render/geometry.cpp": {
+      "sha256": "360a762343e74eb037e93980a518a245bcfd7ab67da5ad85fc486a0020634c07"
+    },
+    "src/engine/light-bake.mjs": {
+      "sha256": "257d02259bc1bd0e713ffb2a0aa9a3cda12ec9fe9287a7d77e823ef4dc0a1995"
+    },
+    "src/engine/lighting-uv.js": {
+      "sha256": "22652a8f411e4713df20b7a579cefbfcb2523853a394450403d2e12d30eb4d3c"
+    },
+    "src/engine/baked-lighting.js": {
+      "sha256": "54116932a524c9d21a2225193f2d93070c5b21564eaca6e6aef45b00c2e4c012"
+    },
+    "src/engine/scene-optimization.js": {
+      "sha256": "637f356ed6a4671be5f4cb339344ca84d38aaac209dcce3280d6fa0f66dc4dc0"
+    },
+    "src/engine/geometry-cluster.js": {
+      "sha256": "bd1364257417abf0df75bc111029d400a65d5210344efa3a8d44879462c798d6"
+    },
+    "src/engine/rendering-runtime.js": {
+      "sha256": "ecd6bbaa742ce22733281f55d1ba9f2bf9cde4ce37a804da79efe13227403276"
+    },
+    "src/wasm/arkglide_math.js": {
+      "sha256": "93480b4221015eebae0cbe79e26075181c17c29ff897ef9cca3e1e0437f8c6ee"
+    },
+    "examples/lighting-scale-lab.arkglide": {
+      "sha256": "e4761af93203cb85502f4aecb24e1a2256cbb0b36760ce95634dc66930c6e7c5"
+    },
+    "public/runtime.html": {
+      "sha256": "9ff49f3f60e85e9edec51f478b3044474b2f7f9b8a87c9a94804bd89f4b45ce8"
+    },
+    "public/scene-benchmark.js": {
+      "sha256": "5a939cc710924c0449d5f89fe9b705ef5e120bde78479d555f0ef44f764d715c"
+    }
+  },
+  "scope": "Editor static diffuse/AO baking, CSM, material-albedo pixel correctness, cancellation and atomic undo, shared geometry, camera-selected static LOD, resource budget reports, opaque-origin exports and cleanup. Chromium ANGLE SwiftShader for browser regression.",
+  "wasm": {
+    "rebuilt": true,
+    "sourceKernels": [
+      "BVH shadow/AO ray batches",
+      "UV/normal-partitioned static vertex clustering"
+    ],
+    "jsNativeParity": true,
+    "cpuBenchmark": "scene-optimization-performance.json",
+    "note": "CPU kernel timings include bridge copies. They exclude GPU upload, Babylon object creation, shading and game FPS."
+  },
+  "performance": {
+    "browserBenchmark": "scene-scale-performance.json",
+    "mode": "software",
+    "hardwareBudgetVerified": false,
+    "environment": {
+      "drmDevice": false,
+      "nvidiaDevice": false
+    },
+    "note": "The hardware-ready browser/CLI benchmark was implemented. This environment has no GPU device; no target-device 1080p/60 FPS budget is certified."
+  },
+  "standaloneDiagnostics": {
+    "initial": {
+      "stats": {
+        "lodMeshes": 60,
+        "lodLevels": 120,
+        "lodNativeBuilds": 2,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0,
+        "cascadedShadowLights": 1,
+        "atmosphereSky": false,
+        "fogMode": 0,
+        "planarReflections": 0,
+        "planarRenderedViews": 0,
+        "planarRenderedPixels": 0,
+        "ssrEnabled": false,
+        "ssrSupported": true,
+        "dofEnabled": false,
+        "shadowLights": 1,
+        "environmentTextures": 1,
+        "shadowFilters": [
+          "pcf"
+        ],
+        "reflectionProbes": 0,
+        "probeMaterialVariants": 0,
+        "aoEnabled": true,
+        "aoSupported": true,
+        "bloomEnabled": true,
+        "picturePipelines": 1,
+        "hdrOutput": true,
+        "renderQuality": "medium",
+        "renderResolutionScale": 1,
+        "renderDrawCalls": 77,
+        "renderMainTriangles": 77704,
+        "renderSubmitMs": 3529.89999999851,
+        "gpuTimerSupported": true,
+        "gpuTimeMs": null
+      },
+      "floor": {
+        "direct": 0,
+        "uv": 1,
+        "baked": true
+      },
+      "errors": 0
+    },
+    "far": {
+      "stats": {
+        "lodMeshes": 60,
+        "lodLevels": 120,
+        "lodNativeBuilds": 2,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0,
+        "cascadedShadowLights": 1,
+        "atmosphereSky": false,
+        "fogMode": 0,
+        "planarReflections": 0,
+        "planarRenderedViews": 0,
+        "planarRenderedPixels": 0,
+        "ssrEnabled": false,
+        "ssrSupported": true,
+        "dofEnabled": false,
+        "shadowLights": 1,
+        "environmentTextures": 1,
+        "shadowFilters": [
+          "pcf"
+        ],
+        "reflectionProbes": 0,
+        "probeMaterialVariants": 0,
+        "aoEnabled": true,
+        "aoSupported": true,
+        "bloomEnabled": true,
+        "picturePipelines": 1,
+        "hdrOutput": true,
+        "renderQuality": "medium",
+        "renderResolutionScale": 1,
+        "renderDrawCalls": 346,
+        "renderMainTriangles": 272390,
+        "renderSubmitMs": 7.399999998509884,
+        "gpuTimerSupported": true,
+        "gpuTimeMs": null
+      },
+      "cameraZ": -50,
+      "source": 4624,
+      "selected": 753
+    },
+    "stopped": {
+      "stats": {
+        "lodMeshes": 0,
+        "lodLevels": 0,
+        "lodNativeBuilds": 0,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0,
+        "cascadedShadowLights": 0,
+        "atmosphereSky": false,
+        "fogMode": 0,
+        "planarReflections": 0,
+        "planarRenderedViews": 0,
+        "planarRenderedPixels": 0,
+        "ssrEnabled": false,
+        "ssrSupported": true,
+        "dofEnabled": false,
+        "shadowLights": 0,
+        "environmentTextures": 0,
+        "shadowFilters": [],
+        "reflectionProbes": 0,
+        "probeMaterialVariants": 0,
+        "aoEnabled": false,
+        "aoSupported": true,
+        "bloomEnabled": false,
+        "picturePipelines": 0,
+        "hdrOutput": false,
+        "renderQuality": "medium",
+        "renderResolutionScale": 1,
+        "renderDrawCalls": 0,
+        "renderMainTriangles": 0,
+        "renderSubmitMs": 0,
+        "gpuTimerSupported": true,
+        "gpuTimeMs": null
+      },
+      "lodMeshes": 0,
+      "targets": 0
+    }
+  },
+  "boundaries": [
+    "Static diffuse direct light plus ambient AO; no multi-bounce GI, emitter-texture lighting or automatic UV unwrap for imported models",
+    "Baked receivers disable all real-time direct lighting; environment reflections remain available",
+    "CSM is main-camera directional-light coverage; virtual views reuse it",
+    "Static LOD uses conservative normal/UV partitions and keeps original collision/picking geometry; unsupported/deforming materials retain their source",
+    "Geometry sharing saves vertex/index buffers and does not imply draw-call batching; instancing/occlusion/KTX2 remain later work",
+    "Resource texture memory is an RGBA8 full-mip estimate and excludes render targets and driver overhead"
+  ],
+  "execution": "Source was fixed during browser suites. Builds, CLI exports, editor regression and static-player regression ran serially to avoid Vite hot reload interference. The full 51-case editor suite passed before the final CSM near/far refresh, direct-disposal LOD cleanup and budget-explanation wording changes. All 595 unit cases and seven lighting/scale browser cases then passed again, including assertions on actual native cascade split distances after a lens change and cleanup after direct mesh disposal. The exported runtime also waits for initial WASM readiness before LOD preparation. There are 71 unique browser cases, plus that seven-case rerun."
+}

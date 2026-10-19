@@ -46,4 +46,5 @@ test('bake configuration and stale signatures account for lights and parents',()
  const state={nodes:[{id:'light',intensity:1}],settings:{ambientColor:'#FFFFFF',ambientIntensity:.3}},signature=sceneLightingSignature(state);
  assert.equal(sceneLightingSignature({...state,nodes:[{...state.nodes[0],bakedLighting:{signature:'00000000'}}]}),signature);
  assert.notEqual(sceneLightingSignature({...state,nodes:[{id:'light',intensity:2}]}),signature);
+ assert.equal(sceneLightingSignature({...state,nodes:[{intensity:1,id:'light'}]}),signature);
 });
