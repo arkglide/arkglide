@@ -62,6 +62,7 @@ export interface Transform {
 }
 
 export interface SceneNode {
+  bakedLighting?: { autoUV2: boolean; signature: string };
   planarReflection?: import('../types/rendering').PlanarReflectionSettings;
   castShadows?: boolean;
   receiveShadows?: boolean;
@@ -103,6 +104,7 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  cascadedShadowLights?: number;
   atmosphereSky?: boolean;
   dofEnabled?: boolean;
   ssrEnabled?: boolean;
@@ -270,6 +272,7 @@ interface HistoryEntry {
 }
 
 export interface EditorState {
+  applyLightingBake: (nodes: SceneNode[], materials: Record<string, MaterialAsset>, textures: { asset: TextureAsset; bytes: ArrayBuffer }[], documentId: string) => void;
   importAudio: (asset: AudioAsset, bytes: ArrayBuffer) => void;
   deleteAudio: (id: string) => void;
   updateGameplay: (value: GameplayConfig) => void;
@@ -399,6 +402,7 @@ export interface EditorState {
         | "castShadows"
         | "receiveShadows"
         | "planarReflection"
+        | "bakedLighting"
       >
     >,
     recordHistory?: boolean,
@@ -1335,7 +1339,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     ))) return;
     partial = structuredClone(partial);
     if (
-      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows", "planarReflection"].some((k) =>
+      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows", "planarReflection", "bakedLighting"].some((k) =>
         Object.hasOwn(partial, k),
       )
     ) {
@@ -2050,6 +2054,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // 重置播放快照：新建项目后无播放前状态
       prePlaySnapshot: null,
     });
+  },
+  applyLightingBake: (nodes, materials, textures, documentId) => {
+    const s=get();assertEditing(s);
+    if(s.documentId!==documentId)throw Error('项目已切换，烘焙结果已取消');
+    const content={...s.content,materials:{...s.content.materials,...structuredClone(materials)},textures:[...s.content.textures,...textures.map(t=>structuredClone(t.asset))]};
+    const textureBuffers=new Map(s.textureBuffers);
+    for(const t of textures){if(t.bytes.byteLength!==t.asset.byteLength)throw Error('烘焙贴图大小不一致');textureBuffers.set(t.asset.id,t.bytes.slice(0));}
+    validateProject({...s,scene:{nodes},content});
+    pushHistory(get,set);set({nodes:structuredClone(nodes),content,textureBuffers});
   },
   createMaterial: (name = "新材质", sourceId) => {
     if (get().playState !== "stopped") throw new Error("请先停止运行");

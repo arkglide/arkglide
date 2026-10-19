@@ -21,6 +21,7 @@ export default function DiagnosticsPanel() {
           `${stats.nativeMatrixUpdates || 0} / ${((stats.coreWasmHeapBytes || 0) / 1048576).toFixed(1)} MiB`,
         ],
         ["FPS", stats.fps.toFixed(1)],
+        ["级联阴影灯", stats.cascadedShadowLights || 0],
         ["画质 / 渲染比例", `${stats.renderQuality || "custom"} / ${stats.renderResolutionScale ?? 1}`],
         ["大气天空 / 景深 / SSR", `${stats.atmosphereSky ? "开" : "关"} / ${stats.dofEnabled ? "开" : "关"} / ${stats.ssrEnabled ? "开" : "关"}`],
         ["平面反射 / 离屏像素", `${stats.planarReflections || 0} / ${stats.planarRenderedPixels || 0}`],

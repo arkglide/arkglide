@@ -13,6 +13,7 @@
     let probeMeshes = [], probesReady = false, ao = null, pipeline = null, byteColor = null, postCamera = null, postSignature = "", dofDepth = null;
     const observers = [];
     let ssr = null, ownedGeometry = null, borrowedGeometry = null, frameNumber = 0;
+    let shadowCamera = null;
     function watch(observable, fn) { const token = observable.add(fn); observers.push(() => observable.remove(token)); }
     function invalidate() { dirty = true; }
     function report(error) { options.onError?.({ id: "rendering", name: "场景渲染", type: "rendering" }, error); }
@@ -135,6 +136,7 @@
         // Babylon's plugin copyTo clones textures; instantiation shares them.
         for(const key of ['clearCoat','sheen','anisotropy','subSurface','detailMap','iridescence'])if(base[key]&&material[key])B.SerializationHelper.Instanciate(()=>material[key],base[key]);
         material.reflectionTexture = texture;
+        root.ArkGlideBakedLighting?.apply(B,material,!!base.metadata?.arkglideBakedDirectLighting);
       }
       material.metadata = { ...base.metadata, arkglideProbeVariant: true };
       variantSources.set(material, base);
@@ -246,7 +248,10 @@
       for (const light of lights) {
         let slot = shadows.get(light);
         if (!slot) {
-          const generator = new B.ShadowGenerator(Math.min(s.mapSize, caps.maxTextureSize || s.mapSize), light);
+          const cascaded=s.cascades.enabled&&light.getClassName()==='DirectionalLight'&&engine._features?.supportCSM&&!!B.CascadedShadowGenerator&&!!shadowCamera;
+          const size=Math.min(s.mapSize,caps.maxTextureSize||s.mapSize);
+          const generator = cascaded?new B.CascadedShadowGenerator(size,light,true,shadowCamera):new B.ShadowGenerator(size, light);
+          if(cascaded){generator.numCascades=s.cascades.count;generator.lambda=s.cascades.lambda;generator.cascadeBlendPercentage=s.cascades.blend;generator.stabilizeCascades=s.cascades.stabilize;generator.shadowMaxZ=s.maxDistance;}
           const cube = light.needCube();
           const filter = cube || engine.webGLVersion < 2 ? "poisson" : s.filter;
           generator.usePoissonSampling = filter === "poisson";
@@ -255,7 +260,7 @@
           generator.filteringQuality = B.ShadowGenerator.QUALITY_MEDIUM;
           generator.bias = s.bias; generator.normalBias = s.normalBias;
           generator.setDarkness(s.darkness);
-          slot = { generator, filter }; shadows.set(light, slot);
+          slot = { generator, filter, cascaded }; shadows.set(light, slot);
         }
         light.shadowMinZ = 0.1; light.shadowMaxZ = s.maxDistance;
         slot.generator.getShadowMap().renderList = casters;
@@ -285,7 +290,7 @@
       offscreenDraws+=Math.max(0,(engine._drawCalls?.current||0)-beforeDraws);
       updateProbes();
     }
-    function beginFrame() { frameNumber++; frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
+    function beginFrame() { if(shadowCamera!==scene.activeCamera){clearShadows();shadowCamera=scene.activeCamera;dirty=true;}frameNumber++; frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
     function finishFrame() {
       if (!active || !frameOpen) return;
       drawCalls = instrumentation.drawCallsCounter.current + offscreenDraws;
@@ -327,7 +332,7 @@
       viewSettings: () => ({ ...config.views }),
       linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ ...atmosphere?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
+      stats: () => ({ cascadedShadowLights: [...shadows.values()].filter(s=>s.cascaded).length, ...atmosphere?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
       forOwner(owner) {
         const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
         return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, getStats() { check(); return api.stats(); } });

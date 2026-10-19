@@ -3,6 +3,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 export default defineConfig({
   // Keep worker/browser isolation identical for CI and custom local Chromium.
   projects: [
+    { name: "lighting-scale", testMatch: "**/lighting-scale.spec.ts" },
     { name: "core-ui", testMatch: "**/core-ui.spec.ts" },
     { name: "render-compute", testMatch: "**/render-compute.spec.ts" },
     { name: "rendering", testMatch: "**/rendering.spec.ts" },

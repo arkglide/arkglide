@@ -8,7 +8,7 @@
     samples: 4,
     gpuProfiling: false,
     views: { depth: 2, scale: 1, recursiveScale: 0.75, samples: 4, maxViews: 24, maxPixels: 16777216, minArea: 0.0001, minResolution: 32, particles: false },
-    shadows: { enabled: false, mapSize: 1024, filter: "pcf", bias: 0.0005, normalBias: 0.02, darkness: 0, maxDistance: 100, maxLights: 2 },
+    shadows: { enabled: false, mapSize: 1024, filter: "pcf", bias: 0.0005, normalBias: 0.02, darkness: 0, maxDistance: 100, maxLights: 2, cascades: {enabled:false,count:4,lambda:.5,blend:.1,stabilize:true} },
     environment: { textureId: null, intensity: 1, rotation: 0, skybox: false },
     color: { toneMapping: "none", exposure: 1, contrast: 1, saturation: 0, hue: 30, tint: 0 },
     bloom: { enabled: false, threshold: 1, weight: 0.3, kernel: 32, scale: 0.5 },
@@ -56,6 +56,9 @@
     number(c.shadows.darkness, 0, 1, "shadow darkness");
     number(c.shadows.maxDistance, 1, 10000, "shadow distance");
     number(c.shadows.maxLights, 1, 8, "shadow lights");
+    const cascade=c.shadows.cascades;
+    if(typeof cascade.enabled!=='boolean'||typeof cascade.stabilize!=='boolean'||![2,3,4].includes(cascade.count))throw Error('无效级联阴影配置');
+    number(cascade.lambda,0,1,'cascade split');number(cascade.blend,0,.3,'cascade blend');
     number(c.environment.intensity, 0, 20, "IBL intensity");
     number(c.environment.rotation, -Math.PI * 2, Math.PI * 2, "IBL rotation");
     number(c.color.exposure, 0.01, 20, "exposure");
@@ -99,6 +102,7 @@
       if (!(content.textures || []).some(t => t.id === p.textureId && t.mime === "application/x-babylon-env")) throw Error("局部反射探针需要预过滤 .env 环境贴图");
   }
   function validateNode(node) {
+    if(node.bakedLighting!==undefined){const b=node.bakedLighting;if(!object(b)||!['mesh','model'].includes(node.type)||Object.keys(b).some(k=>!['autoUV2','signature'].includes(k))||typeof b.autoUV2!=='boolean'||!/^\w{8}$/.test(b.signature)||node.type==='model'&&b.autoUV2)throw Error('无效烘焙元数据');}
     for (const key of ["castShadows", "receiveShadows"])
       if (node[key] !== undefined && typeof node[key] !== "boolean") throw Error("无效节点阴影开关");
     if (node.planarReflection !== undefined) {
@@ -117,6 +121,7 @@
   };
   function material(input={}) {
     if(!object(input))throw Error("无效扩展材质");
+    if(input.bakedDirectLighting!==undefined&&typeof input.bakedDirectLighting!=='boolean')throw Error('无效烘焙材质开关');
     const c=merge(materialDefaults,Object.fromEntries(Object.keys(materialDefaults).filter(k=>input[k]!==undefined).map(k=>[k,input[k]])),"material");
     if(!["auto","opaque","mask","blend"].includes(c.alphaMode))throw Error("无效材质透明模式");
     number(c.normalScale,0,10,"normal scale");number(c.alphaCutoff,0,1,"alpha cutoff");number(c.uvRotation,-Math.PI*2,Math.PI*2,"UV rotation");

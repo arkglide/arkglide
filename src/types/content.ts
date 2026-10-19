@@ -13,6 +13,7 @@ import {
 } from "./gameplay";
 import type { SceneNode } from "../store/useEditorStore";
 export interface MaterialAsset {
+  bakedDirectLighting?: boolean;
   id: string;
   name: string;
   baseColor: string;

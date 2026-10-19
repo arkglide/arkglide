@@ -336,7 +336,7 @@ function validateContent(
       else if (ref !== undefined && !["image/png", "image/jpeg", "image/webp"].includes(content.textures.find(t => t.id === ref)!.mime))
         throw new Error("材质贴图必须是 PNG、JPEG 或 WebP");
     for (const key of ["aoStrength", "lightmapIntensity"] as const)
-      if (m[key] !== undefined && (!Number.isFinite(m[key]) || m[key]! < 0 || m[key]! > 20)) throw new Error("无效烘焙光照或 AO 强度");
+      if (m[key] !== undefined && (!Number.isFinite(m[key]) || m[key]! < 0 || m[key]! > (key==='lightmapIntensity'?1000000:20))) throw new Error("无效烘焙光照或 AO 强度");
     if (m.lightmapUV !== undefined && ![0, 1].includes(m.lightmapUV)) throw new Error("无效 Lightmap UV 通道");
     if (m.emissiveIntensity !== undefined && (!Number.isFinite(m.emissiveIntensity) || m.emissiveIntensity < 0 || m.emissiveIntensity > 100)) throw new Error("无效自发光强度");
   }

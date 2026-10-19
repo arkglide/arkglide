@@ -3,6 +3,8 @@ import type * as Babylon from "@babylonjs/core";
 import type { ProjectContent } from "../types/content";
 import type { SceneNode } from "../store/useEditorStore";
 import "./scene-runtime.js";
+import "./lighting-uv.js";
+import "./baked-lighting.js";
 import "./rendering-config.js";
 import "./atmosphere-runtime.js";
 import "./render-view-budget.js";

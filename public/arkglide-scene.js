@@ -126,6 +126,8 @@
         mat.emissiveIntensity = d.emissiveIntensity ?? 1;
         mat.emissiveTexture = texture(id, "emissive", d, d.emissiveTextureId);
         mat.metallic = d.metallic;
+        mat.directIntensity = d.bakedDirectLighting ? 0 : 1;
+        root.ArkGlideBakedLighting?.apply(B,mat,!!d.bakedDirectLighting);
         mat.roughness = d.roughness;
         mat.alpha = d.alpha;
         mat.backFaceCulling = !d.doubleSided;
@@ -378,6 +380,7 @@
       object.rotation.set(r.x, r.y, r.z);
       object.scaling.set(s.x, s.y, s.z);
       object.setEnabled(node.visible !== false);
+      if(node.type==='mesh'&&node.bakedLighting?.autoUV2&&!object.metadata.arkglideBakeUV2){root.ArkGlideLightingUV?.generateUV2(B,object,primitiveOf(node));object.metadata.arkglideBakeUV2=true;}
       if (node.type === "mesh" && !node.materialId && node.color) {
         materialLibrary.prepareDestroy(object);
         let mat = object.material;

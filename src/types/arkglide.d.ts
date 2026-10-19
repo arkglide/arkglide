@@ -1078,7 +1078,7 @@ interface RenderingAPI {
     sky: { enabled: boolean; sunAzimuth: number; sunElevation: number; turbidity: number; rayleigh: number; mie: number; luminance: number };
     dof: { enabled: boolean; focusDistance: number; focalLength: number; fStop: number; quality: 0 | 1 | 2 };
     reflections: { ssr: { enabled: boolean; maxSteps: number; step: number; maxDistance: number; thickness: number; strength: number; roughnessFactor: number; blur: number; downsample: number }; planar: { enabled: boolean; maxMirrors: number; maxPixels: number; scale: number } };
-    shadows: { enabled: boolean; mapSize: number; filter: "pcf" | "pcss" | "poisson"; bias: number; normalBias: number; darkness: number; maxDistance: number; maxLights: number };
+    shadows: { enabled: boolean; mapSize: number; filter: "pcf" | "pcss" | "poisson"; bias: number; normalBias: number; darkness: number; maxDistance: number; maxLights: number; cascades: { enabled: boolean; count: 2 | 3 | 4; lambda: number; blend: number; stabilize: boolean } };
     environment: { textureId: string | null; intensity: number; rotation: number; skybox: boolean };
     color: { toneMapping: "none" | "standard" | "aces"; exposure: number; contrast: number; saturation: number; hue: number; tint: number };
     ao: { enabled: boolean; ratio: number; radius: number; strength: number; samples: number };

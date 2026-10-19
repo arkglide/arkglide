@@ -15,6 +15,7 @@ export interface RenderingSettings {
   ao?: { enabled?: boolean; ratio?: number; radius?: number; strength?: number; samples?: number };
   probes?: ReflectionProbeSettings[];
   shadows?: {
+    cascades?: { enabled?: boolean; count?: 2 | 3 | 4; lambda?: number; blend?: number; stabilize?: boolean };
     enabled?: boolean;
     mapSize?: number;
     filter?: "pcf" | "pcss" | "poisson";

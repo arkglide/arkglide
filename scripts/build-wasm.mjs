@@ -27,6 +27,7 @@ const sources = [
   "cpp/math/quaternion.cpp",
   "cpp/runtime/core.cpp",
   "cpp/render/batch.cpp",
+  "cpp/render/light-bake.cpp",
   "cpp/animation/batch.cpp",
 ];
 

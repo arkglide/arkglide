@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { registerEditorScene } from '../../engine/editor-scene';
 import { Box, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import {
   Engine,
@@ -150,6 +151,7 @@ export default function Viewport() {
           ),
     });
     meshMapRef.current = adapterRef.current.nodes;
+    const unregisterEditorScene=registerEditorScene(scene,adapterRef.current);
     pivotRef.current = new TransformNode("__selection_pivot", scene);
 
     const hl = new HighlightLayer("hl", scene);
@@ -227,6 +229,7 @@ export default function Viewport() {
     ro.observe(canvas);
 
     return () => {
+      unregisterEditorScene();
       unsubscribeRendering();
       ro.disconnect();
       engine.stopRenderLoop();

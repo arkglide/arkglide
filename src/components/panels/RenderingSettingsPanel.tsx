@@ -12,7 +12,7 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
   const [error, setError] = useState("");
   const defaults = (globalThis as any).ArkGlideRenderingConfig.settings();
   const c = {
-    shadows: { ...defaults.shadows, ...value?.shadows },
+    shadows: { ...defaults.shadows, ...value?.shadows, cascades:{...defaults.shadows.cascades,...value?.shadows?.cascades} },
     environment: { ...defaults.environment, ...value?.environment },
     color: { ...defaults.color, ...value?.color },
     ao: { ...defaults.ao, ...value?.ao },
@@ -54,6 +54,13 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     </Stack>
     <Stack direction="row" spacing={1}>{number("shadows", "maxDistance", "阴影距离", 1, 10000, 1)}{number("shadows", "maxLights", "阴影灯数量", 1, 8, 1)}</Stack>
     <Stack direction="row" spacing={1}>{number("shadows", "bias", "阴影深度偏移", 0, 0.1, 0.0001)}{number("shadows", "normalBias", "阴影法线偏移", 0, 1, 0.005)}</Stack>
+    <FormControlLabel label="方向光级联阴影（室外）" control={<Switch checked={c.shadows.cascades.enabled} onChange={e=>change('shadows',{cascades:{...c.shadows.cascades,enabled:e.target.checked}})} />} />
+    {c.shadows.cascades.enabled&&<Stack spacing={1}>
+      <TextField label="阴影级联数" select size="small" value={c.shadows.cascades.count} onChange={e=>change('shadows',{cascades:{...c.shadows.cascades,count:Number(e.target.value)}})}>{[2,3,4].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+      <ScalarField label="级联分割权重" size="small" value={c.shadows.cascades.lambda} inputProps={{min:0,max:1,step:.05}} onValueChange={lambda=>change('shadows',{cascades:{...c.shadows.cascades,lambda}})} />
+      <ScalarField label="级联过渡比例" size="small" value={c.shadows.cascades.blend} inputProps={{min:0,max:.3,step:.01}} onValueChange={blend=>change('shadows',{cascades:{...c.shadows.cascades,blend}})} />
+      <FormControlLabel label="稳定级联边缘" control={<Switch checked={c.shadows.cascades.stabilize} onChange={e=>change('shadows',{cascades:{...c.shadows.cascades,stabilize:e.target.checked}})} />} />
+    </Stack>}
     <TextField label="环境光照贴图" size="small" select value={c.environment.textureId || ""} onChange={e => change("environment", { textureId: e.target.value || null })}>
       <MenuItem value="">无</MenuItem>
       {textures.filter(t => ["application/x-babylon-env", "image/vnd.radiance"].includes(t.mime)).map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}

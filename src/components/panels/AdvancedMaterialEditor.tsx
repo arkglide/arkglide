@@ -11,6 +11,7 @@ export function AdvancedMaterialEditor({material:m,textures,onChange}:{material:
  const texture=(field:keyof MaterialAsset,label:string)=><TextField key={field} label={label} select size="small" value={m[field] || ''} onChange={e=>void onChange({[field]:e.target.value||undefined})}><MenuItem value="">无贴图</MenuItem>{textures.filter(t=>['image/png','image/jpeg','image/webp'].includes(t.mime)).map(t=><MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}</TextField>;
  const toggle=(section:'clearCoat'|'sheen'|'anisotropy'|'transmission'|'detail',label:string)=><FormControlLabel label={label} control={<Switch checked={c[section].enabled} onChange={e=>change(section,{enabled:e.target.checked})} />} />;
  return <Stack spacing={1} data-testid="advanced-material">
+  {m.lightmapTextureId&&<FormControlLabel label="烘焙直射光（关闭实时直射）" control={<Switch checked={!!m.bakedDirectLighting} onChange={e=>void onChange({bakedDirectLighting:e.target.checked})}/>}/>}
   <Typography variant="subtitle2">透明、法线与 UV</Typography>
   <TextField label="透明模式" select size="small" value={c.alphaMode} onChange={e=>void onChange({alphaMode:e.target.value as MaterialAsset['alphaMode']})}>{[['auto','自动（按透明度）'],['opaque','不透明'],['mask','透明裁切'],['blend','透明混合']].map(([v,n])=><MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
   <Stack direction="row" spacing={1}>{scalar('裁切阈值',c.alphaCutoff,alphaCutoff=>void onChange({alphaCutoff}),0,1,.05)}{scalar('法线强度',c.normalScale,normalScale=>void onChange({normalScale}),0,10)}</Stack>
