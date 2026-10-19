@@ -44,3 +44,30 @@ test('GPU particles emit using the native backend, freeze when paused and clean 
  });
  expect(r.backend).toBe('gpu');expect(r.active).toBeGreaterThan(0);expect(r.stats.gpuParticleSystems).toBe(1);expect(r.lit).toBeGreaterThan(0);expect(r.frozen).toBe(true);expect(r.remaining).toBe(0);expect(r.resources).toBe(0);
 });
+
+test('SSR and bounded planar reflections render real reflected geometry without duplicate captures',async({page})=>{
+ await page.goto('/runtime.html');await page.waitForFunction(()=>!!(window as any).ArkGlideReflections);
+ const r=await page.evaluate(async()=>{
+  const w=window as any,B=w.BABYLON,canvas=document.createElement('canvas');canvas.width=160;canvas.height=128;document.body.append(canvas);
+  const engine=new B.Engine(canvas,false,{preserveDrawingBuffer:true}),scene=new B.Scene(engine),camera=new B.FreeCamera('camera',new B.Vector3(0,3,-6),scene);camera.setTarget(new B.Vector3(0,.3,1));
+  scene.clearColor.set(.005,.005,.005,1);
+  const floor=B.MeshBuilder.CreateGround('mirror',{width:12,height:12},scene),source=new B.PBRMaterial('metal',scene);source.albedoColor.set(.8,.8,.8);source.metallic=1;source.roughness=.03;source.metadata={arkglideManagedMaterial:true};floor.material=source;
+  floor.metadata={arkglideRendering:{planarReflection:{enabled:true,axis:'y'}}};
+  const box=B.MeshBuilder.CreateBox('emitter',{size:1.6},scene);box.position.set(0,1,1);
+  const lamp=new B.PBRMaterial('red',scene);lamp.emissiveColor.set(5,.05,.01);lamp.metallic=0;box.material=lamp;box.metadata={arkglideRendering:{}};
+  const manager=w.ArkGlideRendering.create(B,scene);
+  const draw=async(n=10)=>{await scene.whenReadyAsync();for(let i=0;i<n;i++){scene.render();await new Promise(r=>setTimeout(r,20));}return Array.from(await engine.readPixels(0,0,160,128)) as number[];};
+  const diff=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+(i%4===3?0:Math.abs(v-b[i])),0);
+  try{
+   manager.configure({color:{toneMapping:'aces'}});await manager.sync();const plain=await draw();
+   manager.configure({color:{toneMapping:'aces'},reflections:{ssr:{enabled:true,maxSteps:128,blur:0,downsample:0,thickness:.5}}});const ssr=await draw();const screen=manager.stats();
+   manager.configure({color:{toneMapping:'aces'},reflections:{planar:{enabled:true,maxMirrors:1,maxPixels:10000,scale:1}}});const planar=await draw();
+   const texture=floor.material.reflectionTexture;let captures=0;texture.onBeforeRenderObservable.add(()=>captures++);await draw(4);
+   floor.position.y=.4;floor.rotation.z=.2;await draw(2);const plane=texture.mirrorPlane.asArray(),stats=manager.stats();
+   floor.setEnabled(false);await draw(2);const hidden=manager.stats();manager.clear();
+   return {ssr:diff(plain,ssr),planar:diff(plain,planar),screen,captures,plane,stats,hidden,cleared:manager.stats(),posts:camera._postProcesses.filter(Boolean).length,geometry:!!scene.geometryBufferRenderer,sourceUnchanged:source.reflectionTexture===null};
+  }finally{manager.dispose();scene.dispose();engine.dispose();canvas.remove();}
+ });
+ await test.info().attach('reflections.json',{body:JSON.stringify(r,null,2),contentType:'application/json'});
+ expect(r.ssr).toBeGreaterThan(1000);expect(r.planar).toBeGreaterThan(1000);expect(r.screen.ssrEnabled).toBe(true);expect(r.stats.planarRenderedViews).toBe(1);expect(r.stats.planarRenderedPixels).toBeLessThanOrEqual(10000);expect(r.captures).toBe(6);expect(r.plane[0]).toBeGreaterThan(.1);expect(r.sourceUnchanged).toBe(true);expect(r.hidden.planarReflections).toBe(0);expect(r.cleared.planarReflections).toBe(0);expect(r.posts).toBe(0);expect(r.geometry).toBe(false);
+});

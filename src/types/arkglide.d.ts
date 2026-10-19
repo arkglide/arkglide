@@ -1077,6 +1077,7 @@ interface RenderingAPI {
     fog: { mode: "none" | "linear" | "exp" | "exp2"; color: string; density: number; start: number; end: number };
     sky: { enabled: boolean; sunAzimuth: number; sunElevation: number; turbidity: number; rayleigh: number; mie: number; luminance: number };
     dof: { enabled: boolean; focusDistance: number; focalLength: number; fStop: number; quality: 0 | 1 | 2 };
+    reflections: { ssr: { enabled: boolean; maxSteps: number; step: number; maxDistance: number; thickness: number; strength: number; roughnessFactor: number; blur: number; downsample: number }; planar: { enabled: boolean; maxMirrors: number; maxPixels: number; scale: number } };
     shadows: { enabled: boolean; mapSize: number; filter: "pcf" | "pcss" | "poisson"; bias: number; normalBias: number; darkness: number; maxDistance: number; maxLights: number };
     environment: { textureId: string | null; intensity: number; rotation: number; skybox: boolean };
     color: { toneMapping: "none" | "standard" | "aces"; exposure: number; contrast: number; saturation: number; hue: number; tint: number };
@@ -1085,7 +1086,7 @@ interface RenderingAPI {
     views: { depth: number; scale: number; recursiveScale: number; samples: number; maxViews: number; maxPixels: number; minArea: number; minResolution: number; particles: boolean };
     probes: { id: string; name: string; textureId: string; position: Vec3; size: Vec3; priority: number; intensity: number }[];
   };
-  getStats(): { renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean };
+  getStats(): { renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
 }
 declare const rendering: RenderingAPI;
 interface ScriptContext { rendering: RenderingAPI; }

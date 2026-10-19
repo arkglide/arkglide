@@ -20,8 +20,12 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     fog: { ...defaults.fog, ...value?.fog },
     sky: { ...defaults.sky, ...value?.sky },
     dof: { ...defaults.dof, ...value?.dof },
+    ssr: { ...defaults.reflections.ssr, ...value?.reflections?.ssr },
+    planar: { ...defaults.reflections.planar, ...value?.reflections?.planar },
   };
-  const change = (section: keyof typeof c, patch: object) => onChange({ ...value, quality: "custom", [section]: { ...c[section], ...patch } });
+  const change = (section: keyof typeof c, patch: object) => onChange(section === "ssr" || section === "planar"
+    ? { ...value, quality:"custom",reflections:{...value?.reflections,[section]:{...c[section],...patch}} }
+    : { ...value, quality: "custom", [section]: { ...c[section], ...patch } });
   const chooseQuality = (name: string) => {
     try {
       onChange((globalThis as any).ArkGlideRenderingConfig.preset(value, name));
@@ -85,6 +89,14 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <FormControlLabel label="景深（主视图）" control={<Switch checked={c.dof.enabled} onChange={e=>change("dof",{enabled:e.target.checked})} />} />
     <Stack direction="row" spacing={1}>{number("dof","focusDistance","对焦距离（世界单位）",.01,100000,.1)}{number("dof","focalLength","焦距（mm）",1,300,1)}{number("dof","fStop","光圈 f-stop",.1,32,.1)}</Stack>
     <TextField label="景深质量" select size="small" value={c.dof.quality} onChange={e=>change("dof",{quality:Number(e.target.value)})}>{["低","中","高"].map((n,i)=><MenuItem key={i} value={i}>{n}</MenuItem>)}</TextField>
+    <Typography variant="subtitle2">实时反射</Typography>
+    <FormControlLabel label="屏幕空间反射（SSR，主视图）" control={<Switch checked={c.ssr.enabled} onChange={e=>change("ssr",{enabled:e.target.checked})} />} />
+    <Stack direction="row" spacing={1}>{number("ssr","maxSteps","SSR 最大步数",8,256,8)}{number("ssr","step","SSR 步距（像素）",1,8,1)}{number("ssr","maxDistance","SSR 射线距离",.1,10000,1)}</Stack>
+    <Stack direction="row" spacing={1}>{number("ssr","thickness","SSR 厚度容差",.001,10,.01)}{number("ssr","strength","SSR 强度",0,2,.1)}{number("ssr","blur","SSR 模糊",0,.2,.01)}</Stack>
+    <TextField label="SSR 分辨率" select size="small" value={c.ssr.downsample} onChange={e=>change("ssr",{downsample:Number(e.target.value)})}>{["全分辨率","1/2","1/3","1/4"].map((n,i)=><MenuItem key={i} value={i}>{n}</MenuItem>)}</TextField>
+    <FormControlLabel label="平面反射（在节点属性中指定反射面）" control={<Switch checked={c.planar.enabled} onChange={e=>change("planar",{enabled:e.target.checked})} />} />
+    <Stack direction="row" spacing={1}>{number("planar","maxMirrors","平面反射数量上限",1,8,1)}{number("planar","scale","平面反射分辨率比例",.1,1,.1)}</Stack>
+    <TextField label="平面反射总像素预算" type="number" size="small" value={c.planar.maxPixels} inputProps={{min:1024,max:67108864,step:65536}} onChange={e=>change("planar",{maxPixels:Number(e.target.value)})} />
     <Typography variant="subtitle2">局部反射探针</Typography>
     {(value?.probes || []).map(p => <ProbeEditor key={p.id} value={p} textures={textures.filter(t => t.mime === "application/x-babylon-env")} onChange={next => onChange({ ...value, probes: value!.probes!.map(old => old.id === p.id ? next : old) })} onDelete={() => onChange({ ...value, probes: value!.probes!.filter(old => old.id !== p.id) })} />)}
     <Button size="small" disabled={!(textures.some(t => t.mime === "application/x-babylon-env")) || (value?.probes?.length || 0) >= 32} onClick={() => onChange({ ...value, probes: [...(value?.probes || []), { id: crypto.randomUUID(), name: "房间反射", textureId: textures.find(t => t.mime === "application/x-babylon-env")!.id, position: { x: 0, y: 0, z: 0 }, size: { x: 10, y: 5, z: 10 }, priority: 0, intensity: 1 }] })}>添加局部反射探针</Button>

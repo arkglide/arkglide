@@ -5,6 +5,8 @@ import type { SceneNode } from "../store/useEditorStore";
 import "./scene-runtime.js";
 import "./rendering-config.js";
 import "./atmosphere-runtime.js";
+import "./render-view-budget.js";
+import "./reflection-runtime.js";
 import "./rendering-runtime.js";
 
 export interface SceneAdapter {

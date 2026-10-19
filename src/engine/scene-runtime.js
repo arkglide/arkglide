@@ -344,7 +344,7 @@
     }
     function update(node) {
       const object = nodes.get(node.id);
-      object.metadata = { ...object.metadata, arkglideRendering: { castShadows: node.castShadows !== false, receiveShadows: node.receiveShadows !== false } };
+      object.metadata = { ...object.metadata, arkglideRendering: { castShadows: node.castShadows !== false, receiveShadows: node.receiveShadows !== false, planarReflection: node.planarReflection } };
       const p = node.transform || { x: 0, y: 0, z: 0 },
         r = node.rotation || { x: 0, y: 0, z: 0 },
         s = node.scale || { x: 1, y: 1, z: 1 };

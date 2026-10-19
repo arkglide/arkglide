@@ -4,6 +4,7 @@
   function create(B, scene, options = {}) {
     const C = root.ArkGlideRenderingConfig, engine = scene.getEngine(), shadows = new Map();
     const atmosphere = root.ArkGlideAtmosphere?.create(B, scene);
+    const mirrors = root.ArkGlideReflections?.create(B, scene, options);
     const baseHardwareScale = engine.getHardwareScalingLevel(), instrumentation = new B.SceneInstrumentation(scene);
     let gpu = null, gpuStartCount = 0, frameOpen = false, frameStarted = 0, offscreenDraws = 0, drawCalls = 0, mainTriangles = 0, cpuSubmitMs = 0;
     let config = C.settings(), content = {}, buffers = new Map(), active = false, dead = false, dirty = true;
@@ -11,6 +12,7 @@
     const cubes = new Map(), probeTextures = new Map(), variants = new Map(), assignments = new Map(), variantSources = new WeakMap();
     let probeMeshes = [], probesReady = false, ao = null, pipeline = null, byteColor = null, postCamera = null, postSignature = "", dofDepth = null;
     const observers = [];
+    let ssr = null, ownedGeometry = null, borrowedGeometry = null, frameNumber = 0;
     function watch(observable, fn) { const token = observable.add(fn); observers.push(() => observable.remove(token)); }
     function invalidate() { dirty = true; }
     function report(error) { options.onError?.({ id: "rendering", name: "场景渲染", type: "rendering" }, error); }
@@ -110,22 +112,27 @@
       }
       probesReady = true; dirty = true;
     }
-    function variant(base, probeId) {
+    function variant(base, probeId, texture = probeTextures.get(probeId), planar = false) {
       base = variantSources.get(base) || base;
-      if (!base || (!base.subMaterials && !base.metadata?.arkglideManagedMaterial)) return base;
+      if (!base || (!base.subMaterials && !base.metadata?.arkglideManagedMaterial && !(planar && ['StandardMaterial','PBRMaterial','PBRMetallicRoughnessMaterial'].includes(base.getClassName())))) return base;
       let map = variants.get(base);
       if (!map) { map = new Map(); variants.set(base, map); }
-      if (map.has(probeId)) return map.get(probeId);
+      if (map.has(probeId)) {
+        const m=map.get(probeId);
+        if(m.subMaterials) m.subMaterials=base.subMaterials.map(part=>variant(part,probeId,texture,planar));
+        else m.reflectionTexture=texture;
+        return m;
+      }
       let material;
       if (base.subMaterials) {
-        const parts = base.subMaterials.map(m => variant(m, probeId));
+        const parts = base.subMaterials.map(m => variant(m, probeId, texture, planar));
         if (parts.every((m, i) => m === base.subMaterials[i])) return base;
         material = new B.MultiMaterial(base.name + ":probe:" + probeId, scene);
         material.subMaterials = parts;
       } else {
         // Instanciate shares source textures instead of allocating copies per probe.
-        material = B.SerializationHelper.Instanciate(() => new B.PBRMaterial(base.name + ":probe:" + probeId, scene), base);
-        material.reflectionTexture = probeTextures.get(probeId);
+        material = B.SerializationHelper.Instanciate(() => new base.constructor(base.name + ":probe:" + probeId, scene), base);
+        material.reflectionTexture = texture;
       }
       material.metadata = { ...base.metadata, arkglideProbeVariant: true };
       variantSources.set(material, base);
@@ -133,15 +140,16 @@
       return material;
     }
     function updateProbes() {
-      if (!probesReady || !config.probes.length) return;
+      if ((!probesReady || !config.probes.length) && !config.reflections.planar.enabled && !assignments.size) return;
       for (const mesh of probeMeshes) {
         if (mesh.isDisposed()) { assignments.delete(mesh); continue; }
         mesh.computeWorldMatrix(!mesh.isSynchronized());
         const point = mesh.getBoundingInfo().boundingBox.centerWorld;
-        const index = C.selectProbe(point, config.probes);
+        const index = probesReady ? C.selectProbe(point, config.probes) : -1;
         const record = assignments.get(mesh);
         const base = record && mesh.material === record.assigned ? record.base : variantSources.get(mesh.material) || mesh.material;
-        const material = index < 0 ? base : variant(base, config.probes[index].id);
+        const mirror = mirrors?.textureFor(mesh);
+        const material = mirror ? variant(base,mirror.key,mirror.texture,true) : index < 0 ? base : variant(base, config.probes[index].id);
         if (mesh.material !== material) mesh.material = material;
         if (material !== base) assignments.set(mesh, { base, assigned: material }); else assignments.delete(mesh);
       }
@@ -151,18 +159,33 @@
       pipeline?.dispose(); pipeline = null;
       if (dofDepth && scene._depthRenderer?.[dofDepth.camera.uniqueId] === dofDepth.renderer) scene.disableDepthRenderer(dofDepth.camera);
       dofDepth = null;
-      ao?.dispose(true); ao = null; postCamera = null; postSignature = "";
+      ao?.dispose(false); ao = null; postCamera = null; postSignature = "";
+      ssr?.dispose(false); ssr = null;
+      if(ownedGeometry && scene.geometryBufferRenderer===ownedGeometry)scene.disableGeometryBufferRenderer();
+      if(borrowedGeometry && scene.geometryBufferRenderer===borrowedGeometry.renderer)Object.assign(borrowedGeometry.renderer,borrowedGeometry.flags);
+      ownedGeometry = borrowedGeometry = null;
       scene.imageProcessingConfiguration.applyByPostProcess = false;
     }
     function updatePost() {
-      const needsPost = config.dof.enabled || config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
-      const camera = scene.activeCamera, key = JSON.stringify([config.ao, config.bloom, config.dof, needsPost, config.antialiasing, config.samples]);
+      const needsPost = config.reflections.ssr.enabled || config.reflections.planar.enabled || config.dof.enabled || config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
+      const camera = scene.activeCamera, key = JSON.stringify([config.reflections, config.ao, config.bloom, config.dof, needsPost, config.antialiasing, config.samples]);
       if (postCamera === camera && postSignature === key) return;
       clearPost(); postCamera = camera; postSignature = key;
+      const previousGeometry=scene.geometryBufferRenderer;
+      if(previousGeometry) borrowedGeometry={renderer:previousGeometry,flags:{enableReflectivity:previousGeometry.enableReflectivity,enableDepth:previousGeometry.enableDepth,enableScreenspaceDepth:previousGeometry.enableScreenspaceDepth,useSpecificClearForDepthTexture:previousGeometry.useSpecificClearForDepthTexture}};
       if (config.ao.enabled && camera && engine.webGLVersion >= 2 && engine.getCaps().drawBuffersExtension) {
         ao = new B.SSAO2RenderingPipeline("arkglide:ao", scene, { ssaoRatio: config.ao.ratio, blurRatio: 1 }, [camera], true);
         ao.radius = config.ao.radius; ao.totalStrength = config.ao.strength; ao.samples = config.ao.samples;
       }
+      if(config.reflections.ssr.enabled && camera && engine.webGLVersion>=2 && engine.getCaps().drawBuffersExtension) {
+        const r=config.reflections.ssr,caps=engine.getCaps();
+        ssr=new B.SSRRenderingPipeline("arkglide:ssr",scene,[camera],true,caps.textureHalfFloatRender?B.Constants.TEXTURETYPE_HALF_FLOAT:B.Constants.TEXTURETYPE_UNSIGNED_BYTE);
+        ssr.maxSteps=r.maxSteps;ssr.step=r.step;ssr.maxDistance=r.maxDistance;ssr.thickness=r.thickness;ssr.strength=r.strength;
+        ssr.roughnessFactor=r.roughnessFactor;ssr.blurDispersionStrength=r.blur;ssr.ssrDownsample=r.downsample;ssr.blurDownsample=r.downsample;
+        ssr.inputTextureColorIsInGammaSpace=false;ssr.generateOutputInGammaSpace=false;
+        ssr.environmentTexture=scene.environmentTexture;
+      }
+      if(!previousGeometry && scene.geometryBufferRenderer)ownedGeometry=scene.geometryBufferRenderer;
       if (needsPost && camera) {
         const caps = engine.getCaps(), hdr = !!(caps.textureHalfFloatRender || caps.textureFloatRender);
         pipeline = new B.DefaultRenderingPipeline("arkglide:picture", true, scene, [camera], false);
@@ -211,7 +234,7 @@
       if (signature !== key) { clearShadows(); signature = key; }
       const lights = shadowLights();
       for (const [light, slot] of shadows) if (!lights.includes(light)) { slot.generator.dispose(); shadows.delete(light); }
-      if (!s.enabled && !config.probes.length) { probeMeshes = []; return; }
+      if (!s.enabled && !config.probes.length && !config.reflections.planar.enabled && !assignments.size) { probeMeshes = []; return; }
       const meshes = scene.meshes.filter(mesh => !mesh.isDisposed() && !mesh.metadata?.arkglideRenderInternal && mesh.getTotalVertices() > 0 && flags(mesh));
       probeMeshes = meshes;
       if (s.enabled) for (const mesh of meshes) mesh.receiveShadows = flags(mesh).receiveShadows !== false;
@@ -252,9 +275,14 @@
         if (lights.length !== shadows.size || lights.some(light => !shadows.has(light))) dirty = true;
       }
       if (dirty) updateShadows();
-      updateProbes(); updatePost(); atmosphere?.configure(config, !!pipeline);
+      updatePost(); atmosphere?.configure(config, !!pipeline);
+      if(ssr && ssr.environmentTexture!==scene.environmentTexture)ssr.environmentTexture=scene.environmentTexture;
+      const beforeDraws=engine._drawCalls?.current||0;
+      mirrors?.prepare(config,probeMeshes,frameNumber);
+      offscreenDraws+=Math.max(0,(engine._drawCalls?.current||0)-beforeDraws);
+      updateProbes();
     }
-    function beginFrame() { frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
+    function beginFrame() { frameNumber++; frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
     function finishFrame() {
       if (!active || !frameOpen) return;
       drawCalls = instrumentation.drawCallsCounter.current + offscreenDraws;
@@ -274,6 +302,7 @@
       active = false; dirty = true; signature = "";
       syncGeneration++; clearProbes(); clearPost(); clearShadows();
       atmosphere?.clear();
+      mirrors?.clear();
       for (const [id, slot] of cubes) releaseCube(id, slot);
       if (gpu) { gpu.captureGPUFrameTime = false; gpu.dispose(); gpu = null; }
       engine.setHardwareScalingLevel(baseHardwareScale);
@@ -295,7 +324,7 @@
       viewSettings: () => ({ ...config.views }),
       linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ ...atmosphere?.stats(), dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
+      stats: () => ({ ...atmosphere?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
       forOwner(owner) {
         const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
         return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, getStats() { check(); return api.stats(); } });

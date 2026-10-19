@@ -9,6 +9,8 @@ import { createStaticGame, RUNTIME_FILES } from "../src/export/static-game.mjs";
 import "../src/engine/package-runtime.js";
 import "../src/engine/rendering-config.js";
 import "../src/engine/atmosphere-runtime.js";
+import "../src/engine/render-view-budget.js";
+import "../src/engine/reflection-runtime.js";
 import "../src/engine/rendering-runtime.js";
 import "../src/engine/scene-runtime.js";
 const C = globalThis.ArkGlideRenderingConfig;
@@ -24,6 +26,24 @@ test("atmosphere settings reject invalid drafts, preserve old defaults and resto
     assert.equal(scene.meshes.filter(m=>m.name==='arkglide:atmosphere').length,1);
     manager.clear(); assert.equal(scene.fogMode,B.Scene.FOGMODE_NONE);assert.equal(manager.stats().atmosphereSky,false);
   } finally {manager.dispose();scene.dispose();engine.dispose();}
+});
+test("planar captures obey budgets, isolate shared materials and follow transformed planes", async () => {
+  const engine=new B.NullEngine({renderWidth:160,renderHeight:128}),scene=new B.Scene(engine),camera=new B.FreeCamera('main',new B.Vector3(0,4,-6),scene);camera.setTarget(B.Vector3.Zero());
+  let captures=0;class Mirror extends B.MirrorTexture {render(){captures++;}}
+  const manager=globalThis.ArkGlideRendering.create({...B,MirrorTexture:Mirror},scene);
+  const source=new B.PBRMaterial('shared',scene);source.metadata={arkglideManagedMaterial:true};
+  const a=B.MeshBuilder.CreateGround('a',{width:5,height:5},scene),b=B.MeshBuilder.CreateGround('b',{width:2,height:2},scene);b.position.x=8;
+  for(const mesh of [a,b]){mesh.material=source;mesh.metadata={arkglideRendering:{planarReflection:{enabled:true,axis:'y'}}};}
+  try{
+    manager.configure({reflections:{planar:{enabled:true,maxMirrors:1,maxPixels:5000,scale:1}}});await manager.sync();scene.render();
+    assert.equal(captures,1);assert.equal(manager.stats().planarReflections,1);assert.ok(manager.stats().planarRenderedPixels<=5000);
+    assert.notEqual(a.material,source);assert.equal(b.material,source);assert.equal(source.reflectionTexture,null);
+    a.position.y=.4;a.rotation.z=.2;scene.render();assert.ok(a.material.reflectionTexture.mirrorPlane.normal.x>.1);
+    a.setEnabled(false);b.setEnabled(false);scene.render();assert.equal(manager.stats().planarReflections,0);assert.equal(a.material,source);
+    manager.clear();assert.equal(manager.stats().planarRenderedPixels,0);
+  }finally{manager.dispose();scene.dispose();engine.dispose();}
+  assert.throws(()=>C.settings({reflections:{planar:{maxPixels:NaN}}}));
+  assert.throws(()=>C.validateNode({type:'mesh',planarReflection:{enabled:true,axis:'bad'}}));
 });
 let server, store, archive, validate;
 before(async () => {

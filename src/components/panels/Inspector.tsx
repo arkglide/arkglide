@@ -150,6 +150,7 @@ export default function Inspector() {
         | "activeCamera"
         | "castShadows"
         | "receiveShadows"
+        | "planarReflection"
         | "primitive"
       >
     >,
@@ -372,6 +373,11 @@ export default function Inspector() {
 
           <FormControlLabel label="投射阴影" control={<Switch checked={currentNode.castShadows !== false} onChange={e => update({ castShadows: e.target.checked })} />} />
           <FormControlLabel label="接收阴影" control={<Switch checked={currentNode.receiveShadows !== false} onChange={e => update({ receiveShadows: e.target.checked })} />} />
+          <FormControlLabel label="平面反射（需在画面设置中开启）" control={<Switch checked={currentNode.planarReflection?.enabled || false} onChange={e=>update({planarReflection:{...currentNode.planarReflection,enabled:e.target.checked}})} />} />
+          {currentNode.planarReflection?.enabled && <Stack spacing={1}>
+            <TextField label="反射面本地法向" select size="small" value={currentNode.planarReflection.axis || 'y'} onChange={e=>update({planarReflection:{...currentNode.planarReflection!,axis:e.target.value as 'x'|'y'|'z'}})}>{['x','y','z'].map(axis=><MenuItem key={axis} value={axis}>{axis.toUpperCase()}</MenuItem>)}</TextField>
+            {(['offset','blur','intensity'] as const).map((key,i)=><TextField key={key} label={['反射面本地偏移','反射模糊','反射强度'][i]} size="small" type="number" value={currentNode.planarReflection![key] ?? (key==='intensity'?1:0)} onChange={e=>update({planarReflection:{...currentNode.planarReflection!,[key]:Number(e.target.value)}})} />)}
+          </Stack>}
           <Typography variant="caption">
             {currentNode.materialId
               ? "备用节点颜色（当前由材质覆盖）"

@@ -463,6 +463,7 @@
         scene,
       );
       mesh.isPickable = false;
+      mesh.metadata = { arkglidePortalView: true };
       const material = new B.ShaderMaterial(id + ":material", scene, shader, {
         attributes: ["position"],
         uniforms: [

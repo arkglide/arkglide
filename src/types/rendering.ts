@@ -7,6 +7,10 @@ export interface RenderingSettings {
   fog?: { mode?: "none" | "linear" | "exp" | "exp2"; color?: string; density?: number; start?: number; end?: number };
   sky?: { enabled?: boolean; sunAzimuth?: number; sunElevation?: number; turbidity?: number; rayleigh?: number; mie?: number; luminance?: number };
   dof?: { enabled?: boolean; focusDistance?: number; focalLength?: number; fStop?: number; quality?: 0 | 1 | 2 };
+  reflections?: {
+    ssr?: { enabled?: boolean; maxSteps?: number; step?: number; maxDistance?: number; thickness?: number; strength?: number; roughnessFactor?: number; blur?: number; downsample?: number };
+    planar?: { enabled?: boolean; maxMirrors?: number; maxPixels?: number; scale?: number };
+  };
   views?: { depth?: number; scale?: number; recursiveScale?: number; samples?: number; maxViews?: number; maxPixels?: number; minArea?: number; minResolution?: number; particles?: boolean };
   ao?: { enabled?: boolean; ratio?: number; radius?: number; strength?: number; samples?: number };
   probes?: ReflectionProbeSettings[];
@@ -33,3 +37,4 @@ export interface ReflectionProbeSettings {
   priority?: number;
   intensity?: number;
 }
+export interface PlanarReflectionSettings { enabled: boolean; axis?: "x" | "y" | "z"; offset?: number; blur?: number; intensity?: number; }

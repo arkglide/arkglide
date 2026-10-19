@@ -62,6 +62,7 @@ export interface Transform {
 }
 
 export interface SceneNode {
+  planarReflection?: import('../types/rendering').PlanarReflectionSettings;
   castShadows?: boolean;
   receiveShadows?: boolean;
   id: string;
@@ -102,6 +103,15 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  atmosphereSky?: boolean;
+  dofEnabled?: boolean;
+  ssrEnabled?: boolean;
+  ssrSupported?: boolean;
+  planarReflections?: number;
+  planarRenderedViews?: number;
+  planarRenderedPixels?: number;
+  gpuParticleSystems?: number;
+  cpuParticleSystems?: number;
   renderQuality?: string;
   renderResolutionScale?: number;
   renderDrawCalls?: number;
@@ -388,6 +398,7 @@ export interface EditorState {
         | "activeCamera"
         | "castShadows"
         | "receiveShadows"
+        | "planarReflection"
       >
     >,
     recordHistory?: boolean,
@@ -1317,7 +1328,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     ))) return;
     partial = structuredClone(partial);
     if (
-      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows"].some((k) =>
+      ["physics", "character", "joints", "animation", "audioSource", "castShadows", "receiveShadows", "planarReflection"].some((k) =>
         Object.hasOwn(partial, k),
       )
     ) {

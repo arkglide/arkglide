@@ -16,6 +16,10 @@
     fog: { mode: "none", color: "#A8BDD0", density: 0.01, start: 10, end: 100 },
     sky: { enabled: false, sunAzimuth: 0, sunElevation: 35, turbidity: 2, rayleigh: 2, mie: 0.005, luminance: 1 },
     dof: { enabled: false, focusDistance: 10, focalLength: 50, fStop: 2.8, quality: 1 },
+    reflections: {
+      ssr: { enabled: false, maxSteps: 64, step: 1, maxDistance: 100, thickness: 0.2, strength: 1, roughnessFactor: 0, blur: 0.03, downsample: 1 },
+      planar: { enabled: false, maxMirrors: 2, maxPixels: 2097152, scale: 0.5 },
+    },
     probes: [],
   };
   const environmentMimes = ["application/x-babylon-env", "image/vnd.radiance"];
@@ -69,6 +73,10 @@
     number(c.sky.sunAzimuth, -360, 360, "sun azimuth"); number(c.sky.sunElevation, -90, 90, "sun elevation");
     number(c.sky.turbidity, 1, 20, "sky turbidity"); number(c.sky.rayleigh, 0, 8, "sky Rayleigh"); number(c.sky.mie, 0, 0.1, "sky Mie"); number(c.sky.luminance, 0, 10, "sky luminance");
     number(c.dof.focusDistance, 0.01, 100000, "focus distance"); number(c.dof.focalLength, 1, 300, "focal length"); number(c.dof.fStop, 0.1, 32, "f-stop");
+    const {ssr,planar}=c.reflections;
+    if (typeof ssr.enabled!=="boolean" || typeof planar.enabled!=="boolean" || !Number.isInteger(ssr.maxSteps) || !Number.isInteger(ssr.step) || ![0,1,2,3].includes(ssr.downsample) || !Number.isInteger(planar.maxMirrors) || !Number.isInteger(planar.maxPixels)) throw Error("无效反射配置");
+    number(ssr.maxSteps,8,256,"SSR steps");number(ssr.step,1,8,"SSR pixel step");number(ssr.maxDistance,.1,10000,"SSR distance");number(ssr.thickness,.001,10,"SSR thickness");number(ssr.strength,0,2,"SSR strength");number(ssr.roughnessFactor,0,1,"SSR roughness");number(ssr.blur,0,.2,"SSR blur");
+    number(planar.maxMirrors,1,8,"mirror count");number(planar.maxPixels,1024,67108864,"mirror pixels");number(planar.scale,.1,1,"mirror scale");
     if (!Array.isArray(c.probes) || c.probes.length > 32) throw Error("反射探针数量超过上限");
     const ids = new Set();
     c.probes = c.probes.map(p => {
@@ -93,6 +101,11 @@
   function validateNode(node) {
     for (const key of ["castShadows", "receiveShadows"])
       if (node[key] !== undefined && typeof node[key] !== "boolean") throw Error("无效节点阴影开关");
+    if (node.planarReflection !== undefined) {
+      const p=node.planarReflection;
+      if (!object(p) || !["mesh","model"].includes(node.type) || Object.keys(p).some(k=>!["enabled","axis","offset","blur","intensity"].includes(k)) || typeof p.enabled!=="boolean" || !["x","y","z"].includes(p.axis??"y")) throw Error("无效节点平面反射");
+      number(p.offset??0,-100000,100000,"mirror offset");number(p.blur??0,0,64,"mirror blur");number(p.intensity??1,0,20,"mirror intensity");
+    }
   }
   function selectProbe(point, probes) {
     let selected = -1, priority = -Infinity, volume = Infinity;
@@ -116,6 +129,8 @@
     Object.assign(c.ao, { enabled: !low, ratio: high ? 1 : 0.5, samples: high ? 16 : 8 });
     Object.assign(c.bloom, { enabled: !low, scale: high ? 0.5 : 0.25 });
     c.dof.quality = high ? 2 : low ? 0 : 1;
+    Object.assign(c.reflections.ssr,{enabled:high,maxSteps:high?128:32,downsample:high?0:1});
+    Object.assign(c.reflections.planar,{enabled:!low,maxMirrors:high?4:1,maxPixels:high?4194304:524288,scale:high?1:.5});
     Object.assign(c.views, { depth: low ? 1 : 2, scale: low ? 0.5 : high ? 1 : 0.75, samples: high ? 4 : 1, maxViews: low ? 4 : high ? 16 : 8, maxPixels: low ? 1048576 : high ? 8388608 : 3145728, particles: high });
     return c;
   }
