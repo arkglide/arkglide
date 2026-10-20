@@ -331,6 +331,8 @@ export default function Inspector() {
 
       {(["mesh","model"].includes(currentNode.type)) && <Stack spacing={1} sx={{mt:1}}>
           {currentNode.type==='mesh'&&<FormControlLabel label="共享重复基础几何" control={<Switch checked={currentNode.optimization?.shareGeometry!==false} onChange={e=>update({optimization:{...currentNode.optimization,shareGeometry:e.target.checked}})}/>}/>}
+          {currentNode.type==='mesh'&&<FormControlLabel label="静态实例批次" control={<Switch checked={!!currentNode.optimization?.instancing} onChange={e=>update({optimization:{...currentNode.optimization,instancing:e.target.checked}})}/>}/>}
+          {currentNode.optimization?.instancing&&<Typography variant="caption">相同基础几何、PBR 材质和阴影设置自动合批。保留独立拾取与变换；脚本、透明、烘焙、探针、镜面、负缩放和 LOD 等组合保留普通网格。</Typography>}
           <FormControlLabel label="静态几何 LOD" control={<Switch checked={!!currentNode.optimization?.lod?.enabled} onChange={e=>update({optimization:{...currentNode.optimization,lod:{enabled:e.target.checked,levels:currentNode.optimization?.lod?.levels?.length?currentNode.optimization.lod.levels:[{distance:20,grid:16},{distance:50,grid:6}]}}})}/>}/>
           {currentNode.optimization?.lod?.enabled&&<Stack spacing={1}>
             <Typography variant="caption">距离使用世界单位；网格精度越小，远景越简化。骨骼、变形、多材质和光照图网格保留原几何。碰撞与拾取使用原网格。</Typography>

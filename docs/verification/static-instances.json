@@ -1,0 +1,82 @@
+{
+  "baseCommit": "050b190cf90793fe3464d3ad5a14c7d717628903",
+  "scope": [
+    "Opt-in native InstancedMesh batches with independent node identity, picking and transforms",
+    "Owned hidden source groups; managed material preservation and last-member cleanup",
+    "Conservative unsupported-material/animation/baking/reflection/LOD fallback",
+    "Editor, persistence, resource-budget geometry ownership, diagnostics and exported corridor",
+    "Same-geometry benchmark comparison"
+  ],
+  "validation": {
+    "unitTests": 606,
+    "editorBrowserCases": 57,
+    "independentBrowserCases": 15,
+    "staticPlayerBrowserCases": 7,
+    "distinctBrowserCases": 79,
+    "typescript": "passed",
+    "productionBuild": "passed with 4096 MiB Node heap",
+    "runtimeMirrors": 45,
+    "interruptedRun": "An earlier editor run was interrupted by environment refresh and discarded; the replacement full 57-case run passed."
+  },
+  "webGL": {
+    "baselineDrawCalls": 65,
+    "instancedDrawCalls": 2,
+    "mainTriangles": 770,
+    "members": 64,
+    "batches": 1,
+    "meanPixelChannelDifference": 0,
+    "withShadowAndVolumeDifference": 0,
+    "pickedNode": "box-3",
+    "parentTranslationDelta": 0.9999999761581421,
+    "deletedMemberMaterialRetained": true,
+    "remainingMembers": 63,
+    "cleared": {
+      "meshes": 0,
+      "geometries": 0,
+      "materials": 0,
+      "stats": {
+        "instancingSupported": true,
+        "instanceBatches": 0,
+        "instancedMeshes": 0,
+        "instanceSkippedMeshes": 0
+      },
+      "depths": 0
+    }
+  },
+  "export": {
+    "members": 24,
+    "batches": 1,
+    "floorUsesNativeInstance": true,
+    "nativeColliderRayHit": "Floor",
+    "nativeColliderDistance": 5,
+    "sourcesAfterStop": 0,
+    "depthsAfterStop": 0
+  },
+  "performance": {
+    "report": "static-instances-performance.json",
+    "drawCallsMedianBefore": 37,
+    "drawCallsMedianAfter": 5,
+    "renderMode": "software",
+    "hardwareBudgetVerified": false,
+    "note": "Software measurements verify grouping, unchanged geometry, query accounting and process; target FPS needs real hardware."
+  },
+  "limits": [
+    "Base primitives only, explicit per-node opt-in",
+    "No independent per-instance material parameters",
+    "Fallback for unsupported devices, scripts/animation/dynamic physics, nonpositive scale, baked lighting, probe projects, planar reflectors and LOD",
+    "Scene synchronization is needed after host-side material/probe/definition edits"
+  ],
+  "artifactSha256": {
+    "src/engine/static-instances.js": "42d9568e03ce88c9a5273892b429ce68c5be1981ca0a16dbc23ef4a8e7ee7a76",
+    "src/engine/scene-runtime.js": "12d2ff049688dbb47ff54c873fe58ff30ada9effde2775908b6c2475c6183909",
+    "src/engine/rendering-config.js": "48fe2fcc0aa381e9f760657487b500ce0050bbb3887463bb6e9725dcbf7dd755",
+    "src/utils/resourceBudget.ts": "eb28dedac10676875cd9ca3e0e68e95d00f3146940e1422311a1fc45d2e0e212",
+    "src/types/rendering.ts": "096b2d0acb2020a651983af7da76384e726a8a137857d095b407205ee2392351",
+    "src/types/arkglide.d.ts": "32ee4bf89bb6b91271e4da2ca5d1366a717c94222f959b36d69d828714456c00",
+    "public/runtime.html": "460b24909daa10afc731d13bca73fb6bf042c602b57f9632f37020d0e3a32fe5",
+    "public/scene-benchmark.js": "57ca7d031038a50803c326bbaa5d43ec2e192f3f94aa6ad15013f59eab27fc57",
+    "public/scene-benchmark.html": "3364a3f0a79c6cbbeae3a74fd94e79d2e433a9328c49c5dc97da17ffa84b65a3",
+    "src/engine/scene-benchmark-metrics.js": "ab9590a761cd2e28cdb6eb25830f2f3da532c0537dc62d6117bc41b37b77e30e",
+    "examples/instance-lab.arkglide": "6e33c9ef54008c8cd31a8b18c220e219578baaa967276b2912edbeb01f0c15fc"
+  }
+}

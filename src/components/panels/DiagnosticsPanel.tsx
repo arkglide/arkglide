@@ -22,6 +22,7 @@ export default function DiagnosticsPanel() {
         ],
         ["FPS", stats.fps.toFixed(1)],
         ["级联阴影灯", stats.cascadedShadowLights || 0],
+        ["实例批次 / 成员 / 回退", `${stats.instanceBatches||0} / ${stats.instancedMeshes||0} / ${stats.instanceSkippedMeshes||0}`],
         ["LOD 网格 / 层级 / 跳过", `${stats.lodMeshes||0} / ${stats.lodLevels||0} / ${stats.lodSkippedMeshes||0}`],
         ["LOD 构建 WASM / JS", `${stats.lodNativeBuilds||0} / ${stats.lodJSBuilds||0}`],
         ["画质 / 渲染比例", `${stats.renderQuality || "custom"} / ${stats.renderResolutionScale ?? 1}`],

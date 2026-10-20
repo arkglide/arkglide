@@ -183,13 +183,14 @@
       return Promise.all([...slots.values()].map((s) => s.promise));
     }
     function restore(mesh) {
+      if (mesh.metadata?.arkglideBatchMember) return;
       if (mesh.material?.metadata?.arkglideManagedMaterial)
         mesh.material = originals.get(mesh) || null;
     }
     function apply(node, object) {
       const targets =
         node.type === "mesh"
-          ? [object]
+          ? [object.metadata?.arkglideBatchMember ? object.sourceMesh : object]
           : node.type === "model"
             ? object
                 .getChildMeshes(false)
@@ -269,7 +270,8 @@
   }
   function createSceneAdapter(B, scene, options = {}) {
     const optimization = root.ArkGlideSceneOptimization?.create(B, scene, options), geometryPool = new Map();
-    const rendering = root.ArkGlideRendering?.create(B, scene, {...options,onPrepareGeometry:()=>optimization?.prepare(),getOptimizationStats:()=>optimization?.stats()});
+    const instances = root.ArkGlideStaticInstances?.create(B,scene);
+    const rendering = root.ArkGlideRendering?.create(B, scene, {...options,onPrepareGeometry:()=>optimization?.prepare(),getOptimizationStats:()=>({...optimization?.stats(),...instances?.stats(nodes)})});
     const nodes = new Map(),
       records = new Map(),
       resources = new Map(),
@@ -315,9 +317,7 @@
       mat.wireframe = true;
       mesh.material = mat;
     }
-    function make(node) {
-      let object;
-      if (node.type === "mesh") {
+    function primitiveMesh(id,primitive,shared) {
         const builders = {
           box: "CreateBox",
           sphere: "CreateSphere",
@@ -326,9 +326,16 @@
           capsule: "CreateCapsule",
           torus: "CreateTorus",
         };
-        const primitive=primitiveOf(node),shared=node.optimization?.shareGeometry!==false,cached=geometryPool.get(primitive);
-        if(shared&&cached&&!cached.isDisposed()){object=new B.Mesh(node.id,scene);cached.applyToMesh(object);}
-        else {object=B.MeshBuilder[builders[primitive]||'CreateBox'](node.id,{},scene);if(shared)geometryPool.set(primitive,object.geometry);}
+        const cached=geometryPool.get(primitive);let object;
+        if(shared&&cached&&!cached.isDisposed()){object=new B.Mesh(id,scene);cached.applyToMesh(object);}
+        else {object=B.MeshBuilder[builders[primitive]||'CreateBox'](id,{},scene);if(shared)geometryPool.set(primitive,object.geometry);}
+        return object;
+    }
+    function make(node) {
+      let object;
+      if (node.type === "mesh") {
+        const primitive=primitiveOf(node),factory=()=>primitiveMesh(node.id,primitive,node.optimization?.shareGeometry!==false);
+        object=instances?.make(node,primitive,factory)||factory();
       } else object = new B.TransformNode(node.id, scene);
       nodes.set(node.id, object);
       object.onDisposeObservable?.add(() => {
@@ -425,7 +432,7 @@
     function modelExtension(node) {
       return /\.gltf$/i.test(node.modelUrl || "") ? ".gltf" : ".glb";
     }
-    function kindOf(node){return node.type+':'+(node.type==='mesh'?primitiveOf(node)+':'+(node.optimization?.shareGeometry!==false):node.lightType||'');}
+    function kindOf(node){return node.type+':'+(node.type==='mesh'?primitiveOf(node)+':'+(node.optimization?.shareGeometry!==false)+':'+(instances?.key(node,primitiveOf(node))||'mesh'):node.lightType||'');}
     async function loadModel(node, buffer) {
       const token = {},
         object = nodes.get(node.id);
@@ -522,6 +529,7 @@
     ) {
       if (disposed) return Promise.resolve();
       definitions = next;
+      instances?.configure(next,content,rendering?.settings());
       const ids = new Set(next.map((n) => n.id));
       // Detach surviving children before deleting/replacing a parent.
       nodes.forEach((object, id) => {
@@ -585,6 +593,7 @@
         object.dispose(false, true);
       });
       nodes.clear();
+      instances?.clear();
       geometryPool.clear();
       records.clear();
       for(const mat of legacyMaterials.values())mat.dispose(false,false);
@@ -600,6 +609,7 @@
     return {
       rendering,
       optimization,
+      instanceStats:()=>instances?.stats(nodes)||{},
       nodes,
       resources,
       sync,
@@ -608,6 +618,7 @@
         clear();
         const generation=batchGeneration;
         const all=next; definitions=all;
+        instances?.configure(all,content,rendering?.settings());
         await Promise.all([materialLibrary.sync(content,textureBuffers), rendering?.sync(content,textureBuffers)]);
         for(let offset=0;offset<all.length;offset+=batchNodes){
           if(disposed||generation!==batchGeneration)throw Error('场景分块创建已取消');

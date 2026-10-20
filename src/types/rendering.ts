@@ -46,4 +46,4 @@ export interface ReflectionProbeSettings {
   intensity?: number;
 }
 export interface PlanarReflectionSettings { enabled: boolean; axis?: "x" | "y" | "z"; offset?: number; blur?: number; intensity?: number; }
-export interface MeshOptimizationSettings { shareGeometry?: boolean; lod?: {enabled:boolean;levels?:{distance:number;grid:number}[]}; }
+export interface MeshOptimizationSettings { shareGeometry?: boolean; instancing?: boolean; lod?: {enabled:boolean;levels?:{distance:number;grid:number}[]}; }

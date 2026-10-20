@@ -105,6 +105,7 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  instancingSupported?: boolean; instanceBatches?: number; instancedMeshes?: number; instanceSkippedMeshes?: number;
   lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number;
   cascadedShadowLights?: number;
   atmosphereSky?: boolean;

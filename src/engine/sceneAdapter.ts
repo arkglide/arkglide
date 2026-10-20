@@ -7,6 +7,7 @@ import "./lighting-uv.js";
 import "./baked-lighting.js";
 import "./geometry-cluster.js";
 import "./scene-optimization.js";
+import "./static-instances.js";
 import {loadMathModule} from './wasm/math-loader';
 import "./rendering-config.js";
 import "./atmosphere-runtime.js";
@@ -16,6 +17,7 @@ import "./reflection-runtime.js";
 import "./rendering-runtime.js";
 
 export interface SceneAdapter {
+  instanceStats(): {instancingSupported?: boolean;instanceBatches?: number;instancedMeshes?: number;instanceSkippedMeshes?: number};
   rendering: any;
   nodes: Map<string, TransformNode>;
   sync(

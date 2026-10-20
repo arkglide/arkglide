@@ -10,6 +10,8 @@
 
 [体积大气](docs/volumetric-atmosphere.md) 支持 GPU 高度雾、噪声密度、方向光遮挡光束和有像素预算的保边合成；`examples/volumetric-lab.arkglide` 用 `V` 对照效果、`1/2/3` 调节质量。后续顺序见 [渲染路线](docs/volumetric-and-rendering-roadmap.md)。
 
+[静态实例批次](docs/static-instances.md) 为重复基础几何与相同材质合批，保留独立拾取、变换和静态碰撞。`examples/instance-lab.arkglide` 展示实例批次与体积光束的组合。
+
 ```sh
 npm ci
 npm run dev
