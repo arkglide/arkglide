@@ -14,6 +14,7 @@
     bloom: { enabled: false, threshold: 1, weight: 0.3, kernel: 32, scale: 0.5 },
     ao: { enabled: false, ratio: 0.5, radius: 1, strength: 1, samples: 8 },
     fog: { mode: "none", color: "#A8BDD0", density: 0.01, start: 10, end: 100 },
+    volumetric: { enabled: false, color: "#B5C9DE", density: 0.025, height: 0, falloff: 0.15, maxDistance: 80, ambient: 0.2, lightIntensity: 1, anisotropy: 0.45, noiseStrength: 0.35, noiseScale: 0.15, steps: 48, scale: 0.5, maxPixels: 1048576, shadows: true, shadowMapSize: 1024, shadowDistance: 80, shadowBias: 0.001 },
     sky: { enabled: false, sunAzimuth: 0, sunElevation: 35, turbidity: 2, rayleigh: 2, mie: 0.005, luminance: 1 },
     dof: { enabled: false, focusDistance: 10, focalLength: 50, fStop: 2.8, quality: 1 },
     reflections: {
@@ -72,6 +73,11 @@
     if (!["none", "linear", "exp", "exp2"].includes(c.fog.mode) || !/^#[\da-f]{6}$/i.test(c.fog.color)) throw Error("无效大气雾配置");
     number(c.fog.density, 0, 1, "fog density"); number(c.fog.start, 0, 100000, "fog start"); number(c.fog.end, 0.001, 1000000, "fog end");
     if (c.fog.end <= c.fog.start) throw Error("雾结束距离必须大于开始距离");
+    const v = c.volumetric;
+    if (typeof v.enabled !== "boolean" || typeof v.shadows !== "boolean" || !/^#[\da-f]{6}$/i.test(v.color) || ![16,24,32,48,64,96].includes(v.steps) || ![256,512,1024,2048].includes(v.shadowMapSize) || !Number.isInteger(v.maxPixels)) throw Error("无效体积大气配置");
+    number(v.density,0,1,"volume density"); number(v.height,-100000,100000,"volume height"); number(v.falloff,0,10,"volume height falloff"); number(v.maxDistance,1,10000,"volume distance");
+    number(v.ambient,0,5,"volume ambient"); number(v.lightIntensity,0,10,"volume light"); number(v.anisotropy,-.8,.8,"volume anisotropy"); number(v.noiseStrength,0,1,"volume noise"); number(v.noiseScale,.001,10,"volume noise scale");
+    number(v.scale,.25,1,"volume scale"); number(v.maxPixels,16384,4194304,"volume pixel budget"); number(v.shadowDistance,1,10000,"volume shadow distance"); number(v.shadowBias,0,.05,"volume shadow bias");
     if (typeof c.sky.enabled !== "boolean" || typeof c.dof.enabled !== "boolean" || ![0, 1, 2].includes(c.dof.quality)) throw Error("无效天空或景深配置");
     number(c.sky.sunAzimuth, -360, 360, "sun azimuth"); number(c.sky.sunElevation, -90, 90, "sun elevation");
     number(c.sky.turbidity, 1, 20, "sky turbidity"); number(c.sky.rayleigh, 0, 8, "sky Rayleigh"); number(c.sky.mie, 0, 0.1, "sky Mie"); number(c.sky.luminance, 0, 10, "sky luminance");
@@ -161,6 +167,7 @@
     Object.assign(c.ao, { enabled: !low, ratio: high ? 1 : 0.5, samples: high ? 16 : 8 });
     Object.assign(c.bloom, { enabled: !low, scale: high ? 0.5 : 0.25 });
     c.dof.quality = high ? 2 : low ? 0 : 1;
+    Object.assign(c.volumetric,{steps:high?64:low?16:32,scale:high?.75:low?.25:.5,maxPixels:high?2097152:low?262144:1048576,shadows:!low,shadowMapSize:high?1024:512});
     Object.assign(c.reflections.ssr,{enabled:high,maxSteps:high?128:32,downsample:high?0:1});
     Object.assign(c.reflections.planar,{enabled:!low,maxMirrors:high?4:1,maxPixels:high?4194304:524288,scale:high?1:.5});
     Object.assign(c.views, { depth: low ? 1 : 2, scale: low ? 0.5 : high ? 1 : 0.75, samples: high ? 4 : 1, maxViews: low ? 4 : high ? 16 : 8, maxPixels: low ? 1048576 : high ? 8388608 : 3145728, particles: high });

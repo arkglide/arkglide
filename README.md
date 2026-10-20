@@ -8,6 +8,8 @@
 
 [静态光照烘焙与级联阴影](docs/lighting-workflow.md)、[几何共享/LOD 与资源预算](docs/scene-scale.md)、[场景性能基准](docs/scene-performance.md) 已接入菜单与属性面板。组合示例为 `examples/lighting-scale-lab.arkglide`；真实显卡预算通过基准入口在目标设备采集。
 
+[体积大气](docs/volumetric-atmosphere.md) 支持 GPU 高度雾、噪声密度、方向光遮挡光束和有像素预算的保边合成；`examples/volumetric-lab.arkglide` 用 `V` 对照效果、`1/2/3` 调节质量。后续顺序见 [渲染路线](docs/volumetric-and-rendering-roadmap.md)。
+
 ```sh
 npm ci
 npm run dev

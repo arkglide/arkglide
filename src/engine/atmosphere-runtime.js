@@ -2,14 +2,14 @@
 (function (root) {
   "use strict";
   function create(B, scene) {
-    let sky = null, material = null, previous = null, previousLinear = null;
+    let sky = null, material = null, previous = null, previousLinear = null, previousVolume = null;
     const original = { mode: scene.fogMode, color: scene.fogColor.clone(), density: scene.fogDensity, start: scene.fogStart, end: scene.fogEnd };
     function clearSky() { sky?.dispose(false, true); sky = material = null; }
-    function configure(config, linear) {
-      if (previous === config && previousLinear === linear) return;
-      previous = config; previousLinear = linear;
+    function configure(config, linear, volume = false) {
+      if (previous === config && previousLinear === linear && previousVolume === volume) return;
+      previous = config; previousLinear = linear; previousVolume = volume;
       const fog = config.fog, s = config.sky;
-      scene.fogMode = { none: B.Scene.FOGMODE_NONE, linear: B.Scene.FOGMODE_LINEAR, exp: B.Scene.FOGMODE_EXP, exp2: B.Scene.FOGMODE_EXP2 }[fog.mode];
+      scene.fogMode = volume ? B.Scene.FOGMODE_NONE : { none: B.Scene.FOGMODE_NONE, linear: B.Scene.FOGMODE_LINEAR, exp: B.Scene.FOGMODE_EXP, exp2: B.Scene.FOGMODE_EXP2 }[fog.mode];
       scene.fogColor.copyFrom(B.Color3.FromHexString(fog.color));
       scene.fogDensity = fog.density; scene.fogStart = fog.start; scene.fogEnd = fog.end;
       if (!s.enabled) { clearSky(); return; }

@@ -108,6 +108,7 @@ export interface RuntimeStats {
   lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number;
   cascadedShadowLights?: number;
   atmosphereSky?: boolean;
+  volumetricSupported?: boolean; volumetricEnabled?: boolean; volumetricPixels?: number; volumetricWidth?: number; volumetricHeight?: number; volumetricSteps?: number; volumetricShadowSize?: number; volumetricShadowed?: boolean; volumetricLight?: string | null;
   dofEnabled?: boolean;
   ssrEnabled?: boolean;
   ssrSupported?: boolean;
@@ -120,6 +121,7 @@ export interface RuntimeStats {
   renderResolutionScale?: number;
   renderDrawCalls?: number;
   renderMainTriangles?: number;
+  renderSceneTriangles?: number;
   renderSubmitMs?: number;
   gpuTimerSupported?: boolean;
   gpuTimeMs?: number | null;

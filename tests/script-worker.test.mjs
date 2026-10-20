@@ -365,7 +365,7 @@ test('quality and multi-view budgets are typed in JS/TS factories and module con
   assert.equal((await diagnostics(invalid.worker, invalid.file('bad.js'))).length, 2);
 });
 test('advanced rendering and GPU particle options have matching module and legacy types',async()=>{
- const body=`const config=rendering.getSettings();console.log(config.fog.mode,config.sky.sunElevation,config.dof.focusDistance,config.reflections.ssr.maxSteps,rendering.getStats().planarRenderedPixels);
+ const body=`const config=rendering.getSettings();console.log(config.fog.mode,config.sky.sunElevation,config.dof.focusDistance,config.reflections.ssr.maxSteps,rendering.getStats().planarRenderedPixels,config.volumetric.steps,rendering.getStats().volumetricPixels);rendering.setVolumetric({enabled:true,density:.04,steps:64});
  const particles=visuals.createParticles({backend:'auto',blendMode:'standard',capacity:128,rate:10,lifetime:[1,2],size:[.1,.2],colors:['#FFFFFF','#FFFF00'],velocity:{min:{x:0,y:0,z:0},max:{x:1,y:1,z:1}},gravity:{x:0,y:-1,z:0},emitBox:{min:{x:0,y:0,z:0},max:{x:1,y:1,z:1}},angularSpeed:[-1,1]});console.log(particles.backend);`;
  const {worker,file}=setup({'advanced.js':`return {onStart(){${body}}};`,'advanced.ts':`return {onStart(){${body}}};`,'module.js':`export default ({rendering,visuals})=>({onStart(){${body}}});`});
  for(const name of ['advanced.js','advanced.ts','module.js'])assert.deepEqual(await diagnostics(worker,file(name)),[]);

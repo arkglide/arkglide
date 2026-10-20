@@ -1065,9 +1065,21 @@ declare const signals: SignalsAPI;
 declare const motion: MotionAPI;
 declare const optics: OpticsAPI;
 type RenderQuality = "low" | "medium" | "high" | "custom";
+interface VolumetricSettings {
+  enabled: boolean; color: string; density: number; height: number; falloff: number; maxDistance: number;
+  ambient: number; lightIntensity: number; anisotropy: number; noiseStrength: number; noiseScale: number;
+  steps: 16 | 24 | 32 | 48 | 64 | 96; scale: number; maxPixels: number; shadows: boolean;
+  shadowMapSize: 256 | 512 | 1024 | 2048; shadowDistance: number; shadowBias: number;
+}
+interface VolumetricStats {
+  volumetricSupported: boolean; volumetricEnabled: boolean; volumetricPixels: number; volumetricWidth: number; volumetricHeight: number;
+  volumetricSteps: number; volumetricShadowSize: number; volumetricShadowed: boolean; volumetricLight: string | null;
+}
 interface RenderingAPI {
   /** Changes quality budgets for this session; keeps environment assets and color choices. */
   setQuality(quality: RenderQuality): void;
+  /** Patch the main-camera volume for this session. Validated before applying. */
+  setVolumetric(patch: Partial<VolumetricSettings>): void;
   getSettings(): {
     quality: RenderQuality;
     resolutionScale: number;
@@ -1075,6 +1087,7 @@ interface RenderingAPI {
     samples: number;
     gpuProfiling: boolean;
     fog: { mode: "none" | "linear" | "exp" | "exp2"; color: string; density: number; start: number; end: number };
+    volumetric: VolumetricSettings;
     sky: { enabled: boolean; sunAzimuth: number; sunElevation: number; turbidity: number; rayleigh: number; mie: number; luminance: number };
     dof: { enabled: boolean; focusDistance: number; focalLength: number; fStop: number; quality: 0 | 1 | 2 };
     reflections: { ssr: { enabled: boolean; maxSteps: number; step: number; maxDistance: number; thickness: number; strength: number; roughnessFactor: number; blur: number; downsample: number }; planar: { enabled: boolean; maxMirrors: number; maxPixels: number; scale: number } };
@@ -1086,7 +1099,7 @@ interface RenderingAPI {
     views: { depth: number; scale: number; recursiveScale: number; samples: number; maxViews: number; maxPixels: number; minArea: number; minResolution: number; particles: boolean };
     probes: { id: string; name: string; textureId: string; position: Vec3; size: Vec3; priority: number; intensity: number }[];
   };
-  getStats(): { cascadedShadowLights?: number; lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number; renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
+  getStats(): VolumetricStats & { cascadedShadowLights?: number; lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number; renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSceneTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
 }
 declare const rendering: RenderingAPI;
 interface ScriptContext { rendering: RenderingAPI; }

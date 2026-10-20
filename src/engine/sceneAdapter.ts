@@ -10,6 +10,7 @@ import "./scene-optimization.js";
 import {loadMathModule} from './wasm/math-loader';
 import "./rendering-config.js";
 import "./atmosphere-runtime.js";
+import "./volumetric-runtime.js";
 import "./render-view-budget.js";
 import "./reflection-runtime.js";
 import "./rendering-runtime.js";

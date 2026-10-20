@@ -11,17 +11,17 @@ function sceneNodes(count,lod){
  return nodes;
 }
 async function measure(config,scene,engine,adapter,camera,instrumentation,signal,label){
- const frames=[],cpu=[],gpu=[],triangles=[],draws=[];let previous=null,lastGpu=instrumentation.gpuFrameTimeCounter.count;
+ const frames=[],cpu=[],gpu=[],triangles=[],sceneTriangles=[],draws=[];let previous=null,lastGpu=instrumentation.gpuFrameTimeCounter.count;
  for(let frame=0;frame<config.warmup+config.samples;frame++){
   const time=await waitFrame(signal);check(signal);
   const angle=frame/(config.warmup+config.samples)*Math.PI*2,radius=Math.sqrt(config.meshes)*3;
   camera.position.set(Math.cos(angle)*radius,radius*.45,Math.sin(angle)*radius);camera.setTarget(B.Vector3.Zero());
   engine.beginFrame();const start=performance.now();scene.render();const elapsed=performance.now()-start;engine.endFrame();
-  if(frame>=config.warmup&&previous!==null){frames.push(time-previous);cpu.push(elapsed);const stats=adapter.rendering.stats();triangles.push(stats.renderMainTriangles);draws.push(stats.renderDrawCalls);if(instrumentation.gpuFrameTimeCounter.count>lastGpu){gpu.push(instrumentation.gpuFrameTimeCounter.current/1000000);}}
+  if(frame>=config.warmup&&previous!==null){frames.push(time-previous);cpu.push(elapsed);const stats=adapter.rendering.stats();triangles.push(stats.renderMainTriangles);sceneTriangles.push(stats.renderSceneTriangles);draws.push(stats.renderDrawCalls);if(instrumentation.gpuFrameTimeCounter.count>lastGpu){gpu.push(instrumentation.gpuFrameTimeCounter.current/1000000);}}
   lastGpu=instrumentation.gpuFrameTimeCounter.count;previous=time;
   if(frame%15===0)status.textContent=label+'：'+(frame<config.warmup?'预热 '+(frame+1)+' / '+config.warmup:'采样 '+(frame-config.warmup+1)+' / '+config.samples);
  }
- return {frameMs:M.summary(frames),cpuRenderMs:M.summary(cpu),gpuMs:M.summary(gpu),triangles:M.summary(triangles),drawCalls:M.summary(draws),optimization:adapter.optimization.stats()};
+ return {frameMs:M.summary(frames),cpuRenderMs:M.summary(cpu),gpuMs:M.summary(gpu),triangles:M.summary(triangles),sceneTriangles:M.summary(sceneTriangles),drawCalls:M.summary(draws),optimization:adapter.optimization.stats(),volume:adapter.rendering.settings().volumetric,volumeStats:adapter.rendering.stats()};
 }
 async function run(input={}){
  if(controller)throw Error('测试正在进行');const config=M.config(input),abort=new AbortController();controller=abort;button.disabled=true;resolution.disabled=true;cancel.disabled=false;download.disabled=true;globalThis.__arkglideBenchmark={state:'running',config};output.textContent='';
@@ -36,18 +36,20 @@ async function run(input={}){
   adapter=globalThis.ArkGlideScene.createSceneAdapter(B,scene,{loadModule:()=>Promise.resolve(module)});
   instrumentation=new B.EngineInstrumentation(engine);const timerSupported=!!engine.getCaps().timerQuery;if(timerSupported)instrumentation.captureGPUFrameTime=true;
   const content={materials,textures:[]},results=[];
-  for(const [label,lod]of [['原始几何',false],['静态 LOD',true]]){
+  const cases=config.volumetric?[['体积关闭',true,false],['体积开启',true,true]]:[['原始几何',false,false],['静态 LOD',true,false]];
+  for(const [label,lod,volume]of cases){
+   adapter.rendering.configure({volumetric:{enabled:volume,steps:32,scale:.5,shadowMapSize:512},color:{toneMapping:config.volumetric?'aces':'none'}});
    check(abort.signal);status.textContent=label+'：准备中…';await guarded(adapter.sync(sceneNodes(config.meshes,lod),{},content,{}),abort.signal);check(abort.signal);await guarded(scene.whenReadyAsync(),abort.signal);
-   results.push({name:label,lod,...await measure(config,scene,engine,adapter,camera,instrumentation,abort.signal,label)});
+   results.push({name:label,lod,volumetric:volume,...await measure(config,scene,engine,adapter,camera,instrumentation,abort.signal,label)});
   }
   const info=engine.getGlInfo(),renderer=info.renderer||'',mode=M.renderMode(renderer),report={date:new Date().toISOString(),browser:navigator.userAgent,renderer:info,renderMode:mode,hardwareBudgetVerified:false,devicePixelRatio:devicePixelRatio,resolution:{width:engine.getRenderWidth(),height:engine.getRenderHeight()},config,timerSupported,results,
    target:{fps:60,frameMs:1000/60,note:mode==='software'?'软件渲染仅验证流程，不用于目标显卡预算。':'此记录只覆盖当前基准场景；需在目标设备与完整游戏中审核预算。'},
-   limits:'Static geometry with basic PBR lights. No shadow/SSR/DOF/physics/script workload; same frame-index camera path in both cases. CPU/GPU/RAF are separate measurements; GPU samples include only newly completed valid timer queries. Hardware is reported by the browser and not independently certified.'};
+   limits:'Static geometry with basic PBR lights; optional volume A/B with identical LOD and color processing. Volume includes its own main and directional light depth passes. No surface shadows/SSR/DOF/physics/script workload; same frame-index camera path in both cases. CPU/GPU/RAF are separate measurements; GPU samples include only newly completed valid timer queries. Hardware is reported by the browser and not independently certified.'};
   globalThis.__arkglideBenchmark={state:'complete',report};output.textContent=JSON.stringify(report,null,2);status.textContent=`测试完成（${mode}）。可下载记录；静态 LOD 三角形中位数 ${results[1].triangles.median.toLocaleString()}。`;download.disabled=false;return report;
  }catch(error){globalThis.__arkglideBenchmark={state:'error',error:String(error)};status.textContent=String(error);throw error;}
  finally{canvas.removeEventListener('webglcontextlost',lost);document.removeEventListener('visibilitychange',hidden);window.removeEventListener('blur',blur);instrumentation?.dispose();adapter?.dispose();scene?.dispose();engine?.dispose();controller=null;button.disabled=false;resolution.disabled=false;cancel.disabled=true;}
 }
 globalThis.ArkGlideSceneBenchmark={run,cancel:()=>controller?.abort()};
-button.addEventListener('click',()=>{const params=new URLSearchParams(location.search),input={};for(const name of ['meshes','width','height','warmup','samples'])if(params.has(name))input[name]=Number(params.get(name));if(!params.has('width'))[input.width,input.height]=resolution.value.split(',').map(Number);void run(input).catch(()=>{});});
+button.addEventListener('click',()=>{const params=new URLSearchParams(location.search),input={volumetric:params.get('volumetric')==='1'||document.querySelector('#volume').checked};for(const name of ['meshes','width','height','warmup','samples'])if(params.has(name))input[name]=Number(params.get(name));if(!params.has('width'))[input.width,input.height]=resolution.value.split(',').map(Number);void run(input).catch(()=>{});});
 cancel.addEventListener('click',()=>controller?.abort());
 download.addEventListener('click',()=>{const report=globalThis.__arkglideBenchmark?.report;if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='arkglide-scene-benchmark.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});

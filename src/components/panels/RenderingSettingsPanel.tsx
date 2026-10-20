@@ -19,6 +19,7 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     bloom: { ...defaults.bloom, ...value?.bloom },
     views: { ...defaults.views, ...value?.views },
     fog: { ...defaults.fog, ...value?.fog },
+    volumetric: { ...defaults.volumetric, ...value?.volumetric },
     sky: { ...defaults.sky, ...value?.sky },
     dof: { ...defaults.dof, ...value?.dof },
     ssr: { ...defaults.reflections.ssr, ...value?.reflections?.ssr },
@@ -90,6 +91,21 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <TextField label="大气雾" select size="small" value={c.fog.mode} onChange={e => change("fog", {mode:e.target.value})}>{[["none","关闭"],["linear","线性距离雾"],["exp","指数雾"],["exp2","指数平方雾"]].map(([v,n])=><MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
     <TextField label="雾颜色" type="color" size="small" value={c.fog.color} onChange={e=>change("fog",{color:e.target.value})} />
     <Stack direction="row" spacing={1}>{number("fog","density","雾密度",0,1,.001)}{number("fog","start","雾开始距离",0,100000,1)}{number("fog","end","雾结束距离",.001,1000000,1)}</Stack>
+    <FormControlLabel label="体积大气（主视图）" control={<Switch checked={c.volumetric.enabled} onChange={e=>change('volumetric',{enabled:e.target.checked})} />} />
+    {c.volumetric.enabled&&<Stack spacing={1.5}>
+      <Typography variant="caption" color="text.secondary">体积高度雾替代距离雾。首个启用的方向光形成光束；透明表面使用后方不透明深度。</Typography>
+      <TextField label="体积雾颜色" type="color" size="small" value={c.volumetric.color} onChange={e=>change('volumetric',{color:e.target.value})} />
+      <Stack direction="row" spacing={1}>{number('volumetric','density','体积雾密度',0,1,.001)}{number('volumetric','height','体积雾基准高度',-100000,100000,.1)}{number('volumetric','falloff','高度衰减',0,10,.01)}</Stack>
+      <Stack direction="row" spacing={1}>{number('volumetric','maxDistance','体积积分距离',1,10000,1)}{number('volumetric','ambient','雾环境亮度',0,5,.05)}{number('volumetric','lightIntensity','雾方向光强度',0,10,.05)}</Stack>
+      {number('volumetric','anisotropy','雾散射方向性',-.8,.8,.05)}
+      <Stack direction="row" spacing={1}>{number('volumetric','noiseStrength','雾噪声强度',0,1,.05)}{number('volumetric','noiseScale','雾噪声频率',.001,10,.01)}</Stack>
+      <TextField label="体积采样步数" size="small" select value={c.volumetric.steps} onChange={e=>change('volumetric',{steps:Number(e.target.value)})}>{[16,24,32,48,64,96].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+      {number('volumetric','scale','体积分辨率比例',.25,1,.05)}
+      <ScalarField label="体积像素上限（MP）" size="small" value={c.volumetric.maxPixels/1048576} inputProps={{min:1/64,max:4,step:.25}} onValueChange={v=>change('volumetric',{maxPixels:Math.round(v*1048576)})} />
+      <FormControlLabel label="方向光体积遮挡" control={<Switch checked={c.volumetric.shadows} onChange={e=>change('volumetric',{shadows:e.target.checked})} />} />
+      <TextField label="体积光深度图" size="small" select value={c.volumetric.shadowMapSize} onChange={e=>change('volumetric',{shadowMapSize:Number(e.target.value)})}>{[256,512,1024,2048].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+      <Stack direction="row" spacing={1}>{number('volumetric','shadowDistance','体积遮挡范围',1,10000,1)}{number('volumetric','shadowBias','体积遮挡偏移',0,.05,.0001)}</Stack>
+    </Stack>}
     <FormControlLabel label="程序大气天空" control={<Switch checked={c.sky.enabled} onChange={e=>change("sky",{enabled:e.target.checked})} />} />
     <Stack direction="row" spacing={1}>{number("sky","sunAzimuth","太阳方位（度）",-360,360,1)}{number("sky","sunElevation","太阳高度（度）",-90,90,1)}</Stack>
     <Stack direction="row" spacing={1}>{number("sky","turbidity","天空浑浊度",1,20,.1)}{number("sky","rayleigh","Rayleigh 散射",0,8,.1)}{number("sky","mie","Mie 散射",0,.1,.001)}</Stack>

@@ -5,6 +5,7 @@ export interface RenderingSettings {
   samples?: number;
   gpuProfiling?: boolean;
   fog?: { mode?: "none" | "linear" | "exp" | "exp2"; color?: string; density?: number; start?: number; end?: number };
+  volumetric?: VolumetricSettings;
   sky?: { enabled?: boolean; sunAzimuth?: number; sunElevation?: number; turbidity?: number; rayleigh?: number; mie?: number; luminance?: number };
   dof?: { enabled?: boolean; focusDistance?: number; focalLength?: number; fStop?: number; quality?: 0 | 1 | 2 };
   reflections?: {
@@ -28,6 +29,12 @@ export interface RenderingSettings {
   environment?: { textureId?: string | null; intensity?: number; rotation?: number; skybox?: boolean };
   color?: { toneMapping?: "none" | "standard" | "aces"; exposure?: number; contrast?: number; saturation?: number; hue?: number; tint?: number };
   bloom?: { enabled?: boolean; threshold?: number; weight?: number; kernel?: number; scale?: number };
+}
+export interface VolumetricSettings {
+  enabled?: boolean; color?: string; density?: number; height?: number; falloff?: number; maxDistance?: number;
+  ambient?: number; lightIntensity?: number; anisotropy?: number; noiseStrength?: number; noiseScale?: number;
+  steps?: 16 | 24 | 32 | 48 | 64 | 96; scale?: number; maxPixels?: number; shadows?: boolean;
+  shadowMapSize?: 256 | 512 | 1024 | 2048; shadowDistance?: number; shadowBias?: number;
 }
 export interface ReflectionProbeSettings {
   id: string;

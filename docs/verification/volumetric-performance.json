@@ -1,0 +1,257 @@
+{
+  "date": "2026-10-20T12:32:56.983Z",
+  "browser": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "renderer": {
+    "vendor": "Google Inc. (Google)",
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+  },
+  "renderMode": "software",
+  "hardwareBudgetVerified": false,
+  "devicePixelRatio": 1,
+  "resolution": {
+    "width": 320,
+    "height": 192
+  },
+  "config": {
+    "meshes": 36,
+    "width": 320,
+    "height": 192,
+    "warmup": 10,
+    "samples": 30,
+    "volumetric": true
+  },
+  "timerSupported": true,
+  "results": [
+    {
+      "name": "体积关闭",
+      "lod": true,
+      "volumetric": false,
+      "frameMs": {
+        "samples": 30,
+        "median": 66.60000000000014,
+        "p95": 99.90000000000009,
+        "min": 16.59999999999991,
+        "max": 116.59999999999991
+      },
+      "cpuRenderMs": {
+        "samples": 30,
+        "median": 1.4500000001862645,
+        "p95": 5.399999999906868,
+        "min": 0.8000000002793968,
+        "max": 6.2999999998137355
+      },
+      "gpuMs": {
+        "samples": 9,
+        "median": 34.578252,
+        "p95": 78.347817,
+        "min": 23.770527,
+        "max": 78.347817
+      },
+      "triangles": {
+        "samples": 30,
+        "median": 100659,
+        "p95": 116143,
+        "min": 85175,
+        "max": 116143
+      },
+      "sceneTriangles": {
+        "samples": 30,
+        "median": 100659,
+        "p95": 116143,
+        "min": 85175,
+        "max": 116143
+      },
+      "drawCalls": {
+        "samples": 30,
+        "median": 38,
+        "p95": 38,
+        "min": 38,
+        "max": 38
+      },
+      "optimization": {
+        "lodMeshes": 36,
+        "lodLevels": 72,
+        "lodNativeBuilds": 2,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0
+      },
+      "volume": {
+        "enabled": false,
+        "color": "#B5C9DE",
+        "density": 0.025,
+        "height": 0,
+        "falloff": 0.15,
+        "maxDistance": 80,
+        "ambient": 0.2,
+        "lightIntensity": 1,
+        "anisotropy": 0.45,
+        "noiseStrength": 0.35,
+        "noiseScale": 0.15,
+        "steps": 32,
+        "scale": 0.5,
+        "maxPixels": 1048576,
+        "shadows": true,
+        "shadowMapSize": 512,
+        "shadowDistance": 80,
+        "shadowBias": 0.001
+      },
+      "volumeStats": {
+        "lodMeshes": 36,
+        "lodLevels": 72,
+        "lodNativeBuilds": 2,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0,
+        "cascadedShadowLights": 0,
+        "volumetricSupported": true,
+        "volumetricEnabled": false,
+        "volumetricPixels": 0,
+        "volumetricWidth": 0,
+        "volumetricHeight": 0,
+        "volumetricSteps": 0,
+        "volumetricShadowSize": 0,
+        "volumetricShadowed": false,
+        "volumetricLight": null,
+        "ssrEnabled": false,
+        "ssrSupported": true,
+        "dofEnabled": false,
+        "shadowLights": 0,
+        "environmentTextures": 0,
+        "shadowFilters": [],
+        "reflectionProbes": 0,
+        "probeMaterialVariants": 0,
+        "aoEnabled": false,
+        "aoSupported": true,
+        "bloomEnabled": false,
+        "picturePipelines": 1,
+        "hdrOutput": true,
+        "renderQuality": "custom",
+        "renderResolutionScale": 1,
+        "renderDrawCalls": 38,
+        "renderMainTriangles": 85175,
+        "renderSceneTriangles": 85175,
+        "renderSubmitMs": 1.2999999998137355,
+        "gpuTimerSupported": true,
+        "gpuTimeMs": null
+      }
+    },
+    {
+      "name": "体积开启",
+      "lod": true,
+      "volumetric": true,
+      "frameMs": {
+        "samples": 30,
+        "median": 116.60000000000036,
+        "p95": 249.89999999999964,
+        "min": 16.599999999999454,
+        "max": 250
+      },
+      "cpuRenderMs": {
+        "samples": 30,
+        "median": 1.9499999999534339,
+        "p95": 2.6000000000931323,
+        "min": 1.3999999999068677,
+        "max": 2.8000000002793968
+      },
+      "gpuMs": {
+        "samples": 8,
+        "median": 100.54777150000001,
+        "p95": 152.145319,
+        "min": 89.878054,
+        "max": 152.145319
+      },
+      "triangles": {
+        "samples": 30,
+        "median": 100659,
+        "p95": 116143,
+        "min": 85175,
+        "max": 116143
+      },
+      "sceneTriangles": {
+        "samples": 30,
+        "median": 367784,
+        "p95": 398752,
+        "min": 336816,
+        "max": 398752
+      },
+      "drawCalls": {
+        "samples": 30,
+        "median": 115,
+        "p95": 115,
+        "min": 115,
+        "max": 115
+      },
+      "optimization": {
+        "lodMeshes": 36,
+        "lodLevels": 72,
+        "lodNativeBuilds": 2,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0
+      },
+      "volume": {
+        "enabled": true,
+        "color": "#B5C9DE",
+        "density": 0.025,
+        "height": 0,
+        "falloff": 0.15,
+        "maxDistance": 80,
+        "ambient": 0.2,
+        "lightIntensity": 1,
+        "anisotropy": 0.45,
+        "noiseStrength": 0.35,
+        "noiseScale": 0.15,
+        "steps": 32,
+        "scale": 0.5,
+        "maxPixels": 1048576,
+        "shadows": true,
+        "shadowMapSize": 512,
+        "shadowDistance": 80,
+        "shadowBias": 0.001
+      },
+      "volumeStats": {
+        "lodMeshes": 36,
+        "lodLevels": 72,
+        "lodNativeBuilds": 2,
+        "lodJSBuilds": 0,
+        "lodSkippedMeshes": 0,
+        "cascadedShadowLights": 0,
+        "volumetricSupported": true,
+        "volumetricEnabled": true,
+        "volumetricPixels": 15360,
+        "volumetricWidth": 160,
+        "volumetricHeight": 96,
+        "volumetricSteps": 32,
+        "volumetricShadowSize": 512,
+        "volumetricShadowed": true,
+        "volumetricLight": "sun",
+        "ssrEnabled": false,
+        "ssrSupported": true,
+        "dofEnabled": false,
+        "shadowLights": 0,
+        "environmentTextures": 0,
+        "shadowFilters": [],
+        "reflectionProbes": 0,
+        "probeMaterialVariants": 0,
+        "aoEnabled": false,
+        "aoSupported": true,
+        "bloomEnabled": false,
+        "picturePipelines": 1,
+        "hdrOutput": true,
+        "renderQuality": "custom",
+        "renderResolutionScale": 1,
+        "renderDrawCalls": 115,
+        "renderMainTriangles": 85175,
+        "renderSceneTriangles": 336816,
+        "renderSubmitMs": 2,
+        "gpuTimerSupported": true,
+        "gpuTimeMs": null
+      }
+    }
+  ],
+  "target": {
+    "fps": 60,
+    "frameMs": 16.666666666666668,
+    "note": "软件渲染仅验证流程，不用于目标显卡预算。"
+  },
+  "limits": "Static geometry with basic PBR lights; optional volume A/B with identical LOD and color processing. Volume includes its own main and directional light depth passes. No surface shadows/SSR/DOF/physics/script workload; same frame-index camera path in both cases. CPU/GPU/RAF are separate measurements; GPU samples include only newly completed valid timer queries. Hardware is reported by the browser and not independently certified."
+}

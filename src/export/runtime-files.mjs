@@ -1,6 +1,7 @@
 export const RUNTIME_FILES = [
   "arkglide-rendering-config.js",
   "arkglide-atmosphere.js",
+  "arkglide-volumetric.js",
   "arkglide-lighting-uv.js",
   "arkglide-baked-lighting.js",
   "arkglide-geometry-cluster.js",

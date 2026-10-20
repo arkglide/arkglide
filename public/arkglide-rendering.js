@@ -4,6 +4,7 @@
   function create(B, scene, options = {}) {
     const C = root.ArkGlideRenderingConfig, engine = scene.getEngine(), shadows = new Map();
     const atmosphere = root.ArkGlideAtmosphere?.create(B, scene);
+    const volumetric = root.ArkGlideVolumetric?.create(B, scene);
     const mirrors = root.ArkGlideReflections?.create(B, scene, options);
     const baseHardwareScale = engine.getHardwareScalingLevel(), instrumentation = new B.SceneInstrumentation(scene);
     let gpu = null, gpuStartCount = 0, frameOpen = false, frameStarted = 0, offscreenDraws = 0, drawCalls = 0, mainTriangles = 0, cpuSubmitMs = 0;
@@ -14,6 +15,7 @@
     const observers = [];
     let ssr = null, ownedGeometry = null, borrowedGeometry = null, frameNumber = 0;
     let shadowCamera = null, shadowNear = NaN, shadowFar = NaN;
+    let drawPhaseStart = 0, sceneTriangles = 0;
     function watch(observable, fn) { const token = observable.add(fn); observers.push(() => observable.remove(token)); }
     function invalidate() { dirty = true; }
     function report(error) { options.onError?.({ id: "rendering", name: "场景渲染", type: "rendering" }, error); }
@@ -159,6 +161,7 @@
       }
     }
     function clearPost() {
+      volumetric?.clear();
       byteColor?.dispose(postCamera); byteColor = null;
       pipeline?.dispose(); pipeline = null;
       if (dofDepth && scene._depthRenderer?.[dofDepth.camera.uniqueId] === dofDepth.renderer) scene.disableDepthRenderer(dofDepth.camera);
@@ -171,8 +174,8 @@
       scene.imageProcessingConfiguration.applyByPostProcess = false;
     }
     function updatePost() {
-      const needsPost = config.reflections.ssr.enabled || config.reflections.planar.enabled || config.dof.enabled || config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
-      const camera = scene.activeCamera, key = JSON.stringify([config.reflections, config.ao, config.bloom, config.dof, needsPost, config.antialiasing, config.samples]);
+      const needsPost = config.volumetric.enabled && volumetric?.supported || config.reflections.ssr.enabled || config.reflections.planar.enabled || config.dof.enabled || config.antialiasing !== "none" || config.bloom.enabled || config.ao.enabled || config.color.toneMapping !== "none" || config.color.exposure !== 1 || config.color.contrast !== 1 || config.color.saturation !== 0 || config.color.tint !== 0;
+      const camera = scene.activeCamera, key = JSON.stringify([config.volumetric, config.reflections, config.ao, config.bloom, config.dof, needsPost, config.antialiasing, config.samples]);
       if (postCamera === camera && postSignature === key) return;
       clearPost(); postCamera = camera; postSignature = key;
       const previousGeometry=scene.geometryBufferRenderer;
@@ -192,6 +195,7 @@
         ssr.environmentTexture=null;ssr.useFresnel=true;
       }
       if(!previousGeometry && scene.geometryBufferRenderer)ownedGeometry=scene.geometryBufferRenderer;
+      volumetric?.configure(config.volumetric,camera);
       if (needsPost && camera) {
         const caps = engine.getCaps(), hdr = !!(caps.textureHalfFloatRender || caps.textureFloatRender);
         pipeline = new B.DefaultRenderingPipeline("arkglide:picture", true, scene, [camera], false);
@@ -284,18 +288,19 @@
         if (lights.length !== shadows.size || lights.some(light => !shadows.has(light))) dirty = true;
       }
       if (dirty) updateShadows();
-      updatePost(); atmosphere?.configure(config, !!pipeline);
+      updatePost(); atmosphere?.configure(config, !!pipeline, !!volumetric?.stats().volumetricEnabled);
       const beforeDraws=engine._drawCalls?.current||0;
       mirrors?.prepare(config,probeMeshes,frameNumber);
       offscreenDraws+=Math.max(0,(engine._drawCalls?.current||0)-beforeDraws);
       updateProbes();
       options.onPrepareGeometry?.();
+      volumetric?.prepare();
     }
     function beginFrame() { if(shadowCamera!==scene.activeCamera){clearShadows();shadowCamera=scene.activeCamera;dirty=true;}if(shadowCamera&&(shadowNear!==shadowCamera.minZ||shadowFar!==shadowCamera.maxZ)){shadowNear=shadowCamera.minZ;shadowFar=shadowCamera.maxZ;for(const slot of shadows.values())if(slot.cascaded)slot.generator.splitFrustum();}frameNumber++; frameOpen = true; frameStarted = performance.now(); offscreenDraws = 0; }
     function finishFrame() {
       if (!active || !frameOpen) return;
       drawCalls = instrumentation.drawCallsCounter.current + offscreenDraws;
-      mainTriangles = Math.floor(scene.getActiveIndices() / 3);
+      sceneTriangles = Math.floor(scene.getActiveIndices() / 3);
       cpuSubmitMs = performance.now() - frameStarted; frameOpen = false;
     }
     function configure(input) {
@@ -306,6 +311,8 @@
       if (!config.gpuProfiling && gpu) { gpu.captureGPUFrameTime = false; gpu.dispose(); gpu = null; }
     }
     watch(scene.onBeforeRenderObservable, prepareFrame);
+    watch(scene.onBeforeDrawPhaseObservable, () => { if (active && scene.activeCamera === shadowCamera) drawPhaseStart = scene.getActiveIndices(); });
+    watch(scene.onAfterDrawPhaseObservable, () => { if (active && scene.activeCamera === shadowCamera) mainTriangles = Math.floor((scene.getActiveIndices() - drawPhaseStart) / 3); });
     watch(scene.onAfterRenderObservable, finishFrame);
     function clear() {
       active = false; dirty = true; signature = "";
@@ -315,7 +322,7 @@
       for (const [id, slot] of cubes) releaseCube(id, slot);
       if (gpu) { gpu.captureGPUFrameTime = false; gpu.dispose(); gpu = null; }
       engine.setHardwareScalingLevel(baseHardwareScale);
-      frameOpen = false; drawCalls = mainTriangles = cpuSubmitMs = offscreenDraws = 0;
+      frameOpen = false; drawCalls = mainTriangles = sceneTriangles = cpuSubmitMs = offscreenDraws = 0;
       content = {}; buffers = new Map();
     }
     const api = {
@@ -333,10 +340,10 @@
       viewSettings: () => ({ ...config.views }),
       linearOutput: () => !!pipeline,
       settings: () => structuredClone(config),
-      stats: () => ({ ...options.getOptimizationStats?.(), cascadedShadowLights: [...shadows.values()].filter(s=>s.cascaded).length, ...atmosphere?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
+      stats: () => ({ ...options.getOptimizationStats?.(), cascadedShadowLights: [...shadows.values()].filter(s=>s.cascaded).length, ...atmosphere?.stats(), ...volumetric?.stats(), ...mirrors?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size, probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSceneTriangles: sceneTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
       forOwner(owner) {
         const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
-        return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, getStats() { check(); return api.stats(); } });
+        return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, setVolumetric(patch) { check(); if(!patch||typeof patch!=='object'||Array.isArray(patch))throw Error('无效体积大气配置');configure({...config,volumetric:{...config.volumetric,...patch}}); }, getStats() { check(); return api.stats(); } });
       },
       clear,
       dispose() { if (dead) return; clear(); dead = true; instrumentation.dispose(); for (const remove of observers) remove(); if (scene._arkglideRendering === api) delete scene._arkglideRendering; },

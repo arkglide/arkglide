@@ -17,6 +17,7 @@ copyFileSync(
 for (const [source, target] of [
   ["rendering-config", "rendering-config"],
   ["atmosphere-runtime", "atmosphere"],
+  ["volumetric-runtime", "volumetric"],
   ["lighting-uv", "lighting-uv"],
   ["baked-lighting", "baked-lighting"],
   ["geometry-cluster", "geometry-cluster"],

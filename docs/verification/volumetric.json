@@ -1,0 +1,69 @@
+{
+  "baseCommit": "cd76c76efe9f98489f25f3b2c40d30b9485e3cab",
+  "scope": [
+    "GPU world-space height fog and noise density",
+    "Single scattering with an independently owned directional light depth map",
+    "Depth-guided low-resolution composition before final color processing",
+    "Editor persistence, script patch API, quality budgets, exported demo and volume A/B benchmark",
+    "Separate main-view and complete scene triangle counts"
+  ],
+  "validation": {
+    "unitTests": 599,
+    "editorRenderingBrowserCases": 20,
+    "independentVolumeBrowserCases": 1,
+    "staticPlayerBrowserCases": 7,
+    "distinctBrowserCases": 28,
+    "fullEditorSuiteRun": false,
+    "typescript": "passed",
+    "productionBuild": "passed with 4096 MiB Node heap",
+    "runtimeMirrors": 44,
+    "newWasmKernels": false,
+    "compute": "GPU ray marching; existing native transform/culling kernels retained"
+  },
+  "pixelChecks": {
+    "zeroDensityMaxChannelDifference": 1,
+    "fogCenter": 204,
+    "heightAttenuatedCenter": 39,
+    "shadowPixelDifference": 423054,
+    "movingOccluderDifference": 1309314,
+    "ignoredCasterDifference": 0,
+    "mainTriangles": 16,
+    "sceneTrianglesIncludingDepth": 44,
+    "orthographicThinForegroundAndReverseDepth": "passed"
+  },
+  "lifecycleChecks": {
+    "borrowedDepthRetained": true,
+    "clearedVolumeTextures": 0,
+    "clearedPosts": 0,
+    "resizedPixels": 16236,
+    "pixelBudget": 16384,
+    "sourceCameraResourcesRetained": 2,
+    "unsupportedDistanceFogMode": 1
+  },
+  "performance": {
+    "report": "volumetric-performance.json",
+    "renderMode": "software",
+    "hardwareBudgetVerified": false,
+    "note": "SwiftShader measurements validate comparison and allocation; target hardware needs local sampling."
+  },
+  "limits": [
+    "Main camera only; portal and mirror geometry use aperture/surface depth",
+    "Transparency uses opaque depth, native alpha test applies to cutouts",
+    "One directional light; no volumetric clouds, local light volumes, multiple scattering or temporal reprojection",
+    "Thin foregrounds without matching low-resolution depth retain source color",
+    "Visual sky sun and physical directional light are authored separately"
+  ],
+  "artifactSha256": {
+    "src/engine/volumetric-runtime.js": "d093986ca27c0c42d3ad912ef3a246df9566981e3b8f63633a8f5cb5d68850cb",
+    "src/engine/rendering-runtime.js": "a4918929bd34445461dd048edb2c1f065aefcff1fdc07f9f2da30461a436a56c",
+    "src/engine/rendering-config.js": "38201a369960717c2ada0e56e5ece13c5565d44fcf86a7fdc51b8a68305ac520",
+    "src/engine/atmosphere-runtime.js": "3ffb929be007b71be32f9792d3a494fbe08eccec7ee714e80ebc68892075bcbb",
+    "src/types/rendering.ts": "cb570b171388d5aaa38ef10023bb7cd6333bc40f23ef26f6c048aaf80615f382",
+    "src/types/arkglide.d.ts": "8eb5d0367c308ee8c405768a5419e20e76b73d680665a5e6e94f0bcfab533329",
+    "public/runtime.html": "53121973f560c3d88c5b5880e01221d5b5af8d3089419d0f3521cc2595d902bd",
+    "public/scene-benchmark.js": "dd9289f570cca810e910d8db73a33811dc7719646d6c4a35b496521f700d65a3",
+    "public/scene-benchmark.html": "6b8c1a18f5c9f5baa19f0af7d67c8101f58d04a3e41642c62d17e5878217b79e",
+    "src/engine/scene-benchmark-metrics.js": "91def91a16bee826d638ae38444537a095a5e0ae4670e9a3ae16a5bdc6838f95",
+    "examples/volumetric-lab.arkglide": "1db715ef4daa557e137eb8bb4d2df564074695eac3cf51c8d534707bdc0e599c"
+  }
+}

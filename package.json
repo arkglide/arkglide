@@ -19,6 +19,8 @@
     "example:rendering": "node scripts/create-rendering-example.mjs",
     "example:advanced-rendering": "node scripts/create-advanced-rendering-example.mjs",
     "example:lighting-scale": "node scripts/create-lighting-scale-example.mjs",
+    "example:volumetric": "node scripts/create-volumetric-example.mjs",
+    "test:volumetric:browser": "node --test tests/rendering/volumetric-browser.mjs",
     "test:rendering:browser": "node --test tests/rendering/browser.mjs",
     "test:advanced-rendering:browser": "node --test tests/rendering/advanced-browser.mjs",
     "test:lighting-scale:browser": "node --test tests/rendering/lighting-scale-browser.mjs",
