@@ -1,7 +1,7 @@
 import { deflateSync } from "node:zlib";
 import "../src/engine/rendering-config.js";
 // Small procedural fixture textures; no external assets or decoders are needed.
-function png(width, height, pixel) {
+export function png(width, height, pixel) {
   const be = n => { const out = new Uint8Array(4); new DataView(out.buffer).setUint32(0, n); return out; };
   const concat = parts => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
   const chunk = (name, data) => {

@@ -8,6 +8,7 @@ import "./baked-lighting.js";
 import "./geometry-cluster.js";
 import "./scene-optimization.js";
 import "./static-instances.js";
+import "./ktx2-runtime.js";
 import {loadMathModule} from './wasm/math-loader';
 import "./rendering-config.js";
 import "./atmosphere-runtime.js";

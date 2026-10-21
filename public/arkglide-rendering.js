@@ -124,6 +124,7 @@
         const m=map.get(probeId);
         if(m.subMaterials) m.subMaterials=base.subMaterials.map(part=>variant(part,probeId,texture,planar));
         else m.reflectionTexture=texture;
+        if(base.metadata?.arkglideKTX2NormalMaps)root.ArkGlideKTX2?.applyMaterial(B,m);
         return m;
       }
       let material;
@@ -139,6 +140,7 @@
         for(const key of ['clearCoat','sheen','anisotropy','subSurface','detailMap','iridescence'])if(base[key]&&material[key])B.SerializationHelper.Instanciate(()=>material[key],base[key]);
         material.reflectionTexture = texture;
         root.ArkGlideBakedLighting?.apply(B,material,!!base.metadata?.arkglideBakedDirectLighting);
+        root.ArkGlideKTX2?.applyMaterial(B,material);
       }
       material.metadata = { ...base.metadata, arkglideProbeVariant: true };
       variantSources.set(material, base);

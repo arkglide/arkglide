@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS, type ProjectSettings } from "../types/project";
 import "../engine/render-compute.js";
 import "../engine/animation-compute.js";
 import "../engine/rendering-config.js";
+import "../engine/ktx2-runtime.js";
 
 export function assertScriptPath(name: string): void {
   if (
@@ -285,12 +286,19 @@ function validateContent(
       !id(t.id) ||
       textureIds.has(t.id) ||
       typeof t.name !== "string" ||
-      !["image/png", "image/jpeg", "image/webp", "application/x-babylon-env", "image/vnd.radiance"].includes(t.mime) ||
+      !["image/png", "image/jpeg", "image/webp", "image/ktx2", "application/x-babylon-env", "image/vnd.radiance"].includes(t.mime) ||
       !Number.isInteger(t.byteLength) ||
       t.byteLength <= 0 ||
       t.byteLength > 64 * 1024 * 1024
     )
       throw new Error("无效贴图资源");
+    if(t.ktx2!==undefined){
+      const k=t.ktx2;
+      if(t.mime!=='image/ktx2'||!record(k)||Object.keys(k).some(key=>!['width','height','mipLevels','colorSpace','encoding','supercompression','orientation','estimatedRgbaBytes'].includes(key))||![k.width,k.height,k.mipLevels,k.estimatedRgbaBytes].every(Number.isInteger)||k.width<1||k.height<1||k.width>8192||k.height>8192||k.width*k.height>16777216||!['linear','srgb'].includes(k.colorSpace)||!['rgba8','etc1s','uastc'].includes(k.encoding)||!['none','basisLZ','zstd'].includes(k.supercompression)||!['rd','ru','ld','lu'].includes(k.orientation))throw Error('无效 KTX2 元数据');
+      if(k.mipLevels!==1&&k.mipLevels!==Math.floor(Math.log2(Math.max(k.width,k.height)))+1)throw Error('无效 KTX2 mip 链');
+      let bytes=0;for(let i=0;i<k.mipLevels;i++)bytes+=Math.max(1,k.width>>i)*Math.max(1,k.height>>i)*4;
+      if(bytes!==k.estimatedRgbaBytes)throw Error('无效 KTX2 大小估算');
+    }
     textureIds.add(t.id);
   }
   for (const element of content.gameplay?.hud || []) {
@@ -316,25 +324,15 @@ function validateContent(
     )
       throw new Error("无效材质参数");
     (globalThis as any).ArkGlideRenderingConfig.material(m);
-    for (const ref of [
-      m.albedoTextureId,
-      m.normalTextureId,
-      m.metallicRoughnessTextureId,
-      m.aoTextureId,
-      m.lightmapTextureId,
-      m.emissiveTextureId,
-      m.clearCoatTextureId,
-      m.clearCoatNormalTextureId,
-      m.sheenTextureId,
-      m.anisotropyTextureId,
-      m.thicknessTextureId,
-      m.transmissionTextureId,
-      m.detailTextureId,
-    ])
+    for (const field of ['albedoTextureId','normalTextureId','metallicRoughnessTextureId','aoTextureId','lightmapTextureId','emissiveTextureId','clearCoatTextureId','clearCoatNormalTextureId','sheenTextureId','anisotropyTextureId','thicknessTextureId','transmissionTextureId','detailTextureId'] as const){
+      const ref=m[field];
       if (ref !== undefined && !textureIds.has(ref))
         throw new Error("材质引用的贴图不存在");
-      else if (ref !== undefined && !["image/png", "image/jpeg", "image/webp"].includes(content.textures.find(t => t.id === ref)!.mime))
-        throw new Error("材质贴图必须是 PNG、JPEG 或 WebP");
+      else if (ref !== undefined && !["image/png", "image/jpeg", "image/webp", "image/ktx2"].includes(content.textures.find(t => t.id === ref)!.mime))
+        throw new Error("材质贴图必须是 PNG、JPEG、WebP 或 KTX2");
+      const asset=content.textures.find(t=>t.id===ref);
+      if(asset?.ktx2&&!['albedoTextureId','emissiveTextureId','sheenTextureId'].includes(field)&&asset.ktx2.colorSpace!=='linear')throw Error('KTX2 法线和数据贴图需要线性色彩空间');
+    }
     for (const key of ["aoStrength", "lightmapIntensity"] as const)
       if (m[key] !== undefined && (!Number.isFinite(m[key]) || m[key]! < 0 || m[key]! > (key==='lightmapIntensity'?1000000:20))) throw new Error("无效烘焙光照或 AO 强度");
     if (m.lightmapUV !== undefined && ![0, 1].includes(m.lightmapUV)) throw new Error("无效 Lightmap UV 通道");

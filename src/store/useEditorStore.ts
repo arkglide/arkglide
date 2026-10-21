@@ -105,6 +105,7 @@ export interface DiagnosticLocation {
   stack?: string;
 }
 export interface RuntimeStats {
+  ktx2Textures?: number; ktx2CompressedTextures?: number; ktx2EstimatedGpuBytes?: number | null;
   instancingSupported?: boolean; instanceBatches?: number; instancedMeshes?: number; instanceSkippedMeshes?: number;
   lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number;
   cascadedShadowLights?: number;
@@ -2156,6 +2157,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       throw new Error("贴图大小不一致");
     asset = structuredClone(asset);
     bytes = bytes.slice(0);
+    if(asset.mime==='image/ktx2')asset.ktx2=(globalThis as any).ArkGlideKTX2.inspect(bytes);
     const content = {
       ...s.content,
       textures: [...s.content.textures.filter((t) => t.id !== asset.id), asset],

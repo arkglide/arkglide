@@ -28,7 +28,14 @@
         buffer =
           buffers instanceof Map ? buffers.get(textureId) : buffers[textureId];
       let old = slots.get(key);
-      if (old && (old.id !== textureId || old.buffer !== buffer)) {
+      let ktx2=null;
+      if(asset&&buffer&&asset.mime==='image/ktx2'){
+        if(!root.ArkGlideKTX2)throw Error('KTX2 运行库未加载');
+        ktx2=root.ArkGlideKTX2.inspect(buffer);root.ArkGlideKTX2.assertRole(ktx2,role);
+        const limit=scene.getEngine().getCaps().maxTextureSize||8192;
+        if(ktx2.width>limit||ktx2.height>limit)throw Error('KTX2 尺寸超过当前设备纹理上限：'+limit);
+      }
+      if (old && (old.id !== textureId || old.buffer !== buffer || old.mime !== asset?.mime)) {
         release(old);
         slots.delete(key);
         old = null;
@@ -56,6 +63,8 @@
         options.onLoading?.(1);
         const item = {
           materialId,
+          mime:asset.mime,
+          ktx2,
           id: textureId,
           buffer,
           promise,
@@ -71,7 +80,7 @@
             false,
             true,
             B.Texture.TRILINEAR_SAMPLINGMODE,
-            finish,
+            () => {if(!finished&&slots.get(key)===item&&item.texture&&ktx2){root.ArkGlideKTX2.applyTexture(B,item.texture,ktx2,role);root.ArkGlideKTX2.applyMaterial(B,materials.get(materialId));}finish();},
             (message, error) => {
               if (slots.get(key) === item)
                 options.onError?.(
@@ -84,6 +93,9 @@
             false,
             undefined,
             asset.mime,
+            ktx2?{forceRGBA:!!((ktx2.width&(ktx2.width-1))||(ktx2.height&(ktx2.height-1)))}:undefined,
+            undefined,
+            ktx2?'.ktx2':undefined,
           );
         } catch (error) {
           if (slots.get(key) === item) slots.delete(key);
@@ -91,7 +103,8 @@
           throw error;
         }
         item.texture.name = "arkglide:texture:" + key;
-        item.texture.gammaSpace = role === "albedo" || role === "emissive" || role === "sheen";
+        if(ktx2)root.ArkGlideKTX2.applyTexture(B,item.texture,ktx2,role);
+        else item.texture.gammaSpace = role === "albedo" || role === "emissive" || role === "sheen";
         old = item;
       }
       old.texture.uScale = definition.uvScale.u;
@@ -179,6 +192,7 @@
           detail.texture=texture(id,'detail',d,d.detailTextureId);
           if(detail.texture){detail.texture.uScale=d.uvScale.u*a.detail.scale;detail.texture.vScale=d.uvScale.v*a.detail.scale;}
         }
+        root.ArkGlideKTX2?.applyMaterial(B,mat);
       }
       return Promise.all([...slots.values()].map((s) => s.promise));
     }
@@ -266,12 +280,18 @@
       content = {};
       buffers = new Map();
     }
-    return { sync, apply, prepareDestroy, clear, materials };
+    function stats(){
+      let textures=0,compressed=0,bytes=0,unknown=false;
+      for(const slot of slots.values())if(slot.ktx2){textures++;const t=slot.texture.getInternalTexture?.();if(!t?.isReady){unknown=true;continue;}if(![5,6,7].includes(t.format))compressed++;const n=root.ArkGlideKTX2.storageBytes(t.format,slot.ktx2.width,slot.ktx2.height,slot.ktx2.mipLevels);if(n===null)unknown=true;else bytes+=n;}
+      return {ktx2Textures:textures,ktx2CompressedTextures:compressed,ktx2EstimatedGpuBytes:unknown?null:bytes};
+    }
+    return { sync, apply, prepareDestroy, clear, materials, stats };
   }
   function createSceneAdapter(B, scene, options = {}) {
+    root.ArkGlideKTX2?.configure(B);
     const optimization = root.ArkGlideSceneOptimization?.create(B, scene, options), geometryPool = new Map();
     const instances = root.ArkGlideStaticInstances?.create(B,scene);
-    const rendering = root.ArkGlideRendering?.create(B, scene, {...options,onPrepareGeometry:()=>optimization?.prepare(),getOptimizationStats:()=>({...optimization?.stats(),...instances?.stats(nodes)})});
+    const rendering = root.ArkGlideRendering?.create(B, scene, {...options,onPrepareGeometry:()=>optimization?.prepare(),getOptimizationStats:()=>({...optimization?.stats(),...instances?.stats(nodes),...materialLibrary.stats()})});
     const nodes = new Map(),
       records = new Map(),
       resources = new Map(),
@@ -528,6 +548,13 @@
       textureBuffers = new Map(),
     ) {
       if (disposed) return Promise.resolve();
+      if(root.ArkGlideKTX2?.needsPreparation(content)){
+        const generation=batchGeneration;
+        return root.ArkGlideKTX2.prepare(B).then(()=>{
+          if(disposed||generation!==batchGeneration)throw Error('场景解码资源加载已取消');
+          return sync(next,buffers,content,textureBuffers);
+        });
+      }
       definitions = next;
       instances?.configure(next,content,rendering?.settings());
       const ids = new Set(next.map((n) => n.id));
@@ -613,10 +640,17 @@
       nodes,
       resources,
       sync,
-      refreshMaterials(content,textureBuffers){return Promise.all([materialLibrary.sync(content,textureBuffers), rendering?.sync(content,textureBuffers)]);},
+      async refreshMaterials(content,textureBuffers){
+        const generation=batchGeneration;
+        if(root.ArkGlideKTX2?.needsPreparation(content))await root.ArkGlideKTX2.prepare(B);
+        if(disposed||generation!==batchGeneration)return;
+        return Promise.all([materialLibrary.sync(content,textureBuffers), rendering?.sync(content,textureBuffers)]);
+      },
       async syncBatched(next,buffers,content,textureBuffers,batchNodes=128) {
         clear();
         const generation=batchGeneration;
+        if(root.ArkGlideKTX2?.needsPreparation(content))await root.ArkGlideKTX2.prepare(B);
+        if(disposed||generation!==batchGeneration)throw Error('场景分块创建已取消');
         const all=next; definitions=all;
         instances?.configure(all,content,rendering?.settings());
         await Promise.all([materialLibrary.sync(content,textureBuffers), rendering?.sync(content,textureBuffers)]);

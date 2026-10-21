@@ -1,4 +1,6 @@
 import { useEditorStore, type AssetEntry } from "../store/useEditorStore";
+import {getEditorScene} from '../engine/editor-scene';
+import '../engine/ktx2-runtime.js';
 const replacements = new Map<string, object>();
 export async function importTextureAsset(asset: AssetEntry): Promise<string> {
   const documentId = useEditorStore.getState().documentId;
@@ -32,8 +34,13 @@ export async function importTextureFile(
             : [0x86, 0x16, 0x87, 0x96, 0xf6, 0xd6, 0x96, 0x36].every((v, i) => b[i] === v)
               ? "application/x-babylon-env"
               : /^#\?(?:RADIANCE|RGBE)\r?\n/.test(new TextDecoder().decode(b.slice(0, 32)))
-                ? "image/vnd.radiance" : null;
-    if (!mime) throw new Error("请选择 PNG、JPEG、WebP、.env 或 .hdr 贴图");
+                ? "image/vnd.radiance" : (globalThis as any).ArkGlideKTX2.isKTX2(b)?'image/ktx2':null;
+    if (!mime) throw new Error("请选择 PNG、JPEG、WebP、KTX2、.env 或 .hdr 贴图");
+    if(mime==='image/ktx2'){
+      let caps:Record<string,boolean>={};
+      try{const c=getEditorScene().scene.getEngine().getCaps();caps=Object.fromEntries(['astc','bptc','s3tc','pvrtc','etc2','etc1'].map(k=>[k,!!(c as any)[k]]));}catch{/* Validation before viewport startup uses the RGBA fallback. */}
+      await (globalThis as any).ArkGlideKTX2.validate(bytes,caps);
+    } else
     if (mime === "application/x-babylon-env") {
       const end = b.indexOf(0, 8);
       if (end < 0) throw new Error("环境贴图头损坏");

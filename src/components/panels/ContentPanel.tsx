@@ -127,7 +127,7 @@ export function MaterialEditor({ id }: { id: string }) {
           onChange={(e) => void update({ [slot]: e.target.value || undefined, ...(slot==='lightmapTextureId'&&!e.target.value?{bakedDirectLighting:false}:{}), ...(slot === "emissiveTextureId" && e.target.value && m.emissiveColor === "#000000" ? { emissiveColor: "#FFFFFF" } : {}) })}
         >
           <MenuItem value="">无贴图</MenuItem>
-          {content.textures.filter(t => t.mime.startsWith("image/") && t.mime !== "image/vnd.radiance").map((t) => (
+          {content.textures.filter(t => t.mime.startsWith("image/") && t.mime !== "image/vnd.radiance" && (!t.ktx2||['albedoTextureId','emissiveTextureId'].includes(slot)||t.ktx2.colorSpace==='linear')).map((t) => (
             <MenuItem key={t.id} value={t.id}>
               {t.name}
             </MenuItem>
@@ -380,7 +380,7 @@ function TextureRow({ asset }: { asset: TextureAsset }) {
     <Box
       sx={{ border: "1px solid #444", borderRadius: 1, p: 1, minWidth: 200 }}
     >
-      {url && ["application/x-babylon-env", "image/vnd.radiance"].includes(asset.mime) ? <Typography variant="caption">环境光照贴图</Typography> : url ? (
+      {url && asset.mime==='image/ktx2'? <Typography variant="caption">KTX2 · {asset.ktx2?`${asset.ktx2.width} × ${asset.ktx2.height} · ${asset.ktx2.colorSpace} · ${asset.ktx2.mipLevels} mips`:'GPU 贴图'}</Typography> : url && ["application/x-babylon-env", "image/vnd.radiance"].includes(asset.mime) ? <Typography variant="caption">环境光照贴图</Typography> : url ? (
         <img
           src={url}
           alt={asset.name}
@@ -407,7 +407,7 @@ function TextureRow({ asset }: { asset: TextureAsset }) {
           <input
             aria-label={"替换贴图 " + asset.name}
             type="file"
-            accept="image/png,image/jpeg,image/webp,.env,.hdr"
+            accept="image/png,image/jpeg,image/webp,.ktx2,.env,.hdr"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -578,7 +578,7 @@ export default function ContentPanel() {
               <input
                 aria-label="导入贴图"
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept="image/png,image/jpeg,image/webp,.ktx2"
                 multiple
                 hidden
                 onChange={(e) => {

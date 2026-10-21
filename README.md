@@ -12,6 +12,8 @@
 
 [静态实例批次](docs/static-instances.md) 为重复基础几何与相同材质合批，保留独立拾取、变换和静态碰撞。`examples/instance-lab.arkglide` 展示实例批次与体积光束的组合。
 
+[KTX2 压缩贴图](docs/ktx2-textures.md) 使用本地 WASM 解码、设备压缩格式与 RGBA 回退，贯通材质、保存和沙箱静态导出。`examples/ktx2-lab.arkglide` 展示颜色、清漆、细节法线与透明裁切。
+
 ```sh
 npm ci
 npm run dev

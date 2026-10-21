@@ -1,4 +1,5 @@
 import "./sync-wasm.mjs";
+import "./sync-ktx2.mjs";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 copyFileSync(
   new URL("../src/engine/scene-runtime.js", import.meta.url),
@@ -23,6 +24,7 @@ for (const [source, target] of [
   ["geometry-cluster", "geometry-cluster"],
   ["scene-optimization", "scene-optimization"],
   ["static-instances", "static-instances"],
+  ["ktx2-runtime", "ktx2"],
   ["scene-benchmark-metrics", "scene-benchmark-metrics"],
   ["reflection-runtime", "reflections"],
   ["render-view-budget", "render-view-budget"],

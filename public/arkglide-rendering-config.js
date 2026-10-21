@@ -24,7 +24,7 @@
     probes: [],
   };
   const environmentMimes = ["application/x-babylon-env", "image/vnd.radiance"];
-  const imageMimes = ["image/png", "image/jpeg", "image/webp"];
+  const imageMimes = ["image/png", "image/jpeg", "image/webp", "image/ktx2"];
   function object(v) { return v && typeof v === "object" && !Array.isArray(v); }
   function merge(template, input = {}, path = "rendering") {
     if (!object(input) || Object.keys(input).some(k => !Object.hasOwn(template, k))) throw Error("无效渲染配置: " + path);

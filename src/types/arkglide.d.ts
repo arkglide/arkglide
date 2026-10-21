@@ -1074,6 +1074,7 @@ interface VolumetricSettings {
 interface StaticInstanceStats {
   instancingSupported: boolean; instanceBatches: number; instancedMeshes: number; instanceSkippedMeshes: number;
 }
+interface CompressedTextureStats { ktx2Textures: number; ktx2CompressedTextures: number; ktx2EstimatedGpuBytes: number | null; }
 interface VolumetricStats {
   volumetricSupported: boolean; volumetricEnabled: boolean; volumetricPixels: number; volumetricWidth: number; volumetricHeight: number;
   volumetricSteps: number; volumetricShadowSize: number; volumetricShadowed: boolean; volumetricLight: string | null;
@@ -1102,7 +1103,7 @@ interface RenderingAPI {
     views: { depth: number; scale: number; recursiveScale: number; samples: number; maxViews: number; maxPixels: number; minArea: number; minResolution: number; particles: boolean };
     probes: { id: string; name: string; textureId: string; position: Vec3; size: Vec3; priority: number; intensity: number }[];
   };
-  getStats(): StaticInstanceStats & VolumetricStats & { cascadedShadowLights?: number; lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number; renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSceneTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
+  getStats(): CompressedTextureStats & StaticInstanceStats & VolumetricStats & { cascadedShadowLights?: number; lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number; renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSceneTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
 }
 declare const rendering: RenderingAPI;
 interface ScriptContext { rendering: RenderingAPI; }

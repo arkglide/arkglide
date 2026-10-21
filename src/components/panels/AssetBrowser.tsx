@@ -34,7 +34,7 @@ type AssetType = "model" | "texture" | "script" | "other";
 function getAssetType(filename: string): AssetType {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
   if (["glb", "gltf"].includes(ext)) return "model";
-  if (["png", "jpg", "jpeg", "webp", "bmp"].includes(ext)) return "texture";
+  if (["png", "jpg", "jpeg", "webp", "bmp", "ktx2"].includes(ext)) return "texture";
   if (["js", "ts", "jsx", "tsx"].includes(ext)) return "script";
   return "other";
 }

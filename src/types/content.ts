@@ -56,6 +56,7 @@ export interface TextureAsset {
   name: string;
   mime: string;
   byteLength: number;
+  ktx2?: {width:number;height:number;mipLevels:number;colorSpace:'linear'|'srgb';encoding:'rgba8'|'etc1s'|'uastc';supercompression:'none'|'basisLZ'|'zstd';orientation:'rd'|'ru'|'ld'|'lu';estimatedRgbaBytes:number};
 }
 export interface PrefabAsset {
   id: string;
