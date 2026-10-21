@@ -367,7 +367,7 @@
       const hudKeys = [];
       if (boot.settings.rendering?.environment?.textureId)
         hudKeys.push("texture:" + boot.settings.rendering.environment.textureId);
-      for (const p of boot.settings.rendering?.probes || []) hudKeys.push("texture:" + p.textureId);
+      for (const p of boot.settings.rendering?.probes || []) if(p.textureId) hudKeys.push("texture:" + p.textureId);
       for (const h of content.gameplay?.hud || [])
         if (h.textureId) hudKeys.push("texture:" + h.textureId);
       await group(project.scene.nodes, {}, [

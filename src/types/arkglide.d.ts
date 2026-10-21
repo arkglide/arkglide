@@ -1079,7 +1079,31 @@ interface VolumetricStats {
   volumetricSupported: boolean; volumetricEnabled: boolean; volumetricPixels: number; volumetricWidth: number; volumetricHeight: number;
   volumetricSteps: number; volumetricShadowSize: number; volumetricShadowed: boolean; volumetricLight: string | null;
 }
+interface CloudSettings {
+  enabled: boolean; base: number; thickness: number; coverage: number; density: number; scale: number; detail: number;
+  windX: number; windZ: number; maxDistance: number; steps: 16 | 24 | 32 | 48 | 64 | 96; lightSteps: 2 | 4 | 6 | 8; color: string;
+}
+interface TemporalSettings { samples: 4 | 8 | 16 | 32; factor: number; clampHistory: boolean; cutDistance: number; cutAngle: number; }
+interface RefractionSettings { enabled: boolean; scale: number; maxPixels: number; maxLayers: number; }
+interface VolumeLightingSettings { maxLocalLights: number; localIntensity: number; multipleScattering: number; scatteringOrders: 1 | 2 | 3 | 4; }
+interface RealtimeProbeBudget { maxActive: number; facesPerFrame: number; maxPixels: number; transition: number; }
+interface ExtendedRenderingStats {
+  realtimeProbesSupported: boolean; realtimeProbes: number; probeCapturedFaces: number; probeCapturedPixels: number; probeCompletedUpdates: number; probeWaiting: number; probeFallbacks: number; probeCubeBytes: number;
+  taaSupported: boolean; taaEnabled: boolean; taaHistoryResets: number; motionVectors: boolean; taaSamples: number;
+  sceneRefractionSupported: boolean; sceneRefractionLayers: number; sceneRefractionViews: number; sceneRefractionPixels: number; sceneRefractionFallbacks: number;
+  layeredTransparencySupported: boolean; layeredTransparency: boolean; transparencyLayers: number;
+  volumeLocalLights: number; volumeScatteringOrders: number; volumeMultipleScattering: number; volumeClouds: boolean; volumeCloudSteps: number;
+}
 interface RenderingAPI {
+  setTemporal(patch: Partial<TemporalSettings>): void;
+  setAntialiasing(mode: 'none' | 'fxaa' | 'msaa' | 'taa'): void;
+  resetHistory(): void;
+  refreshProbes(id?: string): void;
+  setClouds(patch: Partial<CloudSettings>): void;
+  setVolumeLighting(patch: Partial<VolumeLightingSettings>): void;
+  setRefraction(patch: Partial<RefractionSettings>): void;
+  setTransparency(patch: Partial<{enabled: boolean; layers: number}>): void;
+  setRealtimeProbeBudget(patch: Partial<RealtimeProbeBudget>): void;
   /** Changes quality budgets for this session; keeps environment assets and color choices. */
   setQuality(quality: RenderQuality): void;
   /** Patch the main-camera volume for this session. Validated before applying. */
@@ -1087,10 +1111,12 @@ interface RenderingAPI {
   getSettings(): {
     quality: RenderQuality;
     resolutionScale: number;
-    antialiasing: "none" | "fxaa" | "msaa";
+    antialiasing: "none" | "fxaa" | "msaa" | "taa";
     samples: number;
     gpuProfiling: boolean;
     fog: { mode: "none" | "linear" | "exp" | "exp2"; color: string; density: number; start: number; end: number };
+    temporal: TemporalSettings; realtimeProbes: RealtimeProbeBudget; refraction: RefractionSettings;
+    transparency: {enabled: boolean; layers: number}; clouds: CloudSettings; volumeLighting: VolumeLightingSettings;
     volumetric: VolumetricSettings;
     sky: { enabled: boolean; sunAzimuth: number; sunElevation: number; turbidity: number; rayleigh: number; mie: number; luminance: number };
     dof: { enabled: boolean; focusDistance: number; focalLength: number; fStop: number; quality: 0 | 1 | 2 };
@@ -1101,9 +1127,9 @@ interface RenderingAPI {
     ao: { enabled: boolean; ratio: number; radius: number; strength: number; samples: number };
     bloom: { enabled: boolean; threshold: number; weight: number; kernel: number; scale: number };
     views: { depth: number; scale: number; recursiveScale: number; samples: number; maxViews: number; maxPixels: number; minArea: number; minResolution: number; particles: boolean };
-    probes: { id: string; name: string; textureId: string; position: Vec3; size: Vec3; priority: number; intensity: number }[];
+    probes: { id: string; name: string; textureId: string | null; mode: "static" | "realtime"; resolution: number; interval: number; blendDistance: number; layerMask: number; position: Vec3; size: Vec3; priority: number; intensity: number }[];
   };
-  getStats(): CompressedTextureStats & StaticInstanceStats & VolumetricStats & { cascadedShadowLights?: number; lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number; renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSceneTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
+  getStats(): ExtendedRenderingStats & CompressedTextureStats & StaticInstanceStats & VolumetricStats & { cascadedShadowLights?: number; lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number; renderQuality: RenderQuality; renderResolutionScale: number; renderDrawCalls: number; renderMainTriangles: number; renderSceneTriangles: number; renderSubmitMs: number; gpuTimerSupported: boolean; gpuTimeMs: number | null; shadowLights: number; picturePipelines: number; hdrOutput: boolean; atmosphereSky: boolean; dofEnabled: boolean; ssrEnabled: boolean; ssrSupported: boolean; planarReflections: number; planarRenderedViews: number; planarRenderedPixels: number };
 }
 declare const rendering: RenderingAPI;
 interface ScriptContext { rendering: RenderingAPI; }

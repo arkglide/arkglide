@@ -55,7 +55,7 @@
      const texture=new B.MirrorTexture('arkglide:mirror:'+r.node.uniqueId,{width,height},scene,true,type,B.Texture.BILINEAR_SAMPLINGMODE);
      // Materials normally enqueue reflection RTTs themselves. Explicit scheduling
      // owns capture order and budgets, so suppress automatic duplicate rendering.
-     texture.isRenderTarget=false;texture.renderParticles=false;
+     texture.isRenderTarget=false;texture.renderParticles=false;texture.noPrePassRenderer=true;
      slot={texture,width,height,key:'planar:'+r.node.uniqueId};slots.set(r.node,slot);
     }
     slot.texture.mirrorPlane=r.plane;slot.texture.gammaSpace=false;

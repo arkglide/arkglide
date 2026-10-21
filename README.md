@@ -14,6 +14,8 @@
 
 [KTX2 压缩贴图](docs/ktx2-textures.md) 使用本地 WASM 解码、设备压缩格式与 RGBA 回退，贯通材质、保存和沙箱静态导出。`examples/ktx2-lab.arkglide` 展示颜色、清漆、细节法线与透明裁切。
 
+[渲染补全](docs/rendering-completion.md) 已加入实时立方体探针与过渡、运动向量/TAA、场景折射与分层透明、体积云及点/聚光散射和多阶散射近似。`examples/rendering-completion-lab.arkglide` 可直接体验组合效果。
+
 ```sh
 npm ci
 npm run dev

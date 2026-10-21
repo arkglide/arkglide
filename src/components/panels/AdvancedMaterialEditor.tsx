@@ -33,13 +33,14 @@ export function AdvancedMaterialEditor({material:m,textures,onChange}:{material:
    <Stack direction="row" spacing={1}>{number('anisotropy','intensity','各向异性强度',0,1)}{number('anisotropy','rotation','纹理方向（弧度）',-Math.PI*2,Math.PI*2)}</Stack>
    {texture('anisotropyTextureId','各向异性贴图（RG 方向 / B 强度）')}
   </>}
-  {toggle('transmission','环境透射与厚度吸收')}
+  {toggle('transmission','透射与厚度吸收')}
   {c.transmission.enabled&&<>
+   <TextField label="透射来源" select size="small" value={c.transmission.source} onChange={e=>change('transmission',{source:e.target.value})}><MenuItem value="environment">环境贴图</MenuItem><MenuItem value="scene">场景折射</MenuItem></TextField>
    <Stack direction="row" spacing={1}>{number('transmission','intensity','透射强度',0,1)}{number('transmission','ior','折射率 IOR',1,3,.05)}{number('transmission','thickness','材质厚度',0,1000)}</Stack>
    <TextField label="透射吸收颜色" type="color" size="small" value={c.transmission.tintColor} onChange={e=>change('transmission',{tintColor:e.target.value})} />
    {number('transmission','tintDistance','吸收距离',.001,100000)}
    {texture('transmissionTextureId','透射遮罩（R 通道）')}{texture('thicknessTextureId','厚度贴图（G 通道）')}
-   <Typography variant="caption">透射采样项目环境贴图。透明混合可透出后方几何，但不会折射后方物体。</Typography>
+   <Typography variant="caption">场景来源需要在画面设置开启场景折射。IOR 和厚度控制背景偏折；捕获层数限制叠加开销。</Typography>
   </>}
   {toggle('detail','细节贴图')}
   {c.detail.enabled&&<>

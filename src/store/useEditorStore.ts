@@ -75,9 +75,10 @@ export interface SceneNode {
   scale: Transform; // 缩放
   visible: boolean; // 可见性
   primitive?: "box" | "sphere" | "plane" | "cylinder" | "capsule" | "torus";
-  lightType?: "hemispheric" | "directional" | "point";
+  lightType?: "hemispheric" | "directional" | "point" | "spot";
   activeCamera?: boolean;
   color?: string; // 颜色（hex 格式如 '#FF6B6B'，mesh 用）
+  lightRange?: number; spotAngle?: number; spotInnerAngle?: number;
   intensity?: number; // 光照强度（light 用）
   fov?: number; // 视场角（camera 用，角度）
   parentId?: string | null; // 父节点 ID（null 或 undefined = 根节点）
@@ -110,6 +111,10 @@ export interface RuntimeStats {
   lodMeshes?: number; lodLevels?: number; lodNativeBuilds?: number; lodJSBuilds?: number; lodSkippedMeshes?: number;
   cascadedShadowLights?: number;
   atmosphereSky?: boolean;
+  realtimeProbesSupported?: boolean; realtimeProbes?: number; probeCapturedFaces?: number; probeCapturedPixels?: number; probeCompletedUpdates?: number; probeWaiting?: number; probeFallbacks?: number; probeCubeBytes?: number;
+  taaSupported?: boolean; taaEnabled?: boolean; taaHistoryResets?: number; motionVectors?: boolean; taaSamples?: number;
+  sceneRefractionSupported?: boolean; sceneRefractionLayers?: number; sceneRefractionViews?: number; sceneRefractionPixels?: number; sceneRefractionFallbacks?: number; layeredTransparencySupported?: boolean; layeredTransparency?: boolean; transparencyLayers?: number;
+  volumeLocalLights?: number; volumeScatteringOrders?: number; volumeMultipleScattering?: number; volumeClouds?: boolean; volumeCloudSteps?: number;
   volumetricSupported?: boolean; volumetricEnabled?: boolean; volumetricPixels?: number; volumetricWidth?: number; volumetricHeight?: number; volumetricSteps?: number; volumetricShadowSize?: number; volumetricShadowed?: boolean; volumetricLight?: string | null;
   dofEnabled?: boolean;
   ssrEnabled?: boolean;
@@ -399,6 +404,7 @@ export interface EditorState {
         | "modelUrl"
         | "primitive"
         | "lightType"
+        | "lightRange" | "spotAngle" | "spotInnerAngle"
         | "character"
         | "joints"
         | "physics"

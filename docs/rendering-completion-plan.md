@@ -18,3 +18,7 @@
 ## 定向检查（按用户要求不跑大验证）
 
 只跑新配置/生命周期必要单测、TypeScript 检查和一个覆盖四项的独立浏览器场景：动态反射与预算、运动/镜头切换、折射背景变化/透明层顺序、云与局部灯开关、High/Low/High、停止资源释放。检查独立沙箱导出使用本地资源。仅发生实质问题时增加对应检查；不跑全量单测、完整编辑器浏览器套件或生产构建。软件 WebGL 结果不充当真实显卡性能证据。
+
+## 交付记录
+
+四项已实现，共用配置、编辑器、脚本/类型、保存和独立导出均已接入。真实像素检查发现并修复离屏捕获擦除运动向量的问题；平面反射及传送门共用隔离；折射增加同帧去重。使用说明见 [rendering-completion.md](rendering-completion.md)，最终定向记录见 [verification/rendering-completion.json](verification/rendering-completion.json)。

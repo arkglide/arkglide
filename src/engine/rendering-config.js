@@ -7,6 +7,10 @@
     antialiasing: "none",
     samples: 4,
     gpuProfiling: false,
+    temporal: { samples: 8, factor: 0.1, clampHistory: true, cutDistance: 5, cutAngle: 45 },
+    transparency: { enabled: false, layers: 4 },
+    refraction: { enabled: false, scale: 0.5, maxPixels: 1048576, maxLayers: 4 },
+    realtimeProbes: { maxActive: 4, facesPerFrame: 2, maxPixels: 131072, transition: 0.25 },
     views: { depth: 2, scale: 1, recursiveScale: 0.75, samples: 4, maxViews: 24, maxPixels: 16777216, minArea: 0.0001, minResolution: 32, particles: false },
     shadows: { enabled: false, mapSize: 1024, filter: "pcf", bias: 0.0005, normalBias: 0.02, darkness: 0, maxDistance: 100, maxLights: 2, cascades: {enabled:false,count:4,lambda:.5,blend:.1,stabilize:true} },
     environment: { textureId: null, intensity: 1, rotation: 0, skybox: false },
@@ -15,6 +19,8 @@
     ao: { enabled: false, ratio: 0.5, radius: 1, strength: 1, samples: 8 },
     fog: { mode: "none", color: "#A8BDD0", density: 0.01, start: 10, end: 100 },
     volumetric: { enabled: false, color: "#B5C9DE", density: 0.025, height: 0, falloff: 0.15, maxDistance: 80, ambient: 0.2, lightIntensity: 1, anisotropy: 0.45, noiseStrength: 0.35, noiseScale: 0.15, steps: 48, scale: 0.5, maxPixels: 1048576, shadows: true, shadowMapSize: 1024, shadowDistance: 80, shadowBias: 0.001 },
+    clouds: { enabled: false, base: 80, thickness: 35, coverage: 0.5, density: 0.08, scale: 0.025, detail: 0.4, windX: 1, windZ: 0.3, maxDistance: 1500, steps: 48, lightSteps: 4, color: "#F2F6FF" },
+    volumeLighting: { maxLocalLights: 0, localIntensity: 1, multipleScattering: 0, scatteringOrders: 3 },
     sky: { enabled: false, sunAzimuth: 0, sunElevation: 35, turbidity: 2, rayleigh: 2, mie: 0.005, luminance: 1 },
     dof: { enabled: false, focusDistance: 10, focalLength: 50, fStop: 2.8, quality: 1 },
     reflections: {
@@ -40,7 +46,17 @@
   }
   function settings(input) {
     const c = merge(defaults, input);
-    if (!["custom", "low", "medium", "high"].includes(c.quality) || !["none", "fxaa", "msaa"].includes(c.antialiasing) || ![1, 2, 4, 8].includes(c.samples) || typeof c.gpuProfiling !== "boolean") throw Error("无效画质配置");
+    if (!["custom", "low", "medium", "high"].includes(c.quality) || !["none", "fxaa", "msaa", "taa"].includes(c.antialiasing) || ![1, 2, 4, 8].includes(c.samples) || typeof c.gpuProfiling !== "boolean") throw Error("无效画质配置");
+    const t=c.temporal, rt=c.realtimeProbes, tr=c.transparency, refr=c.refraction, cloud=c.clouds, vl=c.volumeLighting;
+    if(![4,8,16,32].includes(t.samples)||typeof t.clampHistory!=='boolean')throw Error('无效时间抗锯齿配置');
+    number(t.factor,.02,1,'TAA factor');number(t.cutDistance,.01,10000,'TAA cut distance');number(t.cutAngle,1,180,'TAA cut angle');
+    if(!Number.isInteger(rt.maxActive)||!Number.isInteger(rt.facesPerFrame)||!Number.isInteger(rt.maxPixels))throw Error('无效实时探针预算');
+    number(rt.maxActive,1,8,'active probes');number(rt.facesPerFrame,1,6,'probe faces');number(rt.maxPixels,1024,6291456,'probe pixels');number(rt.transition,0,5,'probe transition');
+    if(typeof tr.enabled!=='boolean'||!Number.isInteger(tr.layers))throw Error('无效分层透明配置');number(tr.layers,1,8,'transparent layers');
+    if(typeof refr.enabled!=='boolean'||!Number.isInteger(refr.maxPixels)||!Number.isInteger(refr.maxLayers))throw Error('无效场景折射配置');number(refr.scale,.25,1,'refraction scale');number(refr.maxPixels,16384,4194304,'refraction pixels');number(refr.maxLayers,1,8,'refraction layers');
+    if(typeof cloud.enabled!=='boolean'||!/^#[\da-f]{6}$/i.test(cloud.color)||![16,24,32,48,64,96].includes(cloud.steps)||![2,4,6,8].includes(cloud.lightSteps))throw Error('无效体积云配置');
+    number(cloud.base,-10000,100000,'cloud base');number(cloud.thickness,1,10000,'cloud thickness');number(cloud.coverage,0,1,'cloud coverage');number(cloud.density,0,1,'cloud density');number(cloud.scale,.0001,1,'cloud scale');number(cloud.detail,0,1,'cloud detail');number(cloud.windX,-100,100,'cloud wind X');number(cloud.windZ,-100,100,'cloud wind Z');number(cloud.maxDistance,10,100000,'cloud distance');
+    if(!Number.isInteger(vl.maxLocalLights)||![1,2,3,4].includes(vl.scatteringOrders))throw Error('无效体积灯光配置');number(vl.maxLocalLights,0,8,'volume lights');number(vl.localIntensity,0,10,'local volume intensity');number(vl.multipleScattering,0,1,'multiple scattering');
     number(c.resolutionScale, 0.5, 1.5, "resolution scale");
     if (![1, 2, 3, 4, 5].includes(c.views.depth) || ![1, 2, 4, 8].includes(c.views.samples) || !Number.isInteger(c.views.maxViews) || !Number.isInteger(c.views.maxPixels) || !Number.isInteger(c.views.minResolution) || typeof c.views.particles !== "boolean") throw Error("无效离屏视图预算");
     number(c.views.maxViews, 1, 64, "view count"); number(c.views.maxPixels, 1024, 67108864, "view pixels");
@@ -89,15 +105,17 @@
     if (!Array.isArray(c.probes) || c.probes.length > 32) throw Error("反射探针数量超过上限");
     const ids = new Set();
     c.probes = c.probes.map(p => {
-      if (!object(p) || Object.keys(p).some(k => !["id", "name", "textureId", "position", "size", "priority", "intensity"].includes(k)) ||
-          typeof p.id !== "string" || !p.id || ids.has(p.id) || typeof p.name !== "string" || typeof p.textureId !== "string" || !p.textureId) throw Error("无效反射探针");
+      if (!object(p) || Object.keys(p).some(k => !["id", "name", "textureId", "position", "size", "priority", "intensity", "mode", "resolution", "interval", "blendDistance", "layerMask"].includes(k)) ||
+          typeof p.id !== "string" || !p.id || ids.has(p.id) || typeof p.name !== "string" || !['static','realtime'].includes(p.mode??'static') || ((p.mode??'static')==='static'&&(typeof p.textureId!=='string'||!p.textureId)) || p.textureId!==undefined&&p.textureId!==null&&typeof p.textureId!=='string') throw Error("无效反射探针");
       ids.add(p.id);
       for (const [key, min] of [["position", -1000000], ["size", 0.001]]) {
         if (!object(p[key]) || Object.keys(p[key]).some(k => !["x", "y", "z"].includes(k))) throw Error("无效反射探针范围");
         for (const axis of ["x", "y", "z"]) number(p[key][axis], min, 1000000, "probe " + key);
       }
       number(p.priority ?? 0, -1000, 1000, "probe priority"); number(p.intensity ?? 1, 0, 20, "probe intensity");
-      return { ...p, position: { ...p.position }, size: { ...p.size }, priority: p.priority ?? 0, intensity: p.intensity ?? 1 };
+      if(![32,64,128,256,512,1024].includes(p.resolution??128)||!Number.isInteger(p.layerMask??0x0fffffff))throw Error('无效探针捕获配置');
+      number(p.interval??.5,0,60,'probe interval');number(p.blendDistance??0,0,10000,'probe edge blend');number(p.layerMask??0x0fffffff,0,0xffffffff,'probe layer mask');
+      return { ...p, textureId:p.textureId||null, mode:p.mode??'static', resolution:p.resolution??128, interval:p.interval??.5, blendDistance:p.blendDistance??0, layerMask:p.layerMask??0x0fffffff, position: { ...p.position }, size: { ...p.size }, priority: p.priority ?? 0, intensity: p.intensity ?? 1 };
     });
     return c;
   }
@@ -105,7 +123,7 @@
     const id = c.environment.textureId;
     if (id && !(content.textures || []).some(t => t.id === id && environmentMimes.includes(t.mime))) throw Error("IBL 引用的环境资源不存在或格式不正确");
     for (const p of c.probes)
-      if (!(content.textures || []).some(t => t.id === p.textureId && t.mime === "application/x-babylon-env")) throw Error("局部反射探针需要预过滤 .env 环境贴图");
+      if (p.textureId && !(content.textures || []).some(t => t.id === p.textureId && t.mime === "application/x-babylon-env")) throw Error("局部反射探针需要预过滤 .env 环境贴图");
   }
   function validateNode(node) {
     if(node.optimization!==undefined){
@@ -126,7 +144,7 @@
     clearCoat: {enabled:false,intensity:1,roughness:0.1,normalScale:1},
     sheen: {enabled:false,color:"#FFFFFF",intensity:1,roughness:0.5},
     anisotropy: {enabled:false,intensity:0.5,rotation:0},
-    transmission: {enabled:false,intensity:1,ior:1.5,thickness:0.1,tintColor:"#FFFFFF",tintDistance:1},
+    transmission: {enabled:false,source:'environment',intensity:1,ior:1.5,thickness:0.1,tintColor:"#FFFFFF",tintDistance:1},
     detail: {enabled:false,scale:8,diffuse:1,normal:1,roughness:1},
   };
   function material(input={}) {
@@ -134,6 +152,7 @@
     if(input.bakedDirectLighting!==undefined&&typeof input.bakedDirectLighting!=='boolean')throw Error('无效烘焙材质开关');
     const c=merge(materialDefaults,Object.fromEntries(Object.keys(materialDefaults).filter(k=>input[k]!==undefined).map(k=>[k,input[k]])),"material");
     if(!["auto","opaque","mask","blend"].includes(c.alphaMode))throw Error("无效材质透明模式");
+    if(!['environment','scene'].includes(c.transmission.source))throw Error('无效透射来源');
     number(c.normalScale,0,10,"normal scale");number(c.alphaCutoff,0,1,"alpha cutoff");number(c.uvRotation,-Math.PI*2,Math.PI*2,"UV rotation");
     for(const axis of ['u','v'])number(c.uvOffset[axis],-10000,10000,"UV offset");
     for(const key of ['clearCoat','sheen','anisotropy','transmission','detail'])if(typeof c[key].enabled!=="boolean")throw Error("无效扩展材质开关");
@@ -145,11 +164,11 @@
     number(c.detail.scale,.01,1000,"detail scale");for(const key of ['diffuse','normal','roughness'])number(c.detail[key],0,5,"detail "+key);
     return c;
   }
-  function selectProbe(point, probes) {
+  function selectProbe(point, probes, excludedId) {
     let selected = -1, priority = -Infinity, volume = Infinity;
     for (let i = 0; i < probes.length; i++) {
       const p = probes[i], v = p.size.x * p.size.y * p.size.z;
-      if (["x", "y", "z"].some(axis => Math.abs(point[axis] - p.position[axis]) > p.size[axis] / 2)) continue;
+      if(p.id===excludedId||Math.abs(point.x-p.position.x)>p.size.x/2||Math.abs(point.y-p.position.y)>p.size.y/2||Math.abs(point.z-p.position.z)>p.size.z/2)continue;
       if (p.priority > priority || (p.priority === priority && (v < volume || (v === volume && (selected < 0 || p.id < probes[selected].id))))) {
         selected = i; priority = p.priority; volume = v;
       }
@@ -162,11 +181,15 @@
     if (name === "custom") return c;
     const low = name === "low", high = name === "high";
     c.resolutionScale = low ? 0.75 : 1;
-    c.antialiasing = high ? "msaa" : "fxaa"; c.samples = high ? 4 : 1;
+    c.antialiasing = c.antialiasing === "taa" ? "taa" : high ? "msaa" : "fxaa"; c.samples = high ? 4 : 1;
     Object.assign(c.shadows, { enabled: true, mapSize: low ? 512 : high ? 2048 : 1024, filter: high ? "pcss" : "pcf", maxLights: low ? 1 : high ? 4 : 2 });
     Object.assign(c.ao, { enabled: !low, ratio: high ? 1 : 0.5, samples: high ? 16 : 8 });
     Object.assign(c.bloom, { enabled: !low, scale: high ? 0.5 : 0.25 });
     c.dof.quality = high ? 2 : low ? 0 : 1;
+    Object.assign(c.clouds,{steps:high?64:low?16:32,lightSteps:high?6:low?2:4});
+    Object.assign(c.realtimeProbes,{facesPerFrame:high?3:low?1:2,maxPixels:high?262144:low?16384:131072,maxActive:high?4:low?1:2});
+    Object.assign(c.refraction,{scale:high?1:low?.25:.5,maxPixels:high?2097152:low?131072:524288,maxLayers:high?4:low?1:2});
+    c.transparency.layers=high?4:low?2:3;
     Object.assign(c.volumetric,{steps:high?64:low?16:32,scale:high?.75:low?.25:.5,maxPixels:high?2097152:low?262144:1048576,shadows:!low,shadowMapSize:high?1024:512});
     Object.assign(c.reflections.ssr,{enabled:high,maxSteps:high?128:32,downsample:high?0:1});
     Object.assign(c.reflections.planar,{enabled:!low,maxMirrors:high?4:1,maxPixels:high?4194304:524288,scale:high?1:.5});

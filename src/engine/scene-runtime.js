@@ -184,6 +184,7 @@
           sheen.color=B.Color3.FromHexString(a.sheen.color);sheen.texture=texture(id,'sheen',d,d.sheenTextureId);sheen.useRoughnessFromMainTexture=true;
           mat.anisotropy.isEnabled=a.anisotropy.enabled;mat.anisotropy.intensity=a.anisotropy.intensity;mat.anisotropy.angle=a.anisotropy.rotation;
           mat.anisotropy.texture=texture(id,'anisotropy',d,d.anisotropyTextureId);
+          mat.metadata={...mat.metadata,arkglideTransmissionSource:a.transmission.source};
           const sub=mat.subSurface;sub.isRefractionEnabled=a.transmission.enabled;sub.refractionIntensity=a.transmission.intensity;sub.indexOfRefraction=a.transmission.ior;
           sub.linkRefractionWithTransparency=false;sub.useGltfStyleTextures=true;
           sub.thicknessTexture=texture(id,'thickness',d,d.thicknessTextureId);sub.minimumThickness=sub.thicknessTexture?0:a.transmission.thickness;sub.maximumThickness=a.transmission.thickness;
@@ -368,7 +369,9 @@
       if (node.type === "light") {
         const type = node.lightType || "directional";
         const light =
-          type === "point"
+          type === "spot"
+            ? new B.SpotLight(node.id+":light",B.Vector3.Zero(),new B.Vector3(0,-1,0),Math.PI/3,2,scene)
+            : type === "point"
             ? new B.PointLight(node.id + ":light", B.Vector3.Zero(), scene)
             : type === "hemispheric"
               ? new B.HemisphericLight(
@@ -423,6 +426,8 @@
       const resource = resources.get(node.id);
       if (node.type === "light" && resource) {
         resource.intensity = node.intensity ?? 1;
+        if(node.lightRange!==undefined)resource.range=node.lightRange;else resource.range=Number.MAX_VALUE;
+        if(node.lightType==='spot'){resource.angle=(node.spotAngle??60)*Math.PI/180;resource.innerAngle=(node.spotInnerAngle??30)*Math.PI/180;resource.exponent=2;}
         resource.diffuse = B.Color3.FromHexString(node.color || "#FFFFFF");
         resource.setEnabled(node.visible !== false);
       } else if (node.type === "camera" && resource) {

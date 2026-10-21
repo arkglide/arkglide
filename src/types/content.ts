@@ -44,7 +44,7 @@ export interface MaterialAsset {
   sheenTextureId?: string;
   anisotropy?: { enabled?: boolean; intensity?: number; rotation?: number };
   anisotropyTextureId?: string;
-  transmission?: { enabled?: boolean; intensity?: number; ior?: number; thickness?: number; tintColor?: string; tintDistance?: number };
+  transmission?: { enabled?: boolean; source?: 'environment' | 'scene'; intensity?: number; ior?: number; thickness?: number; tintColor?: string; tintDistance?: number };
   thicknessTextureId?: string;
   transmissionTextureId?: string;
   detail?: { enabled?: boolean; scale?: number; diffuse?: number; normal?: number; roughness?: number };

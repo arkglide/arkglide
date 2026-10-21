@@ -47,6 +47,8 @@
     "example:composition": "node scripts/create-composition-example.mjs",
     "test:composition:browser": "node --test tests/composition/browser.mjs",
     "test:package:browser": "node --test tests/package/browser.mjs",
+    "example:rendering-completion": "node scripts/create-rendering-completion-example.mjs",
+    "test:rendering-completion:browser": "node --test tests/rendering/completion-browser.mjs",
     "example:ktx2": "node scripts/create-ktx2-example.mjs",
     "test:ktx2:browser": "node --test tests/rendering/ktx2-browser.mjs"
   },

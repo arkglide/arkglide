@@ -99,3 +99,5 @@ npm run example:advanced-rendering
 npm run test:advanced-rendering:browser
 PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:browser
 ```
+
+当前另已支持实时立方体探针、运动向量/TAA、场景折射、分层透明和扩展体积大气，见 [渲染补全](rendering-completion.md)。本文的原阶段范围描述保留用于区分历史交付。

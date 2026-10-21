@@ -1525,6 +1525,7 @@
           false,
         );
         texture.activeCamera = camera;
+        texture.noPrePassRenderer = true;
         if (o.renderCompute) texture.getCustomRenderList = (_pass, list, length) =>
           scene.activeCamera === camera ? o.renderCompute.select(list, scene.frustumPlanes, length) : null;
         texture.ignoreCameraViewport = true;
@@ -1635,7 +1636,8 @@
                 (mesh) => mesh.isEnabled() && !mesh.isDisposed(),
               );
               const beforeDraws = engine._drawCalls?.current || 0;
-              view.texture.render(false, false);
+              const capture=()=>view.texture.render(false,false);
+              if(scene._arkglideRendering?.captureView)scene._arkglideRendering.captureView(capture);else capture();
               scene._arkglideRendering?.recordOffscreenDraws((engine._drawCalls?.current || 0) - beforeDraws);
               renderedViews++; renderedPixels += allocation.width * allocation.height;
               result.set(p, view.texture);

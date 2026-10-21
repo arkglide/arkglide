@@ -148,6 +148,7 @@ export default function Inspector() {
         | "fov"
         | "modelUrl"
         | "lightType"
+        | "lightRange" | "spotAngle" | "spotInnerAngle"
         | "activeCamera"
         | "castShadows"
         | "receiveShadows"
@@ -426,10 +427,15 @@ export default function Inspector() {
           >
             <MenuItem value="hemispheric">Hemispheric</MenuItem>
             <MenuItem value="directional">Directional</MenuItem>
-            <MenuItem value="point">Point</MenuItem>
+            <MenuItem value="point">Point</MenuItem><MenuItem value="spot">Spot</MenuItem>
           </TextField>
           <FormControlLabel label="投射阴影" control={<Switch checked={currentNode.castShadows !== false} onChange={e => update({ castShadows: e.target.checked })} />} />
 
+          {['point','spot'].includes(currentNode.lightType||'')&&<TextField label="灯光范围" type="number" size="small" value={currentNode.lightRange??100} inputProps={{min:.01,max:100000,step:1}} onChange={e=>update({lightRange:Number(e.target.value)})}/>}
+          {currentNode.lightType==='spot'&&<Stack direction="row" spacing={1}>
+            <TextField label="聚光外角（度）" type="number" size="small" value={currentNode.spotAngle??60} inputProps={{min:1,max:179,step:1}} onChange={e=>update({spotAngle:Number(e.target.value)})}/>
+            <TextField label="聚光内角（度）" type="number" size="small" value={currentNode.spotInnerAngle??30} inputProps={{min:0,max:179,step:1}} onChange={e=>update({spotInnerAngle:Number(e.target.value)})}/>
+          </Stack>}
           <Typography variant="caption">Intensity</Typography>
           <Slider
             value={currentNode.intensity ?? 1}

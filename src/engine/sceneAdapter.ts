@@ -15,6 +15,9 @@ import "./atmosphere-runtime.js";
 import "./volumetric-runtime.js";
 import "./render-view-budget.js";
 import "./reflection-runtime.js";
+import "./realtime-probes.js";
+import "./temporal-runtime.js";
+import "./transmission-runtime.js";
 import "./rendering-runtime.js";
 
 export interface SceneAdapter {

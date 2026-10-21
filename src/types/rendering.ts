@@ -1,10 +1,16 @@
 export interface RenderingSettings {
   quality?: "custom" | "low" | "medium" | "high";
   resolutionScale?: number;
-  antialiasing?: "none" | "fxaa" | "msaa";
+  antialiasing?: "none" | "fxaa" | "msaa" | "taa";
   samples?: number;
   gpuProfiling?: boolean;
   fog?: { mode?: "none" | "linear" | "exp" | "exp2"; color?: string; density?: number; start?: number; end?: number };
+  temporal?: { samples?: 4 | 8 | 16 | 32; factor?: number; clampHistory?: boolean; cutDistance?: number; cutAngle?: number };
+  realtimeProbes?: { maxActive?: number; facesPerFrame?: number; maxPixels?: number; transition?: number };
+  refraction?: { enabled?: boolean; scale?: number; maxPixels?: number; maxLayers?: number };
+  transparency?: { enabled?: boolean; layers?: number };
+  clouds?: CloudSettings;
+  volumeLighting?: { maxLocalLights?: number; localIntensity?: number; multipleScattering?: number; scatteringOrders?: 1 | 2 | 3 | 4 };
   volumetric?: VolumetricSettings;
   sky?: { enabled?: boolean; sunAzimuth?: number; sunElevation?: number; turbidity?: number; rayleigh?: number; mie?: number; luminance?: number };
   dof?: { enabled?: boolean; focusDistance?: number; focalLength?: number; fStop?: number; quality?: 0 | 1 | 2 };
@@ -39,7 +45,9 @@ export interface VolumetricSettings {
 export interface ReflectionProbeSettings {
   id: string;
   name: string;
-  textureId: string;
+  textureId?: string | null;
+  mode?: 'static' | 'realtime'; resolution?: 32 | 64 | 128 | 256 | 512 | 1024;
+  interval?: number; blendDistance?: number; layerMask?: number;
   position: { x: number; y: number; z: number };
   size: { x: number; y: number; z: number };
   priority?: number;
@@ -47,3 +55,8 @@ export interface ReflectionProbeSettings {
 }
 export interface PlanarReflectionSettings { enabled: boolean; axis?: "x" | "y" | "z"; offset?: number; blur?: number; intensity?: number; }
 export interface MeshOptimizationSettings { shareGeometry?: boolean; instancing?: boolean; lod?: {enabled:boolean;levels?:{distance:number;grid:number}[]}; }
+
+export interface CloudSettings {
+  enabled?: boolean; base?: number; thickness?: number; coverage?: number; density?: number; scale?: number; detail?: number;
+  windX?: number; windZ?: number; maxDistance?: number; steps?: 16 | 24 | 32 | 48 | 64 | 96; lightSteps?: 2 | 4 | 6 | 8; color?: string;
+}

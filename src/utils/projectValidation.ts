@@ -107,9 +107,10 @@ export function validateProject(data: any): {
       throw new Error("无效几何类型");
     if (
       n.lightType &&
-      !["point", "directional", "hemispheric"].includes(n.lightType)
+      !["point", "directional", "hemispheric", "spot"].includes(n.lightType)
     )
       throw new Error("无效灯光类型");
+    if(n.lightRange!==undefined&&(!Number.isFinite(n.lightRange)||n.lightRange<.01||n.lightRange>100000)||n.spotAngle!==undefined&&(!Number.isFinite(n.spotAngle)||n.spotAngle<1||n.spotAngle>179)||n.spotInnerAngle!==undefined&&(!Number.isFinite(n.spotInnerAngle)||n.spotInnerAngle<0||n.spotInnerAngle>(n.spotAngle??60)))throw Error('无效灯光范围或聚光角度');
     if (n.color && !/^#[0-9a-f]{6}$/i.test(n.color))
       throw new Error("无效颜色");
     if (

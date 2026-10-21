@@ -19,6 +19,12 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     bloom: { ...defaults.bloom, ...value?.bloom },
     views: { ...defaults.views, ...value?.views },
     fog: { ...defaults.fog, ...value?.fog },
+    temporal: { ...defaults.temporal,...value?.temporal },
+    realtimeProbes: { ...defaults.realtimeProbes,...value?.realtimeProbes },
+    refraction: { ...defaults.refraction,...value?.refraction },
+    transparency: { ...defaults.transparency,...value?.transparency },
+    clouds: { ...defaults.clouds,...value?.clouds },
+    volumeLighting: { ...defaults.volumeLighting,...value?.volumeLighting },
     volumetric: { ...defaults.volumetric, ...value?.volumetric },
     sky: { ...defaults.sky, ...value?.sky },
     dof: { ...defaults.dof, ...value?.dof },
@@ -44,8 +50,14 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <TextField label="画质档位" select size="small" value={value?.quality || "custom"} onChange={e => chooseQuality(e.target.value)}>{[["low", "低"], ["medium", "中"], ["high", "高"], ["custom", "自定义"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
     <Stack direction="row" spacing={1}>
       <TextField label="渲染分辨率比例" type="number" size="small" value={value?.resolutionScale ?? 1} inputProps={{ min: 0.5, max: 1.5, step: 0.05 }} onChange={e => onChange({ ...value, quality: "custom", resolutionScale: Number(e.target.value) })} />
-      <TextField label="抗锯齿" select size="small" value={value?.antialiasing || "none"} onChange={e => onChange({ ...value, quality: "custom", antialiasing: e.target.value as RenderingSettings["antialiasing"] })}>{[["none", "基础"], ["fxaa", "FXAA"], ["msaa", "MSAA"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
+      <TextField label="抗锯齿" select size="small" value={value?.antialiasing || "none"} onChange={e => onChange({ ...value, quality: "custom", antialiasing: e.target.value as RenderingSettings["antialiasing"] })}>{[["none", "基础"], ["fxaa", "FXAA"], ["msaa", "MSAA"], ["taa", "TAA（运动重投影）"]].map(([v, n]) => <MenuItem key={v} value={v}>{n}</MenuItem>)}</TextField>
     </Stack>
+    {value?.antialiasing==='taa'&&<Stack spacing={1}>
+      <TextField label="TAA 历史采样" select size="small" value={c.temporal.samples} onChange={e=>change('temporal',{samples:Number(e.target.value)})}>{[4,8,16,32].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+      {number('temporal','factor','TAA 当前帧权重',.02,1,.02)}
+      <FormControlLabel label="TAA 邻域历史裁剪" control={<Switch checked={c.temporal.clampHistory} onChange={e=>change('temporal',{clampHistory:e.target.checked})}/>} />
+      <Stack direction="row" spacing={1}>{number('temporal','cutDistance','镜头跳切距离',.01,10000)}{number('temporal','cutAngle','镜头跳切角度',1,180,1)}</Stack>
+    </Stack>}
     <FormControlLabel label="采集 GPU 帧时间" control={<Switch checked={value?.gpuProfiling || false} onChange={e => onChange({ ...value, gpuProfiling: e.target.checked })} />} />
     {error && <Alert severity="error">{error}</Alert>}
     <FormControlLabel label="实时软阴影" control={<Switch checked={c.shadows.enabled} onChange={e => change("shadows", { enabled: e.target.checked })} />} />
@@ -106,6 +118,22 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
       <TextField label="体积光深度图" size="small" select value={c.volumetric.shadowMapSize} onChange={e=>change('volumetric',{shadowMapSize:Number(e.target.value)})}>{[256,512,1024,2048].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
       <Stack direction="row" spacing={1}>{number('volumetric','shadowDistance','体积遮挡范围',1,10000,1)}{number('volumetric','shadowBias','体积遮挡偏移',0,.05,.0001)}</Stack>
     </Stack>}
+    <FormControlLabel label="体积云层" control={<Switch checked={c.clouds.enabled} onChange={e=>change('clouds',{enabled:e.target.checked})}/>} />
+    {c.clouds.enabled&&<Stack spacing={1}>
+      <Stack direction="row" spacing={1}>{number('clouds','base','云底高度',-10000,100000,1)}{number('clouds','thickness','云层厚度',1,10000,1)}</Stack>
+      <Stack direction="row" spacing={1}>{number('clouds','coverage','云量',0,1,.05)}{number('clouds','density','云密度',0,1,.01)}</Stack>
+      <Stack direction="row" spacing={1}>{number('clouds','scale','云噪声频率',.0001,1,.001)}{number('clouds','detail','云侵蚀细节',0,1,.05)}</Stack>
+      <Stack direction="row" spacing={1}>{number('clouds','windX','云风速 X',-100,100)}{number('clouds','windZ','云风速 Z',-100,100)}</Stack>
+      {number('clouds','maxDistance','云可见距离',10,100000,10)}
+      <TextField label="云颜色" type="color" size="small" value={c.clouds.color} onChange={e=>change('clouds',{color:e.target.value})}/>
+      <TextField label="云积分步数" select size="small" value={c.clouds.steps} onChange={e=>change('clouds',{steps:Number(e.target.value)})}>{[16,24,32,48,64,96].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+      <TextField label="云光路采样" select size="small" value={c.clouds.lightSteps} onChange={e=>change('clouds',{lightSteps:Number(e.target.value)})}>{[2,4,6,8].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+    </Stack>}
+    {(c.volumetric.enabled||c.clouds.enabled)&&<Stack spacing={1}>
+      <Stack direction="row" spacing={1}>{number('volumeLighting','maxLocalLights','体积局部灯上限',0,8,1)}{number('volumeLighting','localIntensity','局部灯散射强度',0,10,.1)}</Stack>
+      {number('volumeLighting','multipleScattering','多次散射补偿',0,1,.05)}
+      {number('volumeLighting','scatteringOrders','散射阶数',1,4,1)}
+    </Stack>}
     <FormControlLabel label="程序大气天空" control={<Switch checked={c.sky.enabled} onChange={e=>change("sky",{enabled:e.target.checked})} />} />
     <Stack direction="row" spacing={1}>{number("sky","sunAzimuth","太阳方位（度）",-360,360,1)}{number("sky","sunElevation","太阳高度（度）",-90,90,1)}</Stack>
     <Stack direction="row" spacing={1}>{number("sky","turbidity","天空浑浊度",1,20,.1)}{number("sky","rayleigh","Rayleigh 散射",0,8,.1)}{number("sky","mie","Mie 散射",0,.1,.001)}</Stack>
@@ -121,7 +149,19 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
     <FormControlLabel label="平面反射（在节点属性中指定反射面）" control={<Switch checked={c.planar.enabled} onChange={e=>change("planar",{enabled:e.target.checked})} />} />
     <Stack direction="row" spacing={1}>{number("planar","maxMirrors","平面反射数量上限",1,8,1)}{number("planar","scale","平面反射分辨率比例",.1,1,.1)}</Stack>
     <TextField label="平面反射总像素预算" type="number" size="small" value={c.planar.maxPixels} inputProps={{min:1024,max:67108864,step:65536}} onChange={e=>change("planar",{maxPixels:Number(e.target.value)})} />
+    <Typography variant="subtitle2">场景折射与透明</Typography>
+    <FormControlLabel label="场景折射捕获（材质选择场景来源）" control={<Switch checked={c.refraction.enabled} onChange={e=>change('refraction',{enabled:e.target.checked})}/>} />
+    {c.refraction.enabled&&<Stack spacing={1}>
+      <Stack direction="row" spacing={1}>{number('refraction','maxLayers','折射背景层上限',1,8,1)}{number('refraction','scale','折射分辨率比例',.25,1,.05)}</Stack>
+      {number('refraction','maxPixels','折射总像素预算',16384,4194304,16384)}
+    </Stack>}
+    <FormControlLabel label="分层透明（双向深度剥离）" control={<Switch checked={c.transparency.enabled} onChange={e=>change('transparency',{enabled:e.target.checked})}/>} />
+    {c.transparency.enabled&&number('transparency','layers','透明剥离轮数',1,8,1)}
     <Typography variant="subtitle2">局部反射探针</Typography>
+    <Stack direction="row" spacing={1}>{number('realtimeProbes','maxActive','实时探针活跃上限',1,8,1)}{number('realtimeProbes','facesPerFrame','每帧捕获面数',1,6,1)}</Stack>
+    {number('realtimeProbes','maxPixels','探针每帧像素预算',1024,6291456,16384)}
+    {number('realtimeProbes','transition','捕获更新过渡（秒）',0,5,.05)}
+    <Button size="small" disabled={(value?.probes?.length||0)>=32} onClick={()=>onChange({...value,probes:[...(value?.probes||[]),{id:crypto.randomUUID(),name:'实时反射',mode:'realtime',position:{x:0,y:2,z:0},size:{x:12,y:6,z:12},resolution:128,interval:.5,blendDistance:1}]})}>添加实时反射探针</Button>
     {(value?.probes || []).map(p => <ProbeEditor key={p.id} value={p} textures={textures.filter(t => t.mime === "application/x-babylon-env")} onChange={next => onChange({ ...value, probes: value!.probes!.map(old => old.id === p.id ? next : old) })} onDelete={() => onChange({ ...value, probes: value!.probes!.filter(old => old.id !== p.id) })} />)}
     <Button size="small" disabled={!(textures.some(t => t.mime === "application/x-babylon-env")) || (value?.probes?.length || 0) >= 32} onClick={() => onChange({ ...value, probes: [...(value?.probes || []), { id: crypto.randomUUID(), name: "房间反射", textureId: textures.find(t => t.mime === "application/x-babylon-env")!.id, position: { x: 0, y: 0, z: 0 }, size: { x: 10, y: 5, z: 10 }, priority: 0, intensity: 1 }] })}>添加局部反射探针</Button>
   </Stack>;
@@ -130,12 +170,19 @@ export function RenderingSettingsPanel({ value, onChange }: { value?: RenderingS
 function ProbeEditor({ value: p, textures, onChange, onDelete }: { value: ReflectionProbeSettings; textures: { id: string; name: string }[]; onChange: (p: ReflectionProbeSettings) => void; onDelete: () => void }) {
   return <Stack spacing={1} sx={{ border: "1px solid", borderColor: "divider", p: 1 }}>
     <TextField label="探针名称" size="small" value={p.name} onChange={e => onChange({ ...p, name: e.target.value })} />
-    <TextField label="探针环境贴图" size="small" select value={p.textureId} onChange={e => onChange({ ...p, textureId: e.target.value })}>{textures.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}</TextField>
+    <TextField label="探针模式" size="small" select value={p.mode||'static'} onChange={e=>onChange({...p,mode:e.target.value as 'static'|'realtime',textureId:p.textureId||textures[0]?.id||null})}><MenuItem value="static">静态环境</MenuItem><MenuItem value="realtime">实时捕获</MenuItem></TextField>
+    <TextField label="探针环境贴图" size="small" select value={p.textureId||''} onChange={e => onChange({ ...p, textureId: e.target.value })}><MenuItem value="">无（实时模式可选回退）</MenuItem>{textures.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}</TextField>
     {(["position", "size"] as const).map(field => <Stack key={field} direction="row" spacing={1}>{(["x", "y", "z"] as const).map(axis => <TextField key={axis} label={(field === "position" ? "中心 " : "范围 ") + axis.toUpperCase()} size="small" type="number" value={p[field][axis]} inputProps={{ min: field === "size" ? 0.001 : -1000000, max: 1000000 }} onChange={e => onChange({ ...p, [field]: { ...p[field], [axis]: e.target.value.trim() ? Number(e.target.value) : NaN } })} />)}</Stack>)}
     <Stack direction="row" spacing={1}>
       <TextField label="探针优先级" size="small" type="number" value={p.priority ?? 0} onChange={e => onChange({ ...p, priority: Number(e.target.value) })} />
       <TextField label="探针亮度" size="small" type="number" value={p.intensity ?? 1} inputProps={{ min: 0, max: 20, step: 0.1 }} onChange={e => onChange({ ...p, intensity: Number(e.target.value) })} />
     </Stack>
+    <ScalarField label="探针边缘过渡距离" size="small" value={p.blendDistance??0} inputProps={{min:0,max:10000,step:.1}} onValueChange={blendDistance=>onChange({...p,blendDistance})}/>
+    {p.mode==='realtime'&&<Stack spacing={1}>
+      <TextField label="实时探针分辨率" select size="small" value={p.resolution??128} onChange={e=>onChange({...p,resolution:Number(e.target.value) as ReflectionProbeSettings['resolution']})}>{[32,64,128,256,512,1024].map(n=><MenuItem key={n} value={n}>{n}</MenuItem>)}</TextField>
+      <ScalarField label="探针刷新间隔（秒）" size="small" value={p.interval??.5} inputProps={{min:0,max:60,step:.1}} onValueChange={interval=>onChange({...p,interval})}/>
+      <ScalarField label="捕获层掩码" size="small" value={p.layerMask??0x0fffffff} inputProps={{min:0,max:0xffffffff,step:1}} onValueChange={layerMask=>onChange({...p,layerMask})}/>
+    </Stack>}
     <Button color="error" size="small" onClick={onDelete}>删除探针</Button>
   </Stack>;
 }

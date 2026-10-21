@@ -51,6 +51,9 @@
     <script src="./arkglide-static-instances.js"></script>
     <script src="./arkglide-ktx2.js"></script>
     <script src="./arkglide-reflections.js"></script>
+    <script src="./arkglide-realtime-probes.js"></script>
+    <script src="./arkglide-temporal.js"></script>
+    <script src="./arkglide-transmission.js"></script>
     <script src="./arkglide-rendering.js"></script>
     <script src="./arkglide-scene.js"></script>
     <script src="./arkglide-lighting-uv.js"></script>
@@ -629,6 +632,7 @@
           engine.resize();
         });
         sceneAdapter = ArkGlideScene.createSceneAdapter(BABYLON, scene, {
+          getRenderDelta:()=>running?time.deltaTime:0,
           loadModule:()=>mathReady.then(()=>coreModule),
           renderCompute,
           onCreate: function (object, node) {
