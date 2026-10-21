@@ -1,6 +1,11 @@
 import "./sync-wasm.mjs";
-import "./sync-ktx2.mjs";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+// Decoder JS/WASM are checked in. Rebuild them explicitly with sync:ktx2;
+// normal startup only mirrors the worker owned by our runtime.
+copyFileSync(
+  new URL("../src/engine/ktx2-validate-worker.js", import.meta.url),
+  new URL("../public/lib/ktx2/validate-worker.js", import.meta.url),
+);
 copyFileSync(
   new URL("../src/engine/scene-runtime.js", import.meta.url),
   new URL("../public/arkglide-scene.js", import.meta.url),

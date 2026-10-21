@@ -1,9 +1,11 @@
 import {build} from 'esbuild';
 import {copyFile,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const source=new URL('../node_modules/@babylonjs/ktx2decoder/',import.meta.url),target=new URL('../public/lib/ktx2/',import.meta.url);
+const project=new URL('../',import.meta.url),source=new URL('./',import.meta.resolve('@babylonjs/ktx2decoder')),target=new URL('../public/lib/ktx2/',import.meta.url);
 await mkdir(target,{recursive:true});
-await build({entryPoints:[fileURLToPath(new URL('legacy/legacy.js',source))],bundle:true,minify:true,format:'iife',globalName:'KTX2DECODER',platform:'browser',outfile:fileURLToPath(new URL('babylon.ktx2Decoder.js',target)),legalComments:'eof'});
+// Resolve the package's public entry instead of a private legacy file. Keep the
+// working directory explicit so package resolution also works outside the repo.
+await build({absWorkingDir:fileURLToPath(project),entryPoints:['@babylonjs/ktx2decoder'],bundle:true,minify:true,format:'iife',globalName:'KTX2DECODER',platform:'browser',outfile:fileURLToPath(new URL('babylon.ktx2Decoder.js',target)),legalComments:'eof'});
 for(const file of ['msc_basis_transcoder.js','msc_basis_transcoder.wasm','uastc_astc.wasm','uastc_bc7.wasm','uastc_r8_unorm.wasm','uastc_rg8_unorm.wasm','uastc_rgba8_srgb_v2.wasm','uastc_rgba8_unorm_v2.wasm','zstddec.wasm'])await copyFile(new URL('wasm/'+file,source),new URL(file,target));
 await copyFile(new URL('license.md',source),new URL('decoder-LICENSE.md',target));
 await copyFile(new URL('wasm/license.md',source),new URL('transcoders-LICENSE.md',target));
