@@ -170,6 +170,22 @@
       const backend = gpu ? 'gpu' : 'cpu';
       const system = gpu ? new B.GPUParticleSystem('visual:particles:' + ++serial, {capacity:options.capacity,randomTextureSize:256}, o.scene)
         : new B.ParticleSystem('visual:particles:' + ++serial, options.capacity, o.scene);
+      if (gpu) {
+        const engine = o.scene.getEngine(), render = system.render;
+        system.render = function (...args) {
+          try { return render.apply(this, args); }
+          finally {
+            // Babylon 9.28's GPU-particle fallback binds instanced attributes
+            // on the default VAO after a shader/pipeline change. Its ordinary
+            // draw path leaves the divisors set, collapsing later fullscreen
+            // post-process triangles. Never modify a cached particle VAO.
+            if (engine._currentInstanceLocations?.length) {
+              engine.bindVertexArrayObject(null, null);
+              engine.unbindInstanceAttributes();
+            }
+          }
+        };
+      }
       let white;
       try {
         if (options.texture) { textures.get(options.texture).check(); system.particleTexture = textures.get(options.texture).native; }

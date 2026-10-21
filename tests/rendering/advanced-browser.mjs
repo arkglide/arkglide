@@ -21,13 +21,31 @@ test('advanced lighting export combines atmosphere, GPU particles, layered mater
   await page.evaluate(()=>ArkGlidePlayer.pause());await frame.waitForFunction(()=>!running);
   const paused=await frame.evaluate(()=>scene.particleSystems[0]._actualFrame);await page.waitForTimeout(300);assert.equal(await frame.evaluate(()=>scene.particleSystems[0]._actualFrame),paused);
   await page.evaluate(()=>ArkGlidePlayer.pause());await frame.waitForFunction(()=>running);
+  const settle=async()=>{
+    await frame.waitForFunction(()=>scene.isReady()&&scene.activeCamera._postProcesses.filter(Boolean).every(p=>p.isReady()));
+    await frame.evaluate(()=>new Promise(resolve=>{let frames=0;const token=scene.onAfterRenderObservable.add(()=>{if(++frames===3){scene.onAfterRenderObservable.remove(token);resolve();}});}));
+  };
+  const image=()=>frame.evaluate(async()=>{
+    const e=scene.getEngine(),width=e.getRenderWidth(),height=e.getRenderHeight(),pixels=await e.readPixels(0,0,width,height);let sum=0,squared=0,difference=0;
+    for(let i=0;i<pixels.length;i+=4){const value=(pixels[i]+pixels[i+1]+pixels[i+2])/3;sum+=value;squared+=value*value;if(globalThis.__advancedPixels?.length===pixels.length)for(let k=0;k<3;k++)difference+=Math.abs(pixels[i+k]-globalThis.__advancedPixels[i+k]);}
+    globalThis.__advancedPixels=pixels;const mean=sum/(width*height);
+    return {mean,variance:squared/(width*height)-mean*mean,difference,divisor:e._gl.getVertexAttrib(0,e._gl.VERTEX_ATTRIB_ARRAY_DIVISOR),activeParticles:scene.particleSystems[0].getActiveCount()};
+  });
   await frame.locator('#renderCanvas').click();await page.keyboard.press('3');await frame.waitForFunction(()=>sceneAdapter.rendering.stats().ssrEnabled,undefined,{timeout:30000});
+  await settle();const highImage=await image();
   const high=await frame.evaluate(()=>({...sceneAdapter.rendering.stats(),...portalRuntime.stats()}));assert.ok(high.planarRenderedPixels<=4194304);
+  // GPU-particle shader rebinding used to leave position divisor=1, freezing
+  // High's image and making the next resize/switch permanently black.
+  await page.keyboard.press('1');await frame.waitForFunction(()=>sceneAdapter.rendering.stats().renderQuality==='low');await settle();const lowImage=await image();
+  await page.keyboard.press('3');await frame.waitForFunction(()=>sceneAdapter.rendering.stats().ssrEnabled);await settle();const highAgainImage=await image();
+  await frame.evaluate(()=>{scene.activeCamera.position.x+=.5;});await settle();const movedImage=await image();
+  for(const sample of [highImage,lowImage,highAgainImage,movedImage]){assert.ok(sample.mean>20,'quality switch must present scene color');assert.ok(sample.variance>25,'scene must not become a flat clear color');assert.equal(sample.divisor,0);assert.ok(sample.activeParticles>0);}
+  assert.ok(movedImage.difference>10000,'High must continue presenting camera movement');
   await page.screenshot({path:new URL('work/advanced-rendering-lab.png',root).pathname});
   await page.locator('iframe').evaluate(iframe=>iframe.contentWindow.postMessage({type:'stop',runId:globalThis.__arkglidePlayer?.getState?.().runId},'*'));
   await frame.waitForFunction(()=>!running&&sceneAdapter.rendering.stats().planarReflections===0);
   const stopped=await frame.evaluate(()=>({...sceneAdapter.rendering.stats(),particles:scene.particleSystems.length,depthTargets:Object.keys(scene._depthRenderer||{}).length}));
   assert.equal(stopped.atmosphereSky,false);assert.equal(stopped.picturePipelines,0);assert.equal(stopped.particles,0);assert.equal(stopped.depthTargets,0);assert.deepEqual(errors,[]);
-  await fs.writeFile(new URL('work/advanced-rendering-static-results.json',root),JSON.stringify({initial,high,stopped},null,2));
+  await fs.writeFile(new URL('work/advanced-rendering-static-results.json',root),JSON.stringify({initial,high,highImage,lowImage,highAgainImage,movedImage,stopped},null,2));
  }finally{await page.close();}
 });

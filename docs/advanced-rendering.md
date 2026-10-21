@@ -90,6 +90,8 @@ SSR 与 AO 复用几何缓冲。反射着色保持线性，再由主相机统一
 
 导入 `examples/advanced-rendering-lab.arkglide` 查看程序天空、雾、景深、GPU 粒子、镜面地板和不同材质层。点击画面后按 1/2/3 切换低/中/高档，高档开启 SSR。这是使用程序资产的技术样例，材质与灯光仍需按具体游戏美术设计。
 
+GPU 粒子在画质/着色器切换后会清理默认 VAO 上遗留的实例属性，防止后处理全屏图元退化导致画面停住或黑屏；保留缓存的粒子 VAO 与 High 的 SSR、AO、景深。切档和镜头移动的专项验证见 [记录](verification/advanced-high-switch-fix.json)。
+
 诊断显示大气/景深/SSR 状态、平面反射数与像素、GPU/CPU 粒子系统数量，并保留原有绘制调用与可选 GPU 时间。正确性验证使用 Chromium/SwiftShader，不能据此推断目标设备帧率。详情见 `verification/advanced-rendering.json`。
 
 ```sh

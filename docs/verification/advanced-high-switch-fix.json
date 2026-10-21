@@ -1,0 +1,62 @@
+{
+  "baseCommit": "5208a88",
+  "cause": "Babylon 9.28 GPU particle shader-rebind fallback leaves instanced attribute divisors on the default VAO; fullscreen post-process triangles then collapse.",
+  "reproduced": {
+    "fullscreenPositionDivisor": 1,
+    "lowFrameMean": 0,
+    "highFrameRemainedStale": true
+  },
+  "fix": "After owned GPU particle rendering, detach the cached VAO before clearing tracked instanced attributes; preserve cached particle VAOs and all quality effects.",
+  "validation": {
+    "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:advanced-rendering:browser",
+    "targetedCases": 1,
+    "qualitySequence": [
+      "medium",
+      "high",
+      "low",
+      "high"
+    ],
+    "high": {
+      "mean": 114.5874091254564,
+      "variance": 1669.9717681886177,
+      "difference": 0,
+      "divisor": 0,
+      "activeParticles": 512
+    },
+    "low": {
+      "mean": 125.01440731096666,
+      "variance": 1500.1660612318065,
+      "difference": 0,
+      "divisor": 0,
+      "activeParticles": 512
+    },
+    "highAgain": {
+      "mean": 114.69487508140041,
+      "variance": 1670.577729402572,
+      "difference": 0,
+      "divisor": 0,
+      "activeParticles": 512
+    },
+    "cameraMoved": {
+      "mean": 113.93426344131818,
+      "variance": 1704.484713284719,
+      "difference": 3335217,
+      "divisor": 0,
+      "activeParticles": 512
+    },
+    "highEffects": {
+      "ssr": true,
+      "ao": true,
+      "dof": true,
+      "gpuParticleSystems": 1
+    },
+    "stoppedParticles": 0,
+    "stoppedDepthTargets": 0,
+    "syntaxCheck": "passed",
+    "runtimeMirror": "identical",
+    "broadSuiteAndBuild": "not run: user requested a focused fix and direct commit"
+  },
+  "renderMode": "software",
+  "hardwareBudgetVerified": false,
+  "sourceSha256": "6f51a25327a6bf01588e65f8a20dc60392e01f588f0b926f0749406683765099"
+}
