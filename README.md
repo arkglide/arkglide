@@ -16,6 +16,8 @@
 
 [渲染补全](docs/rendering-completion.md) 已加入实时立方体探针与过渡、运动向量/TAA、场景折射与分层透明、体积云及点/聚光散射和多阶散射近似。`examples/rendering-completion-lab.arkglide` 可直接体验组合效果。
 
+[竹隐 · 中国风竹林庭院 Showcase](docs/chinese-courtyard/README.md) 将PBR 竹林、扫描蕨类、雕花屏风与扶手椅、苔石及复用的开源亭子组成可编辑场景。导入 `examples/chinese-courtyard-showcase.arkglide`，WASD/鼠标自由浏览、M 巡游、1/2/3 画质、T/R/P/V/B 对照渲染效果；`npm run example:courtyard` 重建项目，`npm run export:courtyard -- work/courtyard-static` 导出独立网页。来源与资产限制见 [清单](examples/chinese-courtyard-assets/ASSETS.md)，实际测试见 [验收记录](docs/chinese-courtyard/VALIDATION.md)。
+
 ```sh
 npm ci
 npm run dev

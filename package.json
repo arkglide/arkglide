@@ -51,7 +51,11 @@
     "example:rendering-completion": "node scripts/create-rendering-completion-example.mjs",
     "test:rendering-completion:browser": "node --test tests/rendering/completion-browser.mjs",
     "example:ktx2": "node scripts/create-ktx2-example.mjs",
-    "test:ktx2:browser": "node --test tests/rendering/ktx2-browser.mjs"
+    "test:ktx2:browser": "node --test tests/rendering/ktx2-browser.mjs",
+    "example:courtyard": "node scripts/create-chinese-courtyard-example.mjs",
+    "assets:courtyard": "node scripts/prepare-courtyard-assets.mjs",
+    "export:courtyard": "npm run sync:runtime && node scripts/export-chinese-courtyard.mjs",
+    "test:courtyard:browser": "npm run sync:runtime && node scripts/verify-chinese-courtyard.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",
@@ -81,6 +85,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "esbuild": "0.28.2",
     "fake-indexeddb": "^6.2.5",
+    "three": "^0.180.0",
     "typescript": "^5.7.0",
     "vite": "^7.3.6"
   },

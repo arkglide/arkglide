@@ -1095,6 +1095,9 @@ interface ExtendedRenderingStats {
   volumeLocalLights: number; volumeScatteringOrders: number; volumeMultipleScattering: number; volumeClouds: boolean; volumeCloudSteps: number;
 }
 interface RenderingAPI {
+  setShadows(patch: Partial<ReturnType<RenderingAPI['getSettings']>['shadows']>): void;
+  /** Patch reflection effects independently without changing the quality preset. */
+  setReflections(patch: { ssr?: Partial<ReturnType<RenderingAPI['getSettings']>['reflections']['ssr']>; planar?: Partial<ReturnType<RenderingAPI['getSettings']>['reflections']['planar']> }): void;
   setTemporal(patch: Partial<TemporalSettings>): void;
   setAntialiasing(mode: 'none' | 'fxaa' | 'msaa' | 'taa'): void;
   resetHistory(): void;

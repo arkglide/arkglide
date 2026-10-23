@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "retrieved": "2026-10-23",
+  "upstreamCommit": "1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3",
+  "downloadNote": "Pinned public copies of CC0 Poly Haven and ambientCG resources, CC BY 4.0 Free Bamboo Set, and MIT Long Wind pavilion source. Full per-asset attribution in ASSETS.md. No runtime CDN.",
+  "downloads": [
+    {
+      "cache": "work/courtyard/raw/assets/ph/models/rock_moss_set_01/rock_moss_set_01.bin",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/models/rock_moss_set_01/rock_moss_set_01.bin",
+      "sha256": "de8360e6175879aaf02c171911069cf5f1852547f9ca7f10e440085dbcc3315e",
+      "bytes": 1466380
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/models/rock_moss_set_01/rock_moss_set_01_1k.gltf",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/models/rock_moss_set_01/rock_moss_set_01_1k.gltf",
+      "sha256": "c36675aca9c6b2be7785c2534cf413b03ec82a5a2a5407a2b1c0cdb0346c9727",
+      "bytes": 9987
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/models/rock_moss_set_01/textures/rock_moss_set_01_diff_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/models/rock_moss_set_01/textures/rock_moss_set_01_diff_1k.jpg",
+      "sha256": "40cea65d8aa4ee73a93b04af19963834d061eee9779c3fc2c1cba76eef812ccc",
+      "bytes": 168099
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/models/rock_moss_set_01/textures/rock_moss_set_01_nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/models/rock_moss_set_01/textures/rock_moss_set_01_nor_gl_1k.jpg",
+      "sha256": "eb4aad3f207f1dc5b624d74ae240372171626a66912bd71adf7bd3e518181d6e",
+      "bytes": 209975
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/models/rock_moss_set_01/textures/rock_moss_set_01_rough_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/models/rock_moss_set_01/textures/rock_moss_set_01_rough_1k.jpg",
+      "sha256": "4d6ec46623abd8e2cdb855f59c7ce31873ad61b36b60e4de579e9e776a497c6b",
+      "bytes": 82624
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/ceramic_roof_01/arm_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/ceramic_roof_01/arm_1k.jpg",
+      "sha256": "76a9fecf7e4f80799b1c6d3d2d4809598364263cd766523c8135658353783120",
+      "bytes": 170410
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/ceramic_roof_01/diffuse_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/ceramic_roof_01/diffuse_1k.jpg",
+      "sha256": "d16264943b3a052a6b91f4ad7c9c1f37c09f2a9e9c503bdb3477f4705c03ff8c",
+      "bytes": 547031
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/ceramic_roof_01/nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/ceramic_roof_01/nor_gl_1k.jpg",
+      "sha256": "e845af7ee8587e1452e5c2ed2780d9aaf827e21a88a59d074db66bf270ef58dd",
+      "bytes": 675803
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/japanese_stone_wall/arm_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/japanese_stone_wall/arm_1k.jpg",
+      "sha256": "f1a93c85b6eca254c36ff784b96cb9375455cbf45661186c2985a40e364d4fba",
+      "bytes": 744925
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/japanese_stone_wall/diffuse_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/japanese_stone_wall/diffuse_1k.jpg",
+      "sha256": "34d8a9ebf646a2f868cecc085b9aa2e1efb697038542455f0ed8a90fe70f78a9",
+      "bytes": 1028056
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/japanese_stone_wall/nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/japanese_stone_wall/nor_gl_1k.jpg",
+      "sha256": "585d5078fc40c0d128e23c875bd0d6510e9b91d2a7e163060b4f3c26adb139d5",
+      "bytes": 1098900
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/rock_boulder_dry/nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/rock_boulder_dry/nor_gl_1k.jpg",
+      "sha256": "5915fea28a97357c78a04fb31c2516f1f7ed1b3a9cef4ae25aa93e4655e6c595",
+      "bytes": 802497
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/weathered_planks/arm_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/weathered_planks/arm_1k.jpg",
+      "sha256": "f0d81d945dbb267ed8b411af4db55141ae52b87313403667dd06aead9532fbef",
+      "bytes": 528272
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/weathered_planks/diffuse_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/weathered_planks/diffuse_1k.jpg",
+      "sha256": "01c9a372cfd7a7bf471b59c2458ed3ccecc93448aebf7ba0cc5b3b5b6ed24349",
+      "bytes": 599581
+    },
+    {
+      "cache": "work/courtyard/raw/assets/ph/textures/weathered_planks/nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/public/assets/ph/textures/weathered_planks/nor_gl_1k.jpg",
+      "sha256": "381d298f3194ec4961b04b4912b9b6efea4b2ff7b914dac57e24c8b6b0be6a25",
+      "bytes": 681552
+    },
+    {
+      "cache": "work/courtyard/upstream/CREDITS.md",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/CREDITS.md",
+      "sha256": "5452cbde8be4a39d357b4663b6aa49f5f93ca657059f8a97866994db3368b6e0",
+      "bytes": 2738
+    },
+    {
+      "cache": "work/courtyard/upstream/LICENSE",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/LICENSE",
+      "sha256": "6c5bed998c0cb6a935570f16a44d9dedd6014d8dfd025cd924bdf96472920ca1",
+      "bytes": 1347
+    },
+    {
+      "cache": "work/courtyard/upstream/src/world/props-geo.js",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/src/world/props-geo.js",
+      "sha256": "1cb72c9368740a88498f7d92a6bf0059731fa2d405f8562681b4da210fada091",
+      "bytes": 4186
+    },
+    {
+      "cache": "work/courtyard/upstream/src/world/props-pavilion.js",
+      "url": "https://raw.githubusercontent.com/jbang2004/long-wind/1e9c4265ad2a7d06a174c8ac5f3ab64bc18252f3/src/world/props-pavilion.js",
+      "sha256": "1f06e1c0f1336635b5010a6764acd4b00ab6b1edc0fd9725d36a78ead87ca971",
+      "bytes": 17421
+    },
+    {
+      "cache": "examples/chinese-courtyard-assets/textures/venice-sunset.hdr",
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/r180/examples/textures/equirectangular/venice_sunset_1k.hdr",
+      "sha256": "0e72ed46b5316cb5fb67fc81ff85b024a09146fd89ef3811a8d2299647ada118",
+      "bytes": 1397783
+    },
+    {
+      "cache": "work/courtyard/raw/screens/screen.gltf",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_screen_panels_1k/chinese_screen_panels_1k.gltf",
+      "sha256": "80eea5b87ed1355f4628c791dc14d7c45ce77888ee9314aa97d92438d43b61a2",
+      "bytes": 4225
+    },
+    {
+      "cache": "work/courtyard/raw/screens/chinese_screen_panels.bin",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_screen_panels_1k/chinese_screen_panels.bin",
+      "sha256": "34a2f03180313ed4dbf6ac8dd6c0277b1b873929daf6bf8f06a209af6c9b2fc3",
+      "bytes": 35936
+    },
+    {
+      "cache": "work/courtyard/raw/screens/textures/chinese_screen_panels_nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_screen_panels_1k/textures/chinese_screen_panels_nor_gl_1k.jpg",
+      "sha256": "41304a8a82c2c68cb4b0e46098a6ee45f30d63b04a9ab005ad0587ae4ffeb09d",
+      "bytes": 84815
+    },
+    {
+      "cache": "work/courtyard/raw/screens/textures/chinese_screen_panels_diff_1k.jpg",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_screen_panels_1k/textures/chinese_screen_panels_diff_1k.jpg",
+      "sha256": "3d2e408ba00a766294708bd3a7e395e5d3c1a8b4b2f39b728ef1584c2896835c",
+      "bytes": 136858
+    },
+    {
+      "cache": "work/courtyard/raw/screens/textures/chinese_screen_panels_arm_1k.jpg",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_screen_panels_1k/textures/chinese_screen_panels_arm_1k.jpg",
+      "sha256": "505467fe58534e6d352f658e918a4ff99ead9452a1087f1da7fec64c576636cb",
+      "bytes": 91254
+    },
+    {
+      "cache": "work/courtyard/raw/chair/chair.gltf",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_armchair_1k/chinese_armchair_1k.gltf",
+      "sha256": "e0649ac9e63135627b824035e9a45a7c06411062589b971e633e5ab5f9e17f04",
+      "bytes": 2816
+    },
+    {
+      "cache": "work/courtyard/raw/chair/chinese_armchair.bin",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_armchair_1k/chinese_armchair.bin",
+      "sha256": "7e72b5360513057bdc453d6c03d5a837d32a8c9a2e6185f1b016c1bc62dc5b27",
+      "bytes": 81428
+    },
+    {
+      "cache": "work/courtyard/raw/chair/textures/chinese_armchair_nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_armchair_1k/textures/chinese_armchair_nor_gl_1k.jpg",
+      "sha256": "5ea32141e75890753810f648d97ea7dc65c24f4b9b1b5514a372546e783d5a78",
+      "bytes": 104045
+    },
+    {
+      "cache": "work/courtyard/raw/chair/textures/chinese_armchair_diff_1k.jpg",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_armchair_1k/textures/chinese_armchair_diff_1k.jpg",
+      "sha256": "b9728f674b7d6390f72278a4934f3f92905eef66715f2726f71023de04929428",
+      "bytes": 97857
+    },
+    {
+      "cache": "work/courtyard/raw/chair/textures/chinese_armchair_arm_1k.jpg",
+      "url": "https://raw.githubusercontent.com/ezEngine/store-sample/ee6100b38262bc945aaea2835e47139f16beaa30/PolyHaven/chinese_armchair_1k/textures/chinese_armchair_arm_1k.jpg",
+      "sha256": "48f9ca9e79e56d227fd916a261e847158f2174641a1409b0c8915bca2c194b55",
+      "bytes": 110858
+    },
+    {
+      "cache": "work/courtyard/raw/sketchfab/free-bamboo-set.glb",
+      "url": "https://raw.githubusercontent.com/AngelaHan1129/half-a-day/00256443f3f8ca8b4e814081f9e2b6883d89cf53/frontend/my-app/public/models/free_bamboo_set.glb",
+      "sha256": "128f76d98d6e7b856da3e7180a203cf4dfc0b6e696135fa855ffb45662570af4",
+      "bytes": 5719236
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/fern/fern.gltf",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/fern/fern.gltf",
+      "sha256": "33974295ee19670af4877705fc7d91f33f42d6302f0d44a625e072271223031f",
+      "bytes": 6899
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/fern/fern_02.bin",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/fern/fern_02.bin",
+      "sha256": "fe1abb762bcbbc7ad9e86925c8080437a62add257d9280e9142fdc85c226e64c",
+      "bytes": 176176
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/fern/textures/fern_02_alpha_2k.png",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/fern/textures/fern_02_alpha_2k.png",
+      "sha256": "f51eb9b8f9f4b25a882f8fe12d1ef53ba69448bac7e71396ec1f05b684e9ea75",
+      "bytes": 230089
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/fern/textures/fern_02_arm_1k.jpg",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/fern/textures/fern_02_arm_1k.jpg",
+      "sha256": "ebfb5d76ce9cbdaec20bcd22dce9b755f0b1b8650ef29ca13555e3e6961025d7",
+      "bytes": 280359
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/fern/textures/fern_02_diff_1k.jpg",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/fern/textures/fern_02_diff_1k.jpg",
+      "sha256": "a828a6e7b4c01c826911e2eac4b3afc7457dab7b3b392a31c681ed88b7d50029",
+      "bytes": 315705
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/fern/textures/fern_02_nor_gl_1k.jpg",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/fern/textures/fern_02_nor_gl_1k.jpg",
+      "sha256": "45bce132c6e96a0864bc89ab5da51361ab3f4afa83a6669ae499ab5ca811f621",
+      "bytes": 367222
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/garden-moss-normal.jpg",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/garden-moss-normal.jpg",
+      "sha256": "c74daa9810de11b97702267125f061f8540bb04f915fc778e80b7d703f7e8b7a",
+      "bytes": 10653102
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/garden-moss-rough.jpg",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/garden-moss-rough.jpg",
+      "sha256": "39c1d20fab86b1798e626eddbb24273ef898e17b35c498ee919dd951d6c270f9",
+      "bytes": 3042558
+    },
+    {
+      "cache": "work/courtyard/raw/refinement/garden-moss.jpg",
+      "url": "https://raw.githubusercontent.com/aicanbuild/chinese-autumn-temple/22b13415fe938d3fd364a9e9b0e8353607df19c3/dist/assets/garden-moss.jpg",
+      "sha256": "62897c8074d8bd8a2231b7a63d903ced1e6fec5718a716a069ae05d5ae0b9022",
+      "bytes": 7417639
+    }
+  ]
+}

@@ -44,6 +44,11 @@ function setup(sources) {
   const file = (name) => "file:///arkglide/scripts/test/" + name;
   return { worker, file };
 }
+test('courtyard ES modules use the published browser-only APIs without editor diagnostics',async()=>{
+ const sources=Object.fromEntries(['main.js','tour.js'].map(name=>[name,fs.readFileSync(new URL('../examples/chinese-courtyard-scripts/'+name,import.meta.url),'utf8')]));
+ const {worker,file}=setup(sources);
+ for(const name of Object.keys(sources))assert.deepEqual(await diagnostics(worker,file(name)),[]);
+});
 async function diagnostics(worker, file) {
   return [
     ...(await worker.getSyntacticDiagnostics(file)),

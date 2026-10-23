@@ -47,6 +47,24 @@ test('batched scene creation joins groups across slices and external source disp
   adapter.nodes.get('a').sourceMesh.dispose(false,true);assert.equal(adapter.nodes.size,0);assert.equal(scene.meshes.length,0);assert.equal(adapter.instanceStats().instanceBatches,0);
  }finally{close();}
 });
+test('probe volumes only exclude intersecting batches and account for transformed parents and edits',async()=>{
+ const {adapter,close}=setup();
+ const probe={id:'pond',name:'Pond',mode:'realtime',position:{x:0,y:0,z:0},size:{x:8,y:8,z:8}};
+ try{
+  adapter.rendering.configure({probes:[probe]});
+  const outside=node('outside',{transform:{x:20,y:0,z:0}}),inside=node('inside'),parent={id:'parent',type:'empty',transform:{x:20,y:0,z:0},rotation:{x:0,y:Math.PI/2,z:0},scale:{x:1,y:1,z:1}},child=node('child',{parentId:'parent',transform:{x:0,y:0,z:20}});
+  const nearChild=node('nearChild',{parentId:'parent',transform:{x:0,y:0,z:-20}});
+  await adapter.sync([outside,inside,parent,child,nearChild],{},{materials:{rock:material()}});
+  assert.equal(adapter.nodes.get('outside').isAnInstance,true);
+  assert.equal(adapter.nodes.get('inside').isAnInstance,false);
+  // Babylon Y rotation moves this child further along X, away from the probe.
+  assert.equal(adapter.nodes.get('child').isAnInstance,true);
+  assert.equal(adapter.nodes.get('nearChild').isAnInstance,false);
+  await adapter.sync([{...outside,transform:{x:0,y:0,z:0}},inside],{},{materials:{rock:material()}});
+  assert.equal(adapter.nodes.get('outside').isAnInstance,false);
+  assert.equal(adapter.instanceStats().instanceBatches,0);
+ }finally{close();}
+});
 test('real Jolt triangle colliders built from native instances retain independent world hits',async()=>{
  await import('../public/lib/jolt-physics.js');await import('../src/engine/physics-advanced.js');await import('../src/engine/physics-runtime.js');await import('../src/engine/lifecycle-runtime.js');
  const J=await createArkGlideJolt(),{adapter,close}=setup();

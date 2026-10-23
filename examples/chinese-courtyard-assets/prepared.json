@@ -1,0 +1,296 @@
+{
+  "version": 2,
+  "pavilionSlots": [
+    {
+      "key": "mesh:1/slot:0",
+      "name": "stone"
+    },
+    {
+      "key": "mesh:2/slot:0",
+      "name": "wood-0"
+    },
+    {
+      "key": "mesh:3/slot:0",
+      "name": "wood-1"
+    },
+    {
+      "key": "mesh:4/slot:0",
+      "name": "wood-2"
+    },
+    {
+      "key": "mesh:5/slot:0",
+      "name": "wood-3"
+    },
+    {
+      "key": "mesh:6/slot:0",
+      "name": "tiles"
+    },
+    {
+      "key": "mesh:7/slot:0",
+      "name": "ceramic"
+    }
+  ],
+  "bambooCulmsPerPatch": 6,
+  "resources": [
+    {
+      "path": "models/bamboo-patch-1.glb",
+      "bytes": 975340,
+      "sha256": "2fab24949e3b234eef332979c389d0023b2358db8f45f83f051fd49f578540c2"
+    },
+    {
+      "path": "models/bamboo-patch-2.glb",
+      "bytes": 975348,
+      "sha256": "af6acb6089b5cf3c61391ab155ddd04b13ea59dd49c225f0d5851f67f5428b8c"
+    },
+    {
+      "path": "models/bamboo-patch-3.glb",
+      "bytes": 975340,
+      "sha256": "a75c898544c4547bfe6c1199b617dc2a03e06ade1e1baef9a68d68491c3ad067"
+    },
+    {
+      "path": "models/chinese-armchair.glb",
+      "bytes": 98636,
+      "sha256": "01a514643dc28ea40071d07045bcc44059dade3edfc61493fc09f10f08833b49"
+    },
+    {
+      "path": "models/chinese-screen-1.glb",
+      "bytes": 23136,
+      "sha256": "7e425ed10420f5a14c033c7e8ae96ca569e87640c9acf2839a4f2bf94cda54af"
+    },
+    {
+      "path": "models/chinese-screen-2.glb",
+      "bytes": 19772,
+      "sha256": "9fd775672eb08c421666c52e9ca58754af2c91fe2e16e0902a7c599673001197"
+    },
+    {
+      "path": "models/fern-patch-1.glb",
+      "bytes": 373652,
+      "sha256": "5158b2565700b1838bfee8bc5340d5104c15b1127fa2ee258dcfff2f39d1c85d"
+    },
+    {
+      "path": "models/fern-patch-2.glb",
+      "bytes": 318740,
+      "sha256": "ececd5f49e0d39f8d2e0f210a6c97c839f40c6309891dcf11057ac37d4a67ef7"
+    },
+    {
+      "path": "models/moon-gate.glb",
+      "bytes": 77668,
+      "sha256": "a9a4229155bc00c7776de30cbfdec1a60437c6f98a6ea19a7ff472bf8e9897e4"
+    },
+    {
+      "path": "models/moss-rock-1.glb",
+      "bytes": 261456,
+      "sha256": "a6d94c0b4487cf166e0e807be0ff486535b721d29cb392f072030a5eadd21dc0"
+    },
+    {
+      "path": "models/moss-rock-2.glb",
+      "bytes": 265080,
+      "sha256": "09ed89282a859842bdf77911b773f75a8adb6e5516c7c19ceed6d4af9e5b5bea"
+    },
+    {
+      "path": "models/moss-rock-3.glb",
+      "bytes": 118672,
+      "sha256": "509bf1b451257dac3411a6c220d065e0ab1e21f4b26d421901c6992d59209a67"
+    },
+    {
+      "path": "models/moss-rock-4.glb",
+      "bytes": 246608,
+      "sha256": "5a20910e45fa1befdd593990fa595fb7c725a77c2f6fc364c393c828ec39ecb1"
+    },
+    {
+      "path": "models/moss-rock-5.glb",
+      "bytes": 373468,
+      "sha256": "8a6cca1ca55736bbbe7a0e91bad7d33ea3a8fdef25c184f6d101880234a430bf"
+    },
+    {
+      "path": "models/moss-rock-6.glb",
+      "bytes": 206860,
+      "sha256": "5250006e4a9e23174b82d141e472246e05a4a665c1aab283cbcb93409fa9cd27"
+    },
+    {
+      "path": "models/pavilion.glb",
+      "bytes": 736552,
+      "sha256": "4c3616f6962fb5e2914774949be33875002a7b37a58c89f0eb9a232056067d59"
+    },
+    {
+      "path": "textures/bamboo-branch-albedo.webp",
+      "bytes": 14742,
+      "sha256": "1bba76fddc574caa1f843ce474c1c3df6b576343441ef0b159cf69f348998120"
+    },
+    {
+      "path": "textures/bamboo-branch-arm.webp",
+      "bytes": 21766,
+      "sha256": "c445cd73645d1c87b6552ab7dc154f560b37aa05057b29c62d82293d81601094"
+    },
+    {
+      "path": "textures/bamboo-branch-normal.webp",
+      "bytes": 79522,
+      "sha256": "e554bea11113d78c5927d076e41e0ed48463a06de4cd76ccc8625ef08542ea37"
+    },
+    {
+      "path": "textures/bamboo-leaf-albedo.webp",
+      "bytes": 92116,
+      "sha256": "29a07bc9755f205a7ac8b1564bc08771389f523a5378362ed26a74598db6d682"
+    },
+    {
+      "path": "textures/bamboo-leaf-arm.webp",
+      "bytes": 236226,
+      "sha256": "6497434c16aaf93508a72a94b0d7bccaec55ebf7d92054593ddde64b8b886550"
+    },
+    {
+      "path": "textures/bamboo-leaf-normal.webp",
+      "bytes": 577388,
+      "sha256": "f6f39e49bf90bfecaf1fc3c843b49f4e7ab9df103d4657b7eac952b15fe4bbcc"
+    },
+    {
+      "path": "textures/bamboo-stem-albedo.webp",
+      "bytes": 37124,
+      "sha256": "9d5f9455d8677076f940950c95be165ce06f1db3315e042545637390b97b9c00"
+    },
+    {
+      "path": "textures/bamboo-stem-arm.webp",
+      "bytes": 75022,
+      "sha256": "d3950d5ebb6af1b8b6f1f2f1d02dd055fa50955a5c868d9bf2403266b9d90568"
+    },
+    {
+      "path": "textures/bamboo-stem-normal.webp",
+      "bytes": 163462,
+      "sha256": "d2544ce4c2261fe2c5ab8c134ce5c6ec9f92469ba033d7d21d1ae84b6a74bfff"
+    },
+    {
+      "path": "textures/ceramic_roof_01-albedo.webp",
+      "bytes": 187004,
+      "sha256": "bb5d7a521220ee5e1969230d10f0125fda321dd6cfdd023aab2a4be8fc3a6048"
+    },
+    {
+      "path": "textures/ceramic_roof_01-arm.webp",
+      "bytes": 1059166,
+      "sha256": "d9f64c4b1f3599b585cac22d1d544fbe2ca31d0d6a8cd324d8e94e0a761119d0"
+    },
+    {
+      "path": "textures/ceramic_roof_01-normal.webp",
+      "bytes": 1662770,
+      "sha256": "7e74958852f2c80795188245a4ef1bd2efdb4c40e05946d30e00f36edb0ad5a1"
+    },
+    {
+      "path": "textures/chinese_armchair-albedo.webp",
+      "bytes": 105130,
+      "sha256": "cbd7e41a324e0ef81e9b958105cece558ce045354e58fa93e9e941d2011582ff"
+    },
+    {
+      "path": "textures/chinese_armchair-arm.webp",
+      "bytes": 876744,
+      "sha256": "b4a5a221aa64573a5e5c4683b655fd12ed5a5dd50edf0a68406a2f22b53f562f"
+    },
+    {
+      "path": "textures/chinese_armchair-normal.webp",
+      "bytes": 560666,
+      "sha256": "711c8d5e3f807fc481aa20e782e13fcd339511f3ffd34797402142ba884d02f2"
+    },
+    {
+      "path": "textures/chinese_screen_panels-albedo.webp",
+      "bytes": 173362,
+      "sha256": "4ad9f7cc9dff6b03110410be48035620da84770bb8f29b76b6a3f3e27a1b9021"
+    },
+    {
+      "path": "textures/chinese_screen_panels-arm.webp",
+      "bytes": 700306,
+      "sha256": "4d1cffb9158e9bec30741b637d0e400f9a900fe7121645a6227b609eee04e56e"
+    },
+    {
+      "path": "textures/chinese_screen_panels-normal.webp",
+      "bytes": 447084,
+      "sha256": "0836ee20ca41a3a1d30c9c7f2c3a23b2c8560deb01f066fe42732885b6c2673e"
+    },
+    {
+      "path": "textures/fern-albedo.webp",
+      "bytes": 172226,
+      "sha256": "96de07a8b632b58e53186f68e58438f979df7f47538ff8731b7ab447be6fdd9b"
+    },
+    {
+      "path": "textures/fern-arm.webp",
+      "bytes": 395358,
+      "sha256": "73679c6d10d3d032cf7865abe99325ac9d6b3349ca1472904023b16483fcc57f"
+    },
+    {
+      "path": "textures/fern-normal.webp",
+      "bytes": 613428,
+      "sha256": "e074109ab4e44ba2f2f7a3f330f1c2ab7540eae0fc9e6dc37930016981652622"
+    },
+    {
+      "path": "textures/garden-moss-albedo.webp",
+      "bytes": 555448,
+      "sha256": "2dfaf88bab644ff6735e3877f845fae18c684b38cded46d9d44247126da9c5dc"
+    },
+    {
+      "path": "textures/garden-moss-arm.webp",
+      "bytes": 734816,
+      "sha256": "eeff937b0c09ac2b4d8ea08b47c816d529efb9a97cb14346d45275c2fbf88d77"
+    },
+    {
+      "path": "textures/garden-moss-normal.webp",
+      "bytes": 2551762,
+      "sha256": "7bd164e8f711da3e1647fd66e3347b938e68202552c8eb6a2f00e7be0e0c134e"
+    },
+    {
+      "path": "textures/japanese_stone_wall-albedo.webp",
+      "bytes": 492822,
+      "sha256": "bd89d1bb4525a71acb359530566b7f0734245a2adda3512bc95d996f6ef76f17"
+    },
+    {
+      "path": "textures/japanese_stone_wall-arm.webp",
+      "bytes": 1293280,
+      "sha256": "35fb34a0ab560dee583d874a3da800b8e7e16eb2af00fdc4e49ca3fef87de4e4"
+    },
+    {
+      "path": "textures/japanese_stone_wall-normal.webp",
+      "bytes": 1797154,
+      "sha256": "fba7d01e029e7b2194810c36c777866832fadf2ba52fc6cea4c3c788378f0ccb"
+    },
+    {
+      "path": "textures/moss-rock-albedo.webp",
+      "bytes": 184922,
+      "sha256": "05c894624a2685beec43733dd08dc2ab11989734aae11c2316b8813287404bad"
+    },
+    {
+      "path": "textures/moss-rock-arm.webp",
+      "bytes": 226364,
+      "sha256": "bf5a3d2c9b41be4e455aaabc69ffbf058b1b6b4eecbbe5973cf20c172c878cfa"
+    },
+    {
+      "path": "textures/moss-rock-normal.webp",
+      "bytes": 1150400,
+      "sha256": "cf24a179e18abed3cbae6beff11f85398fa3adbe852bf66f46abc7a6e7d4d02e"
+    },
+    {
+      "path": "textures/rock_boulder_dry-normal.webp",
+      "bytes": 1437540,
+      "sha256": "2c0e850a68ed4e5d36e128fc17024f62699bf4a921bad523a156f2958f2f2621"
+    },
+    {
+      "path": "textures/venice-sunset.hdr",
+      "bytes": 1397783,
+      "sha256": "0e72ed46b5316cb5fb67fc81ff85b024a09146fd89ef3811a8d2299647ada118"
+    },
+    {
+      "path": "textures/water-normal.webp",
+      "bytes": 20520,
+      "sha256": "41062cee372c5a0c313d45f4184aaa816ba799130cd88a77bc7e7f57eee5bd2d"
+    },
+    {
+      "path": "textures/weathered_planks-albedo.webp",
+      "bytes": 181992,
+      "sha256": "8b5696d5c83957f5b333b37514cbe429b28d1feea798929aa0473bbc8d3a4ce9"
+    },
+    {
+      "path": "textures/weathered_planks-arm.webp",
+      "bytes": 999214,
+      "sha256": "4314affc2660c310e7afb8d1ec3668eaf7f9011b7f9f0c5015f0c3fbdf2993a2"
+    },
+    {
+      "path": "textures/weathered_planks-normal.webp",
+      "bytes": 1238196,
+      "sha256": "13278d708447d46d49510180a6889887c67a3296c7643d3388242be735317703"
+    }
+  ]
+}

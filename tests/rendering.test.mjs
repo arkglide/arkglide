@@ -14,6 +14,20 @@ import "../src/engine/reflection-runtime.js";
 import "../src/engine/rendering-runtime.js";
 import "../src/engine/scene-runtime.js";
 const C = globalThis.ArkGlideRenderingConfig;
+test('script reflection patches preserve sibling budgets and reject invalid patches atomically',()=>{
+ const engine=new B.NullEngine(),scene=new B.Scene(engine),manager=ArkGlideRendering.create(B,scene),owner={record:{active:true}};
+ try{
+  const api=manager.forOwner(owner);
+  api.setShadows({mapSize:512,maxLights:1});assert.equal(api.getSettings().shadows.mapSize,512);
+  assert.throws(()=>api.setShadows({mapSize:3}));assert.equal(api.getSettings().shadows.mapSize,512);
+  api.setReflections({ssr:{enabled:true,maxSteps:48},planar:{enabled:true,maxPixels:32768}});
+  api.setReflections({ssr:{enabled:false}});
+  assert.equal(api.getSettings().reflections.ssr.maxSteps,48);assert.equal(api.getSettings().reflections.planar.maxPixels,32768);
+  const before=api.getSettings();
+  for(const bad of [null,[],{unknown:{}},{ssr:null},{ssr:{maxSteps:0}},{planar:{maxPixels:NaN}}]){assert.throws(()=>api.setReflections(bad));assert.deepEqual(api.getSettings(),before);}
+  owner.record.active=false;assert.throws(()=>api.setReflections({ssr:{enabled:true}}));
+ }finally{manager.dispose();scene.dispose();engine.dispose();}
+});
 test("atmosphere settings reject invalid drafts, preserve old defaults and restore owned sky/fog", async () => {
   assert.equal(C.settings().fog.mode, "none"); assert.equal(C.settings().sky.enabled, false); assert.equal(C.settings().dof.enabled, false);
   for (const input of [{fog:{mode:"height"}},{fog:{start:50,end:40}},{sky:{sunElevation:91}},{dof:{fStop:0}},{dof:{quality:3}}]) assert.throws(()=>C.settings(input));

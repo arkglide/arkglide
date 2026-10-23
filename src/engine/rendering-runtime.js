@@ -362,6 +362,19 @@
       content = {}; buffers = new Map();elapsed=0;delete scene._arkglideRenderTime;
     }
     function patchSettings(section,patch){if(!patch||typeof patch!=='object'||Array.isArray(patch))throw Error('无效渲染配置补丁');configure({...config,[section]:{...config[section],...patch}});}
+    function patchReflections(patch) {
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch) ||
+          Object.keys(patch).some(key => !['ssr', 'planar'].includes(key)))
+        throw Error('无效反射配置补丁');
+      const next = { ...config.reflections };
+      for (const [key, value] of Object.entries(patch)) {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+          throw Error('无效反射配置补丁');
+        next[key] = { ...next[key], ...value };
+      }
+      // configure validates the complete draft before changing any live state.
+      configure({ ...config, reflections: next });
+    }
     const api = {
       configure,
       sync(nextContent = {}, nextBuffers = new Map()) {
@@ -382,7 +395,7 @@
       stats: () => ({ ...options.getOptimizationStats?.(), cascadedShadowLights: [...shadows.values()].filter(s=>s.cascaded).length, ...atmosphere?.stats(), ...volumetric?.stats(), ...mirrors?.stats(), ...liveProbes?.stats(), ...temporal?.stats(), ...transmission?.stats(), ssrEnabled: !!ssr, ssrSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, dofEnabled: !!pipeline && config.dof.enabled, shadowLights: shadows.size, environmentTextures: cubes.size, shadowFilters: [...shadows.values()].map(s => s.filter), reflectionProbes: probeTextures.size+(liveProbes?.stats().realtimeProbes||0), probeMaterialVariants: [...variants.values()].reduce((n, m) => n + m.size, 0), aoEnabled: !!ao, aoSupported: engine.webGLVersion >= 2 && !!engine.getCaps().drawBuffersExtension, bloomEnabled: !!pipeline && config.bloom.enabled, picturePipelines: pipeline ? 1 : 0, hdrOutput: !!pipeline && !!(engine.getCaps().textureHalfFloatRender || engine.getCaps().textureFloatRender), renderQuality: config.quality, renderResolutionScale: config.resolutionScale, renderDrawCalls: drawCalls, renderMainTriangles: mainTriangles, renderSceneTriangles: sceneTriangles, renderSubmitMs: cpuSubmitMs, gpuTimerSupported: !!engine.getCaps().timerQuery, gpuTimeMs: gpu && gpu.gpuFrameTimeCounter.count > gpuStartCount ? gpu.gpuFrameTimeCounter.current / 1000000 : null }),
       forOwner(owner) {
         const check = () => { if (dead || !owner.record.active || owner.record.destroying) throw Error("Rendering owner expired"); };
-        return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, setTemporal(patch){check();patchSettings('temporal',patch);},setClouds(patch){check();patchSettings('clouds',patch);},setVolumeLighting(patch){check();patchSettings('volumeLighting',patch);},setRefraction(patch){check();patchSettings('refraction',patch);},setTransparency(patch){check();patchSettings('transparency',patch);},setAntialiasing(mode){check();configure({...config,antialiasing:mode});},refreshProbes(id){check();liveProbes?.refresh(id);},resetHistory(){check();temporal?.reset();},setRealtimeProbeBudget(patch){check();patchSettings('realtimeProbes',patch);},setVolumetric(patch) { check(); if(!patch||typeof patch!=='object'||Array.isArray(patch))throw Error('无效体积大气配置');configure({...config,volumetric:{...config.volumetric,...patch}}); }, getStats() { check(); return api.stats(); } });
+        return Object.freeze({ getSettings() { check(); return api.settings(); }, setQuality(name) { check(); configure(C.preset(config, name)); }, setShadows(patch){check();patchSettings('shadows',patch);},setReflections(patch){check();patchReflections(patch);},setTemporal(patch){check();patchSettings('temporal',patch);},setClouds(patch){check();patchSettings('clouds',patch);},setVolumeLighting(patch){check();patchSettings('volumeLighting',patch);},setRefraction(patch){check();patchSettings('refraction',patch);},setTransparency(patch){check();patchSettings('transparency',patch);},setAntialiasing(mode){check();configure({...config,antialiasing:mode});},refreshProbes(id){check();liveProbes?.refresh(id);},resetHistory(){check();temporal?.reset();},setRealtimeProbeBudget(patch){check();patchSettings('realtimeProbes',patch);},setVolumetric(patch) { check(); if(!patch||typeof patch!=='object'||Array.isArray(patch))throw Error('无效体积大气配置');configure({...config,volumetric:{...config.volumetric,...patch}}); }, getStats() { check(); return api.stats(); } });
       },
       clear,
       dispose() { if (dead) return; clear(); dead = true; instrumentation.dispose(); for (const remove of observers) remove(); if (scene._arkglideRendering === api) delete scene._arkglideRendering; },
